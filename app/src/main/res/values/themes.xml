@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.FivePlus" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">#0E7A55</item>
+        <item name="colorPrimaryDark">#0B5E42</item>
+        <item name="colorAccent">#0E7A55</item>
+        <item name="android:statusBarColor">#0E7A55</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

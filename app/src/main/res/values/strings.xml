@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">5PLUS</string>
+    <string name="call_permission_title">Allow phone calls</string>
+    <string name="call_permission_text">5PLUS dials the payment code (USSD) for you, so you don\'t have to press call. Allow phone calls on the next screen.</string>
+    <string name="call_permission_ok">Continue</string>
+    <string name="offline">No internet connection. Check your connection and try again.</string>
+    <string name="retry">Try again</string>
+</resources>

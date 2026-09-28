@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HTTPS only. For testing on a local computer over http://, add a <domain-config cleartextTrafficPermitted="true">
+     with that computer's address, and remove it again before giving the app to customers. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
