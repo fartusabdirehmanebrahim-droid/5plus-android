@@ -710,7 +710,7 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
             <div class="mini"><label for="ns-art">Picture</label><select class="input" id="ns-art"></select></div>
             <div class="mini"><label for="ns-photo">Your photo (optional)</label><input class="input" id="ns-photo" type="file" accept="image/jpeg,image/png,image/webp"></div>
           </div>
-          <div class="row-actions"><button class="btn btn-ghost" id="ns-add">Add to the list</button><span class="status-msg" id="st-ns"></span></div>
+          <div class="row-actions"><button class="btn btn-ghost" id="ns-add">Add service</button><span class="status-msg" id="st-ns"></span></div>
         </div>
       </div>
       <div data-spane="wallets" class="sup-col" id="sup-wallets"></div>
@@ -6295,22 +6295,34 @@ $("#ns-add").onclick = async () => {
   const file = $("#ns-photo").files[0];
   let _photoData;
   if (file) { try { _photoData = await compressImage(file, 2_000_000); } catch { return msg("#st-ns", "That photo could not be used. Choose a JPG, PNG or WebP photo.", "bad"); } }
+  const btn = $("#ns-add"); btn.disabled = true; msg("#st-ns", "Adding…");
   svcDraft.push({ id: "", name, sub, art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
-  $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = "";
-  msg("#st-ns", `${name} added to the list. Press Save services to publish it.`, "ok"); renderSuper();
+  try {
+    const failed = await saveServices();
+    $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = "";
+    msg("#st-ns", failed ? `${name} is on the services page now, but its photo could not be uploaded. Use Change photo in the list.` : `${name} is on the services page now, marked “Coming soon”.`, failed ? "bad" : "ok");
+  } catch (e) {
+    svcDraft = svcDraft.filter(x => !(x.id === "" && x.name === name)); renderSuper();
+    msg("#st-ns", e.message, "bad");
+  } finally { btn.disabled = false; }
 };
+// Saves the whole list (and uploads photos chosen before saving). Returns how many photos failed.
+async function saveServices() {
+  const pending = svcDraft.map((x, i) => x._photoData ? { i, data: x._photoData } : null).filter(Boolean);
+  const r = await api("/api/super/services", { method: "PUT", body: { services: svcDraft.map(({ _confirm, _photoData, ...x }) => x) } });
+  allServices = r.services;
+  // The server keeps the order of the list, so position i is the same service.
+  let failed = 0;
+  for (const p of pending) {
+    const sv = r.services[p.i]; if (!sv) continue;
+    try { await api(`/api/super/services/${encodeURIComponent(sv.id)}/photo`, { body: { image: p.data } }); } catch { failed++; }
+  }
+  await loadSuper();
+  return failed;
+}
 $("#save-svcs").onclick = async () => {
   try {
-    const pending = svcDraft.map((x, i) => x._photoData ? { i, data: x._photoData } : null).filter(Boolean);
-    const r = await api("/api/super/services", { method: "PUT", body: { services: svcDraft.map(({ _confirm, _photoData, ...x }) => x) } });
-    allServices = r.services;
-    // The server keeps the order of the list, so position i is the same service. Upload photos chosen before saving.
-    let failed = 0;
-    for (const p of pending) {
-      const sv = r.services[p.i]; if (!sv) continue;
-      try { await api(`/api/super/services/${encodeURIComponent(sv.id)}/photo`, { body: { image: p.data } }); } catch { failed++; }
-    }
-    await loadSuper();
+    const failed = await saveServices();
     msg("#st-svcs", failed ? "Saved, but a photo could not be uploaded. Try Change photo again." : "Saved. Customers see the new home page now.", failed ? "bad" : "ok");
   } catch (e) { msg("#st-svcs", e.message, "bad"); }
 };
