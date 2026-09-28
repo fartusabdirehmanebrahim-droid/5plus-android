@@ -708,6 +708,7 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
             <div class="mini"><label for="ns-name">Name</label><input class="input" id="ns-name" maxlength="30" placeholder="Caafimaad"></div>
             <div class="mini"><label for="ns-sub">Short description</label><input class="input" id="ns-sub" maxlength="60" placeholder="Book a doctor"></div>
             <div class="mini"><label for="ns-art">Picture</label><select class="input" id="ns-art"></select></div>
+            <div class="mini"><label for="ns-photo">Your photo (optional)</label><input class="input" id="ns-photo" type="file" accept="image/jpeg,image/png,image/webp"></div>
           </div>
           <div class="row-actions"><button class="btn btn-ghost" id="ns-add">Add to the list</button><span class="status-msg" id="st-ns"></span></div>
         </div>
@@ -6233,7 +6234,7 @@ function renderSuper() {
   // services editor
   $("#ns-art").innerHTML = ARTS().map(k => `<option value="${k}">${esc(window.SarrifArt.LABELS[k])}</option>`).join("");
   $("#svc-edit").innerHTML = svcDraft.map((sv, i) => `<div class="svc-edit ${sv.visible ? "" : "off"}">
-    <div class="thumb">${ART(sv.art, sv.photo)}</div>
+    <div class="thumb">${sv._photoData ? `<img class="art-photo" src="${sv._photoData}" alt="">` : ART(sv.art, sv.photo)}</div>
     <div class="fields">
       <input class="input" data-f="name" data-i="${i}" value="${esc(sv.name)}" maxlength="30" aria-label="Name">
       <input class="input" data-f="sub" data-i="${i}" value="${esc(sv.sub)}" maxlength="60" aria-label="Description">
@@ -6243,7 +6244,8 @@ function renderSuper() {
       <button class="icon-btn" data-mv="${i}:-1" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
       <button class="icon-btn" data-mv="${i}:1" ${i === svcDraft.length - 1 ? "disabled" : ""} aria-label="Move down">↓</button>
       <label class="chk"><input type="checkbox" data-vis="${i}" ${sv.visible ? "checked" : ""}>Visible</label>
-      ${sv.id ? `<label class="btn btn-ghost svc-photo-btn">${sv.photo ? "Change photo" : "Use my photo"}<input type="file" accept="image/jpeg,image/png,image/webp" data-svcphoto="${esc(sv.id)}" hidden></label>${sv.photo ? `<button class="btn btn-ghost svc-photo-btn" data-svcnophoto="${esc(sv.id)}">Remove photo</button>` : ""}` : ""}
+      ${sv.id ? `<label class="btn btn-ghost svc-photo-btn">${sv.photo ? "Change photo" : "Use my photo"}<input type="file" accept="image/jpeg,image/png,image/webp" data-svcphoto="${esc(sv.id)}" hidden></label>${sv.photo ? `<button class="btn btn-ghost svc-photo-btn" data-svcnophoto="${esc(sv.id)}">Remove photo</button>` : ""}`
+        : `<label class="btn btn-ghost svc-photo-btn">${sv._photoData ? "Change photo" : "Use my photo"}<input type="file" accept="image/jpeg,image/png,image/webp" data-svcnewphoto="${i}" hidden></label>${sv._photoData ? `<button class="btn btn-ghost svc-photo-btn" data-svcnewnophoto="${i}">Remove photo</button>` : ""}`}
       ${sv.builtIn ? "" : (sv._confirm ? `<button class="btn btn-danger" data-rmyes="${i}" style="min-height:34px;padding:5px 10px">Delete</button><button class="btn btn-ghost" data-rmno="${i}" style="min-height:34px;padding:5px 10px">Keep</button>` : `<button class="icon-btn" data-rm="${i}" aria-label="Delete service">✕</button>`)}
     </div></div>`).join("");
   document.querySelectorAll("#svc-edit [data-f]").forEach(el => el.oninput = el.onchange = () => { svcDraft[+el.dataset.i][el.dataset.f] = el.value; if (el.dataset.f === "art") renderSuper(); });
@@ -6257,6 +6259,13 @@ function renderSuper() {
       await svcPhotoDone(await api(`/api/super/services/${encodeURIComponent(el.dataset.svcphoto)}/photo`, { body: { image } }), "Photo saved. Customers see it on the home page now.");
     } catch (e) { msg("#st-svcs", e.message || "That photo could not be used.", "bad"); }
   });
+  // A service that isn't saved yet keeps its photo in the list; it is uploaded when you press Save services.
+  document.querySelectorAll("#svc-edit [data-svcnewphoto]").forEach(el => el.onchange = async () => {
+    const f = el.files[0]; if (!f) return;
+    try { svcDraft[+el.dataset.svcnewphoto]._photoData = await compressImage(f, 2_000_000); renderSuper(); msg("#st-svcs", "Photo chosen. Press Save services to publish it.", "ok"); }
+    catch { msg("#st-svcs", "That photo could not be used. Choose a JPG, PNG or WebP photo.", "bad"); }
+  });
+  document.querySelectorAll("#svc-edit [data-svcnewnophoto]").forEach(el => el.onclick = () => { delete svcDraft[+el.dataset.svcnewnophoto]._photoData; renderSuper(); });
   document.querySelectorAll("#svc-edit [data-svcnophoto]").forEach(el => el.onclick = async () => {
     try { await svcPhotoDone(await api(`/api/super/services/${encodeURIComponent(el.dataset.svcnophoto)}/photo`, { method: "DELETE" }), "Photo removed. The standard picture is back."); }
     catch (e) { msg("#st-svcs", e.message, "bad"); }
@@ -6279,18 +6288,30 @@ async function svcPhotoDone(r, note) {
 async function loadSupAdmins() { try { supAdmins = (await api("/api/admin/users?role=admin")).users; } catch { supAdmins = []; } }
 async function loadSupAdminsAndPaint() { await loadSupAdmins(); renderSuper(); }
 function openDashboard(id) { S.viewAs = id; admTab = "requests"; if (id === "ibedel") { loadRequests(); loadAdminSettings(); } render(); }
-$("#ns-add").onclick = () => {
+$("#ns-add").onclick = async () => {
   const name = $("#ns-name").value.trim(), sub = $("#ns-sub").value.trim();
   if (name.length < 2) return msg("#st-ns", "Enter a name for the service.", "bad");
   if (svcDraft.some(x => x.name.toLowerCase() === name.toLowerCase())) return msg("#st-ns", "A service with this name already exists.", "bad");
-  svcDraft.push({ id: "", name, sub, art: $("#ns-art").value, visible: true, ready: false, builtIn: false });
-  $("#ns-name").value = ""; $("#ns-sub").value = "";
+  const file = $("#ns-photo").files[0];
+  let _photoData;
+  if (file) { try { _photoData = await compressImage(file, 2_000_000); } catch { return msg("#st-ns", "That photo could not be used. Choose a JPG, PNG or WebP photo.", "bad"); } }
+  svcDraft.push({ id: "", name, sub, art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
+  $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = "";
   msg("#st-ns", `${name} added to the list. Press Save services to publish it.`, "ok"); renderSuper();
 };
 $("#save-svcs").onclick = async () => {
   try {
-    const r = await api("/api/super/services", { method: "PUT", body: { services: svcDraft.map(({ _confirm, ...x }) => x) } });
-    allServices = r.services; msg("#st-svcs", "Saved. Customers see the new home page now.", "ok"); await loadSuper();
+    const pending = svcDraft.map((x, i) => x._photoData ? { i, data: x._photoData } : null).filter(Boolean);
+    const r = await api("/api/super/services", { method: "PUT", body: { services: svcDraft.map(({ _confirm, _photoData, ...x }) => x) } });
+    allServices = r.services;
+    // The server keeps the order of the list, so position i is the same service. Upload photos chosen before saving.
+    let failed = 0;
+    for (const p of pending) {
+      const sv = r.services[p.i]; if (!sv) continue;
+      try { await api(`/api/super/services/${encodeURIComponent(sv.id)}/photo`, { body: { image: p.data } }); } catch { failed++; }
+    }
+    await loadSuper();
+    msg("#st-svcs", failed ? "Saved, but a photo could not be uploaded. Try Change photo again." : "Saved. Customers see the new home page now.", failed ? "bad" : "ok");
   } catch (e) { msg("#st-svcs", e.message, "bad"); }
 };
 $("#sa-add").onclick = async () => {
