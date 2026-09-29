@@ -11,7 +11,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
+import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -223,6 +225,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         w.webChromeClient = object : WebChromeClient() {
+            // Full screen for videos (the YouTube full-screen button).
+            private var fullView: View? = null
+            private var fullCallback: WebChromeClient.CustomViewCallback? = null
+            override fun onShowCustomView(view: View, callback: WebChromeClient.CustomViewCallback) {
+                if (fullView != null) { callback.onCustomViewHidden(); return }
+                fullView = view; fullCallback = callback
+                (window.decorView as FrameLayout).addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            }
+            override fun onHideCustomView() {
+                fullView?.let { (window.decorView as FrameLayout).removeView(it) }
+                fullView = null
+                fullCallback?.onCustomViewHidden(); fullCallback = null
+            }
+
             // Picture uploads: Premier Wallet payment screenshots, product and visa pictures.
             override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
                 fileCallback?.onReceiveValue(null)

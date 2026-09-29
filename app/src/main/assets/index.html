@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790703599">
+<meta name="sarrif-build" content="1790703799">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -4211,9 +4211,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
   }, true);
 
   /* ---------- things the demo page is not allowed to do ---------- */
-  // Videos from other sites can't be shown inside the demo page: the app links to them instead.
-  // Inside the 5PLUS Android app they can: it is a normal web view.
-  G.SARRIF_NO_EMBED = !G.SarrifAndroid;
+  // Videos from other sites are tried inside the page; if the page blocks them, the app switches to links by itself.
   // The demo page may not open the phone dialer inside itself (that shows "This content is blocked").
   // Stop that quietly; on a phone, try to open the dialer in a new window instead.
   document.addEventListener("click", e => {
@@ -4616,7 +4614,9 @@ const SUUQ = (() => {
       yt = true;
       // Videos play with sound. Browsers only start a video by itself when it is muted, so there the sound comes on
       // at the customer's first tap; inside the 5PLUS Android app it plays with sound straight away.
-      src = `https://www.youtube-nocookie.com/embed/${m[1]}?enablejsapi=1&playsinline=1&rel=0` + (auto ? `&autoplay=1&mute=${canSound() ? 0 : 1}&loop=1&playlist=${m[1]}` : "");
+      // YouTube needs to know which site shows the video (origin), or it can refuse to play inside apps.
+      const origin = /^https?:/.test(location.origin) ? `&origin=${encodeURIComponent(location.origin)}&widget_referrer=${encodeURIComponent(location.origin)}` : "";
+      src = `https://www.youtube-nocookie.com/embed/${m[1]}?enablejsapi=1&playsinline=1&rel=0&modestbranding=1${origin}` + (auto ? `&autoplay=1&mute=${canSound() ? 0 : 1}&loop=1&playlist=${m[1]}` : "");
     }
     else if ((m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/))) src = `https://player.vimeo.com/video/${m[1]}`;
     else if ((m = url.match(/tiktok\.com\/.*\/video\/(\d+)/))) src = `https://www.tiktok.com/embed/v2/${m[1]}`;
@@ -4629,12 +4629,19 @@ const SUUQ = (() => {
     // Where videos can't play inside the page (the demo page), the picture opens the video on YouTube.
     if (window.SARRIF_NO_EMBED) return yt && auto ? `<a class="vid" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Watch ${esc(title)} on YouTube">${thumb}</a>` : watch;
     // An autoplaying YouTube video loads only when it first scrolls into view, so it starts right then.
-    if (src && yt && auto) return `<div class="vid" data-auto="yt">${thumb}<iframe data-src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>${soundBtn()}</div>`;
-    if (src) return `<div class="vid"${yt ? ` data-auto-yt` : ""}><iframe src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>`;
+    if (src && yt && auto) return `<div class="vid" data-auto="yt">${thumb}<iframe data-src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>${soundBtn()}</div>`;
+    if (src) return `<div class="vid"${yt ? ` data-auto-yt` : ""}><iframe src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div>`;
     if (/\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(url)) return `<div class="vid"${auto ? ` data-auto="file"` : ""}><video src="${esc(url)}" controls playsinline preload="metadata"${auto ? " muted loop" : ""}></video></div>`;
     return watch;
   }
   // Plays autoplay videos while at least half of them is on screen, and pauses them otherwise.
+  // If the page is not allowed to show videos from other sites, switch to links (they open the video on YouTube).
+  document.addEventListener("securitypolicyviolation", e => {
+    if (window.SARRIF_NO_EMBED || !/frame|child|default/.test(e.effectiveDirective || e.violatedDirective || "")) return;
+    if (!/youtube|vimeo|tiktok|facebook|instagram|dailymotion/.test(e.blockedURI || "")) return;
+    window.SARRIF_NO_EMBED = true;
+    if (typeof render === "function") render();
+  });
   let vidObs = null;
   // Sound: on, unless the customer turned it off with the 🔊 button (remembered). In a browser it can only come on
   // after the customer has tapped the page once.
