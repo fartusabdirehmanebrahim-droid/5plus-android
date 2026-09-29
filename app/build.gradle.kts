@@ -17,6 +17,9 @@ android {
         // Optional: put the address of your 5PLUS website here (the real app on your server) so the app always opens it.
         // Left as it is, the app asks on first launch: your website, or the demo built into the app.
         buildConfigField("String", "APP_URL", "\"https://your-5plus-website.com\"")
+        // The demo inside the app checks this address for a newer version every time it opens,
+        // so changes show up without installing a new APK. (The GitHub repository must be public.)
+        buildConfigField("String", "DEMO_UPDATE_URL", "\"https://raw.githubusercontent.com/fartusabdirehmanebrahim-droid/5plus-android/main/app/src/main/assets/index.html\"")
     }
 
     buildFeatures { buildConfig = true }

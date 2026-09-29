@@ -34,6 +34,10 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewAssetLoader
+import java.io.File
+import java.io.FileInputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * 5PLUS for Android: shows the 5PLUS web app and places USSD calls itself.
@@ -59,6 +63,45 @@ class MainActivity : AppCompatActivity() {
     private val demoUrl = "https://$assetHost/assets/index.html"
     private val assetLoader by lazy {
         WebViewAssetLoader.Builder().addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this)).build()
+    }
+
+    /* ---------- demo updates without reinstalling ---------- */
+    // The newest demo downloaded from DEMO_UPDATE_URL. Whichever is newer (this file or the one inside the APK) is shown.
+    private val demoFile by lazy { File(filesDir, "demo/index.html") }
+    private val bundledStamp by lazy { try { assets.open("index.html").use { stampOf(readHead(it)) } } catch (e: Exception) { 0L } }
+    private var lastCheck = 0L
+    private fun readHead(input: java.io.InputStream): String { val b = ByteArray(4096); val n = input.read(b); return if (n > 0) String(b, 0, n) else "" }
+    private fun stampOf(head: String): Long = Regex("name=\"sarrif-build\" content=\"(\\d+)\"").find(head)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+    private fun fileStamp(): Long = try { if (demoFile.exists()) FileInputStream(demoFile).use { stampOf(readHead(it)) } else 0L } catch (e: Exception) { 0L }
+
+    private fun checkDemoUpdate() {
+        if (startUrl != demoUrl) return
+        lastCheck = System.currentTimeMillis()
+        Thread {
+            try {
+                val c = URL(BuildConfig.DEMO_UPDATE_URL).openConnection() as HttpURLConnection
+                c.connectTimeout = 10000; c.readTimeout = 30000; c.useCaches = false
+                c.setRequestProperty("Cache-Control", "no-cache")
+                if (c.responseCode != 200) return@Thread
+                val bytes = c.inputStream.use { it.readBytes() }
+                val head = String(bytes, 0, minOf(bytes.size, 4096))
+                val stamp = stampOf(head)
+                if (!head.contains("<html", ignoreCase = true) || stamp <= maxOf(bundledStamp, fileStamp())) return@Thread
+                demoFile.parentFile?.mkdirs()
+                val tmp = File(demoFile.parentFile, "index.tmp")
+                tmp.writeBytes(bytes)
+                if (!tmp.renameTo(demoFile)) { demoFile.delete(); tmp.renameTo(demoFile) }
+                runOnUiThread {
+                    Toast.makeText(this, "5PLUS updated", Toast.LENGTH_SHORT).show()
+                    web?.reload()
+                }
+            } catch (e: Exception) { /* offline: keep the version we have */ }
+        }.start()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (web != null && System.currentTimeMillis() - lastCheck > 60_000) checkDemoUpdate()
     }
 
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -161,7 +204,10 @@ class MainActivity : AppCompatActivity() {
         w.addJavascriptInterface(Bridge(), "SarrifAndroid")
         w.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-                if (request.url.host == assetHost) assetLoader.shouldInterceptRequest(request.url) else null
+                if (request.url.host != assetHost) null
+                else if (request.url.path == "/assets/index.html" && fileStamp() > bundledStamp)
+                    WebResourceResponse("text/html", "utf-8", FileInputStream(demoFile))
+                else assetLoader.shouldInterceptRequest(request.url)
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val u = request.url
@@ -192,6 +238,7 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(w)
         w.loadUrl(url)
+        checkDemoUpdate()
     }
 
     private fun isOwnSite(u: Uri): Boolean {
