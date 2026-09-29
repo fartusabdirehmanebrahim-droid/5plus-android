@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790703799">
+<meta name="sarrif-build" content="1790704151">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -725,6 +725,15 @@ body.no-top .screen{min-height:100dvh}
 .yt-channel .yt-avatar.big img{object-fit:contain}
 .vid-sound{position:absolute;right:10px;top:10px;z-index:3;width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.62);color:#fff;display:grid;place-items:center;cursor:pointer}
 .vid-sound:focus-visible{outline:3px solid #fff;outline-offset:2px}
+/* visas by country */
+.country-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.country-chips::-webkit-scrollbar{display:none}
+.country-chips button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13.5px;font-weight:600;white-space:nowrap}
+.country-chips button span{color:var(--ink-3);font-weight:500;margin-left:2px}
+.country-chips button[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.country-chips button[aria-pressed="true"] span{color:#e6f4ee}
+.visa-country{display:block;font-size:12.5px;font-weight:600;color:var(--green);margin-bottom:2px}
+.visa-country.big{font-size:14px;margin-bottom:4px}
 
 </style>
 </head>
@@ -2528,6 +2537,7 @@ async function init() {
   // Product approval: new and edited products wait for the Suuq (or Visa) admin. Products that existed before stay approved.
   await addColumn("products", "approval", "TEXT NOT NULL DEFAULT 'approved'");
   await addColumn("products", "review_note", "TEXT NOT NULL DEFAULT ''");
+  await addColumn("products", "country", "TEXT NOT NULL DEFAULT ''"); // the country a visa is for
   // Every shop has a shop number people can search for: 1001, 1002 … (more digits once 9999 is used).
   await addColumn("shops", "shop_no", "INTEGER");
   await db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_no ON shops(shop_no)");
@@ -2995,7 +3005,7 @@ module.exports = function market(ctx) {
     return { id: p.id, name: p.name, description: p.description, price: p.price, cur: p.cur, mode: p.mode,
       images: JSON.parse(p.images || "[]").map(f => "/media/" + f), video: p.video, comm_type: p.comm_type, comm_value: p.comm_value,
       earn: COMMISSION(p, 1), shop_id: p.shop_id, shop_no: p.shop_no ?? null, shop_name: p.shop_name, seller_id: p.owner_id, hidden: !!p.hidden,
-      admin_hidden: !!p.admin_hidden, created_at: p.created_at, approval: p.approval || "approved", review_note: p.review_note || "", service: p.service || "suuq", price_hidden: !!p.price_hidden, price_label: p.price_label || "", ...extra };
+      admin_hidden: !!p.admin_hidden, created_at: p.created_at, approval: p.approval || "approved", review_note: p.review_note || "", service: p.service || "suuq", country: p.country || "", price_hidden: !!p.price_hidden, price_label: p.price_label || "", ...extra };
   }
   // What a shopper sees: a hidden price is replaced by the seller's word, but the affiliate earning is always shown
   // (as a percentage, or the flat amount the seller set).
@@ -3012,10 +3022,13 @@ module.exports = function market(ctx) {
   route("GET", "/api/suuq/products", async (req, res, url) => {
     const u = await needUser(req), m = MARKETS.includes(url.searchParams.get("service")) ? url.searchParams.get("service") : "suuq";
     if (!await marketOpen(m)) fail(`${m === "visa" ? "Visa" : "Suuq"} is not available right now.`);
-    const q = String(url.searchParams.get("q") || "").trim().toLowerCase();
+    const q = String(url.searchParams.get("q") || "").trim().toLowerCase(), country = String(url.searchParams.get("country") || "");
     let rows = await db.all(`${PROD_SELECT} WHERE ${LIVE} AND p.service = ? ORDER BY p.created_at DESC LIMIT 500`, now(), m);
-    if (q) rows = rows.filter(p => p.name.toLowerCase().includes(q) || p.shop_name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-    send(res, 200, { products: rows.map(p => shopperRow(p, u)) });
+    // Visas: the countries that have visas right now (with how many), for the country buttons.
+    const countries = m === "visa" ? Object.entries(rows.reduce((a, p) => (p.country && (a[p.country] = (a[p.country] || 0) + 1), a), {})).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name, n]) => ({ name, n })) : undefined;
+    if (country) rows = rows.filter(p => p.country === country);
+    if (q) rows = rows.filter(p => p.name.toLowerCase().includes(q) || p.shop_name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || (p.country || "").toLowerCase().includes(q));
+    send(res, 200, { products: rows.map(p => shopperRow(p, u)), countries });
   });
   /* ---------- search (services page) and shop pages ---------- */
   // What a shopper may see about a shop.
@@ -3044,7 +3057,7 @@ module.exports = function market(ctx) {
     for (const m of MARKETS) if (await marketOpen(m)) open.push(m);
     const shopIds = new Set(shopRows.map(r => r.id));
     const prodRows = (await db.all(`${PROD_SELECT} WHERE ${LIVE} ORDER BY p.created_at DESC LIMIT 1000`, now())).filter(p => open.includes(p.service || "suuq") &&
-      ((digits && String(p.shop_no) === digits) || has(p.name) || has(p.description) || has(p.shop_name) || shopIds.has(p.shop_id)));
+      ((digits && String(p.shop_no) === digits) || has(p.name) || has(p.description) || has(p.shop_name) || has(p.country || "") || shopIds.has(p.shop_id)));
     send(res, 200, { services, shops: shopRows.slice(0, 20).map(shopCard), products: prodRows.slice(0, 40).map(p => shopperRow(p, u)) });
   });
   // A shop page: the shop's details and its live products (Suuq and Visa).
@@ -3110,7 +3123,10 @@ module.exports = function market(ctx) {
     const price_hidden = b.price_hidden === undefined ? !!existing?.price_hidden : !!b.price_hidden;
     const price_label = price_hidden ? String(b.price_label ?? existing?.price_label ?? "") : "";
     if (price_hidden && !(await getSettings()).priceWords.includes(price_label)) fail("Choose the words to show instead of the price.");
-    return { service, price_hidden: price_hidden ? 1 : 0, price_label, name, description: String(b.description ?? existing?.description ?? "").trim().slice(0, 600), price: round(cur, price), cur, mode, comm_type, comm_value: comm_type === "flat" ? round(cur, comm_value) : Math.round(comm_value * 100) / 100, video: video.slice(0, 500) };
+    // A visa is for one country; customers browse visas by country.
+    const country = service === "visa" ? String(b.country ?? existing?.country ?? "").trim() : "";
+    if (service === "visa" && !COUNTRIES.includes(country)) fail("Choose the country this visa is for.");
+    return { service, country, price_hidden: price_hidden ? 1 : 0, price_label, name, description: String(b.description ?? existing?.description ?? "").trim().slice(0, 600), price: round(cur, price), cur, mode, comm_type, comm_value: comm_type === "flat" ? round(cur, comm_value) : Math.round(comm_value * 100) / 100, video: video.slice(0, 500) };
   }
   async function sellerShop(u) {
     const s = await shopOf(u.id);
@@ -3130,8 +3146,8 @@ module.exports = function market(ctx) {
     const files = await saveImages(imgs, "prod");
     const id = crypto.randomUUID();
     // Every new product waits for the admin's approval before customers can see it.
-    await db.run(`INSERT INTO products (id, shop_id, name, description, price, cur, mode, images, video, comm_type, comm_value, service, price_hidden, price_label, approval, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`, id, s.id, d.name, d.description, d.price, d.cur, d.mode, JSON.stringify(files), d.video, d.comm_type, d.comm_value, d.service, d.price_hidden, d.price_label, now(), now());
+    await db.run(`INSERT INTO products (id, shop_id, name, description, price, cur, mode, images, video, comm_type, comm_value, service, price_hidden, price_label, country, approval, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`, id, s.id, d.name, d.description, d.price, d.cur, d.mode, JSON.stringify(files), d.video, d.comm_type, d.comm_value, d.service, d.price_hidden, d.price_label, d.country, now(), now());
     await announceReview(id);
     send(res, 200, { id, approval: "pending" });
   });
@@ -3150,7 +3166,7 @@ module.exports = function market(ctx) {
     const add = await saveImages(addUrls, "prod");
     const images = [...keep, ...add];
     if (!images.length) fail("Add at least one photo of the product.");
-    await db.run(`UPDATE products SET name = ?, description = ?, price = ?, cur = ?, mode = ?, images = ?, video = ?, comm_type = ?, comm_value = ?, service = ?, price_hidden = ?, price_label = ?, approval = 'pending', review_note = '', updated_at = ? WHERE id = ?`, d.name, d.description, d.price, d.cur, d.mode, JSON.stringify(images), d.video, d.comm_type, d.comm_value, d.service, d.price_hidden, d.price_label, now(), id);
+    await db.run(`UPDATE products SET name = ?, description = ?, price = ?, cur = ?, mode = ?, images = ?, video = ?, comm_type = ?, comm_value = ?, service = ?, price_hidden = ?, price_label = ?, country = ?, approval = 'pending', review_note = '', updated_at = ? WHERE id = ?`, d.name, d.description, d.price, d.cur, d.mode, JSON.stringify(images), d.video, d.comm_type, d.comm_value, d.service, d.price_hidden, d.price_label, d.country, now(), id);
     for (const f of old) if (!images.includes(f)) await db.files.del(f);
     // A changed product goes back to the admin for approval (so an approved product can't be swapped for something else).
     await announceReview(id);
@@ -3732,6 +3748,21 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     const t = await sup("POST", "/api/auth/login", { phone: A.super.phone, pin: A.super.pin });
     await sup("POST", "/api/auth/admin-password", { ticket: t.ticket, password: A.super.password });
     await m("POST", "/api/auth/login", { phone: A.merchant.phone, pin: A.merchant.pin });
+    if (from < 9) {
+      try {
+        const vv = call();
+        await vv("POST", "/api/auth/login", { phone: A.visaSeller.phone, pin: A.visaSeller.pin });
+        const mine = (await vv("GET", "/api/suuq/seller/products")).products;
+        const COUNTRY = { "Turkey e-visa": "Türkiye", "Dubai visit visa": "United Arab Emirates" };
+        for (const p of mine) {
+          const c = Object.entries(COUNTRY).find(([k]) => p.name.startsWith(k)); if (!c || p.country) continue;
+          await vv("PUT", `/api/suuq/products/${p.id}`, { service: "visa", country: c[1], name: p.name, description: p.description, price: p.price, cur: p.cur, mode: p.mode, comm_type: p.comm_type, comm_value: p.comm_value,
+            video: p.video, price_hidden: p.price_hidden, price_label: p.price_label, keepImages: [], newImages: realVisaPhotos() });
+          await sup("POST", `/api/suuq/admin/products/${p.id}/review`, { decision: "approve" });
+        }
+        if (!mine.some(p => p.name.startsWith("Kenya eTA"))) await addMoreVisas(vv, r => sup("POST", `/api/suuq/admin/products/${r.id}/review`, { decision: "approve" }));
+      } catch (e) { console.warn("Visa countries not added:", e.message); }
+    }
     if (from < 8) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
     if (from >= 3) return;
     // The sample visas were left waiting for approval in older demos: approve them.
@@ -3752,6 +3783,18 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
       if (!/speaker/i.test(n.name || p.name)) await sup("POST", `/api/suuq/admin/products/${p.id}/review`, { decision: "approve" });
     }
   };
+
+  const realVisaPhotos = () => { const S = globalThis.__DEMO_STATIC || {}; return [S["/photos/services/visa.jpg"], S["/photos/services/travel.jpg"]].filter(Boolean); };
+  // More sample visas, so customers can browse by country. The photos are real (public/photos/services).
+  async function addMoreVisas(v, approve) {
+    const S = globalThis.__DEMO_STATIC || {}, pass = S["/photos/services/visa.jpg"], trip = S["/photos/services/travel.jpg"];
+    const imgs = [pass, trip].filter(Boolean);
+    if (!imgs.length) return;
+    await approve(await v("POST", "/api/suuq/products", { service: "visa", country: "Kenya", name: "Kenya eTA, 90 days", price: 45, cur: "USD", mode: "buy", comm_type: "flat", comm_value: 4,
+      video: "", description: "Electronic travel authorisation for Kenya. Ready in 3 to 5 working days.", newImages: imgs }));
+    await approve(await v("POST", "/api/suuq/products", { service: "visa", country: "Saudi Arabia", name: "Umrah visa", price: 250, cur: "USD", mode: "buy", comm_type: "percent", comm_value: 4,
+      price_hidden: true, price_label: "Contact for price", video: "", description: "Umrah visa with hotel booking help. The price depends on the season, so ask us first.", newImages: [trip, pass].filter(Boolean) }));
+  }
 
   globalThis.__demoSeed = async ({ call }) => {
     const A = ACCOUNTS;
@@ -3792,10 +3835,11 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     await v("POST", "/api/auth/signup-merchant", { pin: A.visaSeller.pin, profile: {
       full_name: "Sahra Abdi Yusuf", birth_date: "1988-09-02", country: "Somaliland", city: "Hargeisa", kind: "company",
       business_name: "Sahan Travel Agency", address: "Jigjiga Yar, Hargeisa", phone: A.visaSeller.phone, zaad_merchant: "502222", edahab_merchant: "", shop_phone: "" } });
-    await approve(await v("POST", "/api/suuq/products", { service: "visa", name: "Turkey e-visa, 30 days", price: 60, cur: "USD", mode: "buy", comm_type: "flat", comm_value: 5,
-      video: "", description: "Single entry tourist e-visa. Ready in 3 working days. Send your passport photo page in the chat.", newImages: [picture("visa", "#ffe0e0", "#f59a9a")] }));
-    await approve(await v("POST", "/api/suuq/products", { service: "visa", name: "Dubai visit visa, 60 days", price: 180, cur: "USD", mode: "buy", comm_type: "percent", comm_value: 5,
-      price_hidden: true, price_label: "Contact for price", video: "", description: "Tourist visa for the UAE. The price depends on your nationality and travel dates, so ask us first.", newImages: [picture("visa", "#dff1ff", "#8cc4f2")] }));
+    await approve(await v("POST", "/api/suuq/products", { service: "visa", country: "Türkiye", name: "Turkey e-visa, 30 days", price: 60, cur: "USD", mode: "buy", comm_type: "flat", comm_value: 5,
+      video: "", description: "Single entry tourist e-visa. Ready in 3 working days. Send your passport photo page in the chat.", newImages: realVisaPhotos() }));
+    await approve(await v("POST", "/api/suuq/products", { service: "visa", country: "United Arab Emirates", name: "Dubai visit visa, 60 days", price: 180, cur: "USD", mode: "buy", comm_type: "percent", comm_value: 5,
+      price_hidden: true, price_label: "Contact for price", video: "", description: "Tourist visa for the UAE. The price depends on your nationality and travel dates, so ask us first.", newImages: realVisaPhotos().reverse() }));
+    await addMoreVisas(v, approve);
 
     const c = call();
     const me = await c("POST", "/api/auth/signup", { name: A.customer.name, phone: A.customer.phone, pin: A.customer.pin,
@@ -4233,7 +4277,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     delete G.__DEMO_INITIAL_DB;
     await serverStarted; // the server sets up its database, then starts listening
     // Sample data version: 2 = real product photos, 3 = sample visas approved. Older demo data is upgraded in place (your own changes stay).
-    const SAMPLE_VERSION = 8, had = Number(all.get("sampleVersion") || 1);
+    const SAMPLE_VERSION = 9, had = Number(all.get("sampleVersion") || 1);
     if (fresh && G.__demoSeed) await G.__demoSeed({ call: seedCall, Buffer });
     else if (had < SAMPLE_VERSION && G.__demoUpgrade) { try { await G.__demoUpgrade({ call: seedCall, from: had }); } catch (e) { console.warn("Demo upgrade skipped:", e.message); } }
     if (fresh || had < SAMPLE_VERSION) await idbWrite([["sampleVersion", SAMPLE_VERSION]], []);
@@ -4737,7 +4781,13 @@ const SUUQ = (() => {
 
   /* ---------- data ---------- */
   async function loadWallet() { try { st.wallet = await api("/api/wallet"); } catch {} }
-  async function loadProducts() { try { st.products = (await api(`/api/suuq/products?service=${st.market}&q=` + encodeURIComponent(st.q))).products; } catch (e) { st.products = []; st.err = e.message; } }
+  async function loadProducts() {
+    try {
+      const country = st.market === "visa" && st.visaCountry ? "&country=" + encodeURIComponent(st.visaCountry) : "";
+      const r = await api(`/api/suuq/products?service=${st.market}&q=` + encodeURIComponent(st.q) + country);
+      st.products = r.products; if (r.countries) st.visaCountries = r.countries;
+    } catch (e) { st.products = []; st.err = e.message; }
+  }
   async function loadOrders() { try { st.orders = (await api("/api/suuq/orders/mine")).orders; } catch {} }
   async function loadChats() { try { st.chats = (await api("/api/suuq/chats")).chats; } catch {} }
   async function loadShop() {
@@ -4753,7 +4803,7 @@ const SUUQ = (() => {
     if (service === "affiliate") await Promise.all([loadAff(), loadWallet()]);
     if (service === "suuq" || service === "visa") {
       st.shopView = null; st.fromHub = !!extra?.fromHub;
-      if (st.market !== service) { st.market = service; st.q = ""; st.products = []; if (st.tab === "shop") st.product = null; }
+      if (st.market !== service) { st.market = service; st.q = ""; st.visaCountry = ""; st.products = []; if (st.tab === "shop") st.product = null; }
       if (extra?.product) { st.tab = "shop"; await openProduct(extra.product); if (st.product?.service && st.product.service !== service) { st.market = st.product.service; S.service = st.market; } }
       await Promise.all([loadProducts(), loadWallet(), loadChats(), loadShop()]);
     }
@@ -4883,14 +4933,34 @@ const SUUQ = (() => {
     </div>`;
   }
   const ICON_SHOP = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l1.5-5h13L20 9"/><path d="M4 9h16v2a3 3 0 0 1-5.3 1.9A3 3 0 0 1 12 14a3 3 0 0 1-2.7-1.1A3 3 0 0 1 4 11z"/><path d="M5 13.5V20h14v-6.5M10 20v-4h4v4"/></svg>';
+  // A country's flag, from its English name (the browser knows the names). No flag when it doesn't know it.
+  let FLAGS = null;
+  function flagOf(name) {
+    if (!name) return "";
+    if (!FLAGS) {
+      FLAGS = {};
+      try {
+        const dn = new Intl.DisplayNames(["en"], { type: "region" }), A = 65;
+        for (let i = 0; i < 26; i++) for (let j = 0; j < 26; j++) {
+          const code = String.fromCharCode(A + i, A + j), n = dn.of(code);
+          if (n && n !== code) FLAGS[n.toLowerCase()] = String.fromCodePoint(0x1f1e6 + i, 0x1f1e6 + j);
+        }
+        Object.assign(FLAGS, { "türkiye": FLAGS["turkey"] || FLAGS["türkiye"], "turkey": FLAGS["türkiye"] || FLAGS["turkey"], "côte d'ivoire": FLAGS["côte d’ivoire"], "czechia": FLAGS["czechia"] || FLAGS["czech republic"], "vatican city": FLAGS["vatican city"], "congo": FLAGS["congo - brazzaville"] || FLAGS["congo"], "democratic republic of the congo": FLAGS["congo - kinshasa"], "myanmar": FLAGS["myanmar (burma)"] || FLAGS["myanmar"], "palestine": FLAGS["palestinian territories"] || FLAGS["palestine"], "micronesia": FLAGS["micronesia"] || FLAGS["micronesia, federated states of"] });
+      } catch {}
+    }
+    return FLAGS[String(name).toLowerCase()] || "";
+  }
+  const countryTag = c => c ? `${flagOf(c) ? flagOf(c) + " " : ""}${esc(c)}` : "";
   function productCard(p) {
     return `<button class="pcard" data-prod="${esc(p.id)}">
       <span class="pimg">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy">` : `<span class="noimg">▶ Video</span>`}<span class="mode ${p.mode}">${p.mode === "buy" ? "Buy" : "Book"}</span></span>
-      <span class="pbody"><b>${esc(p.name)}</b><span class="price ${p.price == null ? "hidden-price" : "num"}">${esc(priceText(p))}</span><small>${esc(p.shop_name)}${p.shop_no ? ` · no. ${esc(p.shop_no)}` : ""}</small>${earnFor(p) ? `<span class="earn">${esc(earnFor(p))}</span>` : ""}</span></button>`;
+      <span class="pbody">${p.service === "visa" && p.country ? `<span class="visa-country">${countryTag(p.country)}</span>` : ""}<b>${esc(p.name)}</b><span class="price ${p.price == null ? "hidden-price" : "num"}">${esc(priceText(p))}</span><small>${esc(p.shop_name)}${p.shop_no ? ` · no. ${esc(p.shop_no)}` : ""}</small>${earnFor(p) ? `<span class="earn">${esc(earnFor(p))}</span>` : ""}</span></button>`;
   }
   function vShop() {
     const visa = st.market === "visa";
+    const cs = visa ? st.visaCountries || [] : [];
     return `<div class="sq-search"><input class="input" id="sq-q" placeholder="${visa ? "Search visas, countries or agencies" : "Search products or shops"}" value="${esc(st.q)}" aria-label="Search"></div>
+      ${cs.length ? `<div class="country-chips" role="group" aria-label="Countries"><button data-vcountry="" aria-pressed="${!st.visaCountry}">🌍 All countries</button>${cs.map(c => `<button data-vcountry="${esc(c.name)}" aria-pressed="${st.visaCountry === c.name}">${countryTag(c.name)} <span>${c.n}</span></button>`).join("")}</div>` : ""}
       ${st.products.length ? `<div class="pgrid">${st.products.map(productCard).join("")}</div>` : `<div class="empty">${st.q ? "Nothing matches your search." : visa ? "No visas yet. Sellers will post them here soon." : "No products yet. Sellers will post here soon."}</div>`}`;
   }
   function vProduct() {
@@ -4901,7 +4971,7 @@ const SUUQ = (() => {
       ${p.images.length ? `<div class="gallery" id="gallery">${p.images.map((src, i) => `<img src="${esc(src)}" alt="${esc(p.name)}, photo ${i + 1} of ${p.images.length}">`).join("")}</div>` : ""}
       ${p.images.length > 1 ? `<div class="thumbs" role="group" aria-label="Photos">${p.images.map((src, i) => `<button data-thumb="${i}" aria-label="Show photo ${i + 1}" aria-current="${i === 0}"><img src="${esc(src)}" alt=""></button>`).join("")}</div>` : ""}
       ${videoEmbed(p.video)}
-      <div><h2 style="font-size:21px">${esc(p.name)}</h2><div class="price ${p.price == null ? "hidden-price" : "num"}" style="font-size:22px">${esc(priceText(p))}</div>
+      <div>${p.service === "visa" && p.country ? `<span class="visa-country big">${countryTag(p.country)}</span>` : ""}<h2 style="font-size:21px">${esc(p.name)}</h2><div class="price ${p.price == null ? "hidden-price" : "num"}" style="font-size:22px">${esc(priceText(p))}</div>
         ${mine && p.price_hidden ? `<small class="note">Price hidden: customers see “${esc(p.price_label)}”.</small>` : ""}
         <small class="note">Sold by <button class="link-btn" data-openshop="${esc(p.shop_id)}">${esc(p.shop_name)}${p.shop_no ? ` (no. ${esc(p.shop_no)})` : ""}</button> · ${asksPrice(p) ? "Ask for the price, then pay from your wallet" : p.mode === "buy" ? "Buy now, pay from your wallet" : "Book now, pay the seller later"}</small></div>
       ${p.description ? `<p style="margin:0;white-space:pre-wrap">${esc(p.description)}</p>` : ""}
@@ -5136,7 +5206,8 @@ const SUUQ = (() => {
     return `<div class="leg">
       <b style="font-family:var(--display);font-size:17px">${e.id ? (e.service === "visa" ? "Edit visa" : "Edit product") : (e.service === "visa" ? "New visa" : "New product")}</b>
       ${visaOpen() ? `<div class="field"><label>List it in</label><div class="cur-toggle" style="grid-template-columns:1fr 1fr"><button class="USD" data-pesvc="suuq" aria-pressed="${e.service !== "visa"}">Suuq</button><button class="SLSH" data-pesvc="visa" aria-pressed="${e.service === "visa"}">Visa</button></div></div>` : ""}
-      <div class="field"><label for="pe-name">Short name</label><input class="input" id="pe-name" maxlength="60" value="${esc(e.name)}" placeholder="Samsung A15 128GB"></div>
+      ${e.service === "visa" ? `<div class="field"><label for="pe-country">Country of the visa</label><select class="input" id="pe-country"><option value="">Choose a country…</option>${(st.countries || []).filter(c => c !== "Somaliland").map(c => `<option ${c === e.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>` : ""}
+      <div class="field"><label for="pe-name">Short name</label><input class="input" id="pe-name" maxlength="60" value="${esc(e.name)}" placeholder="${e.service === "visa" ? "Tourist visa, 30 days" : "Samsung A15 128GB"}"></div>
       <div class="grid2" style="grid-template-columns:1fr 110px"><div class="field"><label for="pe-price">Price</label><input class="input" id="pe-price" inputmode="decimal" value="${esc(e.price)}"></div>
         <div class="field"><label for="pe-cur">Currency</label><select class="input" id="pe-cur">${CURS.map(c => `<option ${c === e.cur ? "selected" : ""}>${c}</option>`).join("")}</select></div></div>
       <div class="field"><label>Show the price to customers?</label><div class="cur-toggle" style="grid-template-columns:1fr 1fr"><button class="USD" data-pehide="0" aria-pressed="${!e.price_hidden}">Show price</button><button class="SLSH" data-pehide="1" aria-pressed="${!!e.price_hidden}">Hide price</button></div>
@@ -5190,6 +5261,7 @@ const SUUQ = (() => {
       if (st.tab === "orders") await loadOrders(); if (st.tab === "chats") await loadChats(); if (st.tab === "shop") await loadProducts(); if (st.tab === "sell") await loadShop(); render(); });
     q("[data-selltab]").forEach(b => b.onclick = async () => { st.sell = b.dataset.selltab; st.edit = null; st.flash = ""; await loadShop(); render(); });
     q("[data-prod]").forEach(b => b.onclick = async () => { await openProduct(b.dataset.prod); render(); });
+    q("[data-vcountry]").forEach(b => b.onclick = async () => { st.visaCountry = b.dataset.vcountry; await loadProducts(); render(); });
     q("[data-openshop]").forEach(b => b.onclick = () => openShop(Number(b.dataset.openshop)));
     q("[data-viewprod]").forEach(b => b.onclick = async () => { await openProduct(b.dataset.viewprod); render(); });
     q("[data-share]").forEach(b => b.onclick = () => copy(shareLink(b.dataset.share, codeFor(b.dataset.share)), b, "Link copied"));
@@ -5277,6 +5349,7 @@ const SUUQ = (() => {
     if (!e) return;
     e.name = v("pe-name") ?? e.name; e.price = v("pe-price") ?? e.price; e.cur = v("pe-cur") ?? e.cur; e.video = v("pe-video") ?? e.video;
     e.description = v("pe-desc") ?? e.description; e.comm_value = v("pe-comm") ?? e.comm_value; e.price_label = v("pe-label") ?? e.price_label;
+    e.country = v("pe-country") ?? e.country;
   }
   function mountFinance(el) {
     const counts = st.myProducts.reduce((m, p) => (m[p.cur] = (m[p.cur] || 0) + 1, m), {});
@@ -5331,7 +5404,8 @@ const SUUQ = (() => {
   async function saveProduct(b) {
     keepEdit();
     const e = st.edit, err = document.getElementById("pe-err");
-    const body = { service: e.service || "suuq", price_hidden: !!e.price_hidden, price_label: e.price_hidden ? (e.price_label || priceWords()[0]) : "", name: e.name, price: e.price, cur: e.cur, mode: e.mode, video: e.video, description: e.description, comm_type: e.comm_type, comm_value: e.comm_value || 0,
+    if (e.service === "visa" && !e.country) { err.textContent = "Choose the country this visa is for."; return; }
+    const body = { service: e.service || "suuq", country: e.service === "visa" ? e.country : "", price_hidden: !!e.price_hidden, price_label: e.price_hidden ? (e.price_label || priceWords()[0]) : "", name: e.name, price: e.price, cur: e.cur, mode: e.mode, video: e.video, description: e.description, comm_type: e.comm_type, comm_value: e.comm_value || 0,
       keepImages: e.images.filter(x => x.startsWith("/media/")), newImages: e.images.filter(x => x.startsWith("data:")) };
     b.disabled = true; b.textContent = "Saving…";
     try {
@@ -5391,7 +5465,7 @@ const SUUQ = (() => {
   function reviewCard(p, word) {
     return `<div class="person ${p.approval === "pending" ? "to-review" : ""} ${p.admin_hidden ? "susp" : ""}"><div class="person-top">
         ${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" style="width:56px;height:56px;border-radius:10px;object-fit:cover">` : `<div class="avatar">▶</div>`}
-        <div class="t"><b>${esc(p.name)}</b><small>${esc(p.shop_name)} · ${money(p.price, p.cur)}${p.price_hidden ? ` · customers see “${esc(p.price_label)}”` : ""} · ${p.mode === "buy" ? "Buy" : "Book"}${p.comm_value > 0 && p.mode === "buy" ? ` · affiliate ${p.comm_type === "percent" ? p.comm_value + "%" : money(p.comm_value, p.cur)}` : ""}</small>
+        <div class="t"><b>${p.service === "visa" && p.country ? countryTag(p.country) + " · " : ""}${esc(p.name)}</b><small>${esc(p.shop_name)} · ${money(p.price, p.cur)}${p.price_hidden ? ` · customers see “${esc(p.price_label)}”` : ""} · ${p.mode === "buy" ? "Buy" : "Book"}${p.comm_value > 0 && p.mode === "buy" ? ` · affiliate ${p.comm_type === "percent" ? p.comm_value + "%" : money(p.comm_value, p.cur)}` : ""}</small>
           ${p.description ? `<small class="rv-desc">${esc(p.description)}</small>` : ""}
           ${p.video ? `<small><a href="${esc(p.video)}" target="_blank" rel="noopener">Video link</a></small>` : ""}</div>
         ${approvalPill(p)}</div>
