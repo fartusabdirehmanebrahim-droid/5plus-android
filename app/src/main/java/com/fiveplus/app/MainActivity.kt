@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
         when {
             fixed.startsWith("https://") && !fixed.contains("your-5plus-website") -> openWeb(fixed)
             saved != null -> openWeb(saved)
-            else -> showChooser()
+            else -> openWeb(demoUrl) // the app opens straight away and asks for the language
         }
     }
 
