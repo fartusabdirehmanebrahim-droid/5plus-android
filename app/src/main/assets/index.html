@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790702678">
+<meta name="sarrif-build" content="1790703043">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -717,6 +717,12 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
 .gal-item .icon-btn{position:absolute;top:4px;right:4px;width:28px;height:28px;min-height:0;padding:0;background:rgba(255,255,255,.9)}
 .gal-item small{font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (prefers-reduced-motion:reduce){.slides img{transition:none}}
+.topbar[hidden]{display:none}
+body.no-top .screen{min-height:100dvh}
+.link-btn{border:0;background:none;color:var(--green);font-weight:600;text-decoration:underline;text-underline-offset:3px;padding:8px;align-self:center}
+.yt-channel .back{flex:none}
+.yt-channel .yt-avatar.big:has(img){background:#fff;border:1px solid var(--line)}
+.yt-channel .yt-avatar.big img{object-fit:contain}
 
 </style>
 </head>
@@ -5640,6 +5646,8 @@ function render() {
   appEl.innerHTML = views[S.user ? "home" : S.screen]();
   bind();
 }
+// Only on the demo page (the real app has no demo logins).
+const demoLink = () => window.SarrifDemo?.showLogins ? `<button class="link-btn demo-link" data-demo-logins>Demo logins</button>` : "";
 function vWelcome() {
   const act = activeServices();
   return `<div class="view">
@@ -5648,6 +5656,7 @@ function vWelcome() {
     <button class="btn btn-primary btn-block" data-go="login">Log in</button>
     <button class="btn btn-ghost btn-block" data-go="signup">Create customer account</button>
     <button class="btn btn-merchant btn-block" data-go="merchant">${SUUQ_ICONS.shop}Register as merchant</button>
+    ${demoLink()}
   </div>`;
 }
 // PIN is typed in a normal field (hidden digits, number keyboard on phones).
@@ -5671,6 +5680,7 @@ function vLogin() {
     <div class="err" role="alert">${esc(S.err)}</div>
     <button class="btn btn-primary btn-block" id="do-login" ${S.login.pin.length === 4 && !S.busy ? "" : "disabled"}>Log in</button>
     <button class="btn-link" data-go="signup">No account yet? Create one</button>
+    ${demoLink()}
   </div>`;
 }
 function vAdminPw() {
@@ -5802,6 +5812,7 @@ function openService(v) {
   if (["suuq", "visa", "wallet", "affiliate"].includes(v)) return SUUQ.open(v);
   if (v === "hub") SUUQ.loadWallet().then(render);
   render();
+  scrollTo(0, 0); // each service opens at its top
 }
 let hubTimer = null;
 function bindHubSearch() {
@@ -5918,8 +5929,7 @@ function vVideos(h) {
         <a class="btn btn-ghost" href="https://wa.me/?text=${encodeURIComponent(title + " " + v.url)}" target="_blank" rel="noopener">Share</a></div></article>`;
   };
   return `<div class="view yt-view">
-    <div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
-    <div class="yt-channel"><span class="yt-avatar big">${avatar}</span><div class="yt-text"><b>${esc(h.name)}</b><small>${esc(h.sub || "")}</small></div></div>
+    <div class="yt-channel"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><span class="yt-avatar big">${avatar}</span><div class="yt-text"><b>${esc(h.name)}</b><small>${esc(h.sub || "")}</small></div></div>
     ${phone || wa || h.tiktok ? `<div class="yt-contact">${callBtn("")}${waBtn("", "")}${h.tiktok ? `<a class="btn tt-btn" href="${esc(h.tiktok)}" target="_blank" rel="noopener">${SVC_ICONS.tiktok}TikTok</a>` : ""}</div>` : ""}
     ${(h.gallery || []).length ? galleryStrip(h.gallery) : ""}
     <div class="yt-feed">${h.videos.map(card).join("")}</div>
@@ -6081,6 +6091,7 @@ function bind() {
   bindHubSearch();
   if (["suuq", "visa", "wallet", "affiliate"].includes(S.service) && S.user?.role === "customer") SUUQ.bind(appEl);
   SUUQ.bindAutoplay(appEl);
+  appEl.querySelectorAll("[data-demo-logins]").forEach(b => b.onclick = () => window.SarrifDemo?.showLogins());
   appEl.querySelectorAll("[data-call]").forEach(b => b.onclick = () => dialUssd(b.dataset.call));
   appEl.querySelectorAll("[data-gallery]").forEach(strip => {
     const touched = () => { galleryTouched = Date.now(); };
@@ -6245,6 +6256,8 @@ let allServices = [];
 function applyRole() {
   const m = mode(), role = S.user?.role || null, staff = m !== "customer" && m !== "guest";
   $("#customer-area").hidden = staff;
+  // Customers see only the app itself; staff keep the top bar with their name and Log out.
+  document.querySelector(".topbar").hidden = !staff; document.body.classList.toggle("no-top", !staff);
   $("#super").hidden = m !== "super";
   $("#svcdash").hidden = !(m === "svc-admin" || m === "svc-agent");
   $("#admin").hidden = m !== "ibedel-admin";
@@ -6741,7 +6754,8 @@ function renderSvcDash(fromLoad) {
 
 </script>
 <script>
-// The small "Demo" button and panel: sample logins and "Reset demo data". Only on the demo page.
+// The demo logins panel (sample logins and "Reset demo data"). Only on the demo page. It opens from the
+// small "Demo logins" link on the welcome and login screens (SarrifDemo.showLogins).
 (function () {
   "use strict";
   const A = globalThis.__DEMO_ACCOUNTS || {};
@@ -6751,7 +6765,7 @@ function renderSvcDash(fromLoad) {
   .demo-chip b{color:var(--ink);letter-spacing:.06em;font-weight:700}
   .demo-chip i{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;flex:none}
   .demo-chip u{color:var(--green);text-underline-offset:2px}
-  .demo-panel{position:fixed;left:50%;transform:translateX(-50%);top:40px;z-index:9999;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 56px);overflow:auto;
+  .demo-panel{position:fixed;left:50%;transform:translateX(-50%);top:16px;z-index:9999;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 56px);overflow:auto;
     background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 20px 50px -20px rgba(0,0,0,.45);font-size:14px}
   .demo-panel h3{font-size:16px;margin:0 0 4px}
   .demo-panel p{margin:0 0 10px;color:var(--ink-2)}
@@ -6782,15 +6796,18 @@ function renderSvcDash(fromLoad) {
     </table>
     <p>The customer has $300 in the wallet to try buying. Open this page in a second tab to be the buyer in one and the seller or agent in the other; they update each other live.</p>
     <p>USSD codes open the dialer only on a phone.</p>
-    <div class="row"><button type="button" class="danger" data-reset>Reset demo data</button></div>`;
+    <div class="row"><button type="button" data-close>Close</button><button type="button" class="danger" data-reset>Reset demo data</button></div>`;
+  panel.querySelector("[data-close]").onclick = () => { panel.hidden = true; };
   chip.onclick = () => { panel.hidden = !panel.hidden; chip.setAttribute("aria-expanded", String(!panel.hidden)); };
+  globalThis.SarrifDemo = Object.assign(globalThis.SarrifDemo || {}, { showLogins: () => { panel.hidden = false; } });
+  document.addEventListener("click", e => { if (!panel.hidden && !panel.contains(e.target) && !e.target.closest("[data-demo-logins]")) panel.hidden = true; });
   panel.querySelector("[data-reset]").onclick = e => {
     const b = e.currentTarget;
     if (b.dataset.sure) { b.textContent = "Resetting…"; b.disabled = true; globalThis.SarrifDemo.reset(); return; }
     b.dataset.sure = "1"; b.textContent = "Tap again to erase everything";
   };
-  document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) chip.click(); });
-  document.body.prepend(chip); document.body.append(panel);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") panel.hidden = true; });
+  document.body.append(panel);
 })();
 
 </script>
