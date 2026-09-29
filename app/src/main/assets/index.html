@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790699887">
+<meta name="sarrif-build" content="1790700325">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -667,7 +667,9 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
 .art-photo{width:100%;height:100%;object-fit:cover;display:block}
 .hub-art{overflow:hidden}
 
-.svc-video{width:100%;max-width:560px}
+.svc-videos{width:100%;max-width:560px;display:flex;flex-direction:column;gap:14px}
+.svc-video{width:100%}
+.svc-vids{grid-column:1/-1;resize:vertical;min-height:44px;font-size:13px}
 .svc-video .vid{margin:0}
 
 </style>
@@ -712,7 +714,7 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
             <div class="mini"><label for="ns-name">Name</label><input class="input" id="ns-name" maxlength="30" placeholder="Caafimaad"></div>
             <div class="mini"><label for="ns-sub">Short description</label><input class="input" id="ns-sub" maxlength="60" placeholder="Book a doctor"></div>
             <div class="mini"><label for="ns-art">Picture</label><select class="input" id="ns-art"></select></div>
-            <div class="mini"><label for="ns-video">YouTube video link (optional)</label><input class="input" id="ns-video" maxlength="300" inputmode="url" placeholder="https://youtu.be/…"></div>
+            <div class="mini"><label for="ns-video">YouTube video links (optional, one per line)</label><textarea class="input" id="ns-video" rows="3" inputmode="url" placeholder="https://youtu.be/…"></textarea></div>
             <div class="mini"><label for="ns-photo">Your photo (optional)</label><input class="input" id="ns-photo" type="file" accept="image/jpeg,image/png,image/webp"></div>
           </div>
           <div class="row-actions"><button class="btn btn-ghost" id="ns-add">Add service</button><span class="status-msg" id="st-ns"></span></div>
@@ -1685,7 +1687,7 @@ function publicUser(u) {
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
-  return { services: s.services.filter(x => x.visible).map(({ id, name, sub, art, ready, photo, video }) => ({ id, name, sub, art, ready, photo: photo ? "/media/" + photo : null, video: video || "" })),
+  return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x) })),
     premierPayTo: s.agentNums.premier || "",
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };
 }
@@ -2045,13 +2047,16 @@ route("GET", "/api/super/overview", async (req, res) => {
   const sentMonth = await db.all("SELECT cur, COUNT(*) AS n, SUM(fee) AS fees FROM requests WHERE status = 'sent' AND sent_at >= ? GROUP BY cur", month.getTime());
   send(res, 200, { services: s.services.map(x => ({ ...x, photo: x.photo ? "/media/" + x.photo : null })), staff, customers, ibedel: { waiting, sentMonth } });
 });
-// A service's video: a web link (YouTube and others), or nothing.
-function cleanVideo(v) {
-  v = String(v || "").trim().slice(0, 300);
-  if (!v) return "";
-  if (!/^https?:\/\/[^\s<>"']+$/i.test(v)) fail("The video link must be a web address, for example https://youtu.be/…");
-  return v;
+// A service's videos: up to 10 web links (YouTube and others). Accepts a list, or text with one link per line.
+const MAX_SERVICE_VIDEOS = 10;
+function cleanVideos(v) {
+  const list = (Array.isArray(v) ? v : String(v || "").split(/[\s,]+/)).map(x => String(x || "").trim()).filter(Boolean);
+  if (list.length > MAX_SERVICE_VIDEOS) fail(`A service can have up to ${MAX_SERVICE_VIDEOS} videos.`);
+  for (const x of list) if (x.length > 300 || !/^https?:\/\/[^\s<>"']+$/i.test(x)) fail("Each video link must be a web address, for example https://youtu.be/…");
+  return [...new Set(list)];
 }
+// Services saved before several videos were allowed have one "video".
+const serviceVideos = x => Array.isArray(x.videos) ? x.videos : x.video ? [x.video] : [];
 route("PUT", "/api/super/services", async (req, res) => {
   await needRole(req, "super");
   const b = await readJson(req), cur = (await getSettings()).services;
@@ -2065,7 +2070,7 @@ route("PUT", "/api/super/services", async (req, res) => {
     if (!id) id = "service";
     while (seen.has(id)) id += "-2";
     seen.add(id);
-    out.push({ id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, video: cleanVideo(x.video) });
+    out.push({ id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: cleanVideos(x.videos ?? x.video) });
   }
   for (const c of cur) if (c.builtIn && !out.some(o => o.id === c.id)) fail(`${c.name} can be hidden but not deleted.`);
   for (const c of cur) if (c.photo && !out.some(o => o.id === c.id)) await db.files.del(c.photo);
@@ -2126,7 +2131,7 @@ route("DELETE", "/api/admin/expenses/:id", async (req, res, url, [id]) => {
 });
 
 /* ---------- wallets, Suuq, chat, affiliates ---------- */
-require("./market")({ hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings,
+require("./market")({ hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos,
   crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit });
 
 /* ---------- static files ---------- */
@@ -2548,7 +2553,7 @@ __DEMO_MODULES["/app/src/market"] = function (require, module, exports, __dirnam
 // Wallets, the Suuq marketplace, private buyer-seller chat and the affiliate program.
 // Loaded by server.js, which passes in its helpers.
 module.exports = function market(ctx) {
-  const { hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings,
+  const { hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos,
     crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit } = ctx;
 
   /* ---------- money helpers ---------- */
@@ -2896,7 +2901,7 @@ module.exports = function market(ctx) {
     const digits = /^[#\s]*\d+$/.test(q) ? q.replace(/\D/g, "") : "";
     const has = v => String(v || "").toLowerCase().includes(q);
     const s = await getSettings();
-    const services = s.services.filter(x => x.visible && (has(x.name) || has(x.sub))).map(({ id, name, sub, art, ready, photo, video }) => ({ id, name, sub, art, ready, photo: photo ? "/media/" + photo : null, video: video || "" }));
+    const services = s.services.filter(x => x.visible && (has(x.name) || has(x.sub))).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x) }));
     const shopRows = (await db.all(`${SHOP_SELECT} ORDER BY s.shop_no`, now())).filter(r => {
       const pf = JSON.parse(r.profile || "{}");
       return (digits && String(r.shop_no).startsWith(digits)) || has(r.name) || has(pf.business_name) || has(pf.full_name) || has(r.owner_name);
@@ -3543,6 +3548,18 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     return c.toDataURL("image/jpeg", 0.82);
   }
 
+  // Saba Multi Services with its YouTube videos (they play one after another as the customer scrolls).
+  const SABA = { name: "Saba Multi Services", sub: "Watch our videos", art: "general", videos: [
+    "https://youtu.be/CLVee3xFY_I", "https://youtu.be/dkDm6hFQAQI", "https://youtu.be/X_tY0rbV2E8", "https://youtu.be/9LML6owF-UA"] };
+  async function addSaba(sup) {
+    const { services } = await sup("GET", "/api/super/overview");
+    const list = services.map(({ photo, ...x }) => x);
+    const have = list.find(x => x.name.trim().toLowerCase() === SABA.name.toLowerCase());
+    if (have) { if (!(have.videos || []).length) have.videos = SABA.videos; else return; }
+    else list.push({ id: "", visible: true, ...SABA });
+    await sup("PUT", "/api/super/services", { services: list });
+  }
+
   // Demo data made before the sample products had real photos: give those products their real photos
   // (and matching names). Products you added yourself are not touched.
   globalThis.__demoUpgrade = async ({ call, from }) => {
@@ -3557,6 +3574,8 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     const t = await sup("POST", "/api/auth/login", { phone: A.super.phone, pin: A.super.pin });
     await sup("POST", "/api/auth/admin-password", { ticket: t.ticket, password: A.super.password });
     await m("POST", "/api/auth/login", { phone: A.merchant.phone, pin: A.merchant.pin });
+    if (from < 4) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
+    if (from >= 3) return;
     // The sample visas were left waiting for approval in older demos: approve them.
     const va = call();
     try {
@@ -3587,6 +3606,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     await sup("PUT", "/api/super/wallet-settings", { number: "634000555", ussd: { USD: "*880*", SLSH: "*220*" } });
     await sup("POST", "/api/super/admins", { name: A.suuqAdmin.name, phone: A.suuqAdmin.phone, pin: A.suuqAdmin.pin, password: A.suuqAdmin.password, service: "suuq" });
     await sup("POST", "/api/admin/agents", { name: A.agent.name, phone: A.agent.phone, pin: A.agent.pin, service: "ibedel" });
+    await addSaba(sup);
 
     const m = call();
     await m("POST", "/api/auth/signup-merchant", { pin: A.merchant.pin, profile: {
@@ -4057,7 +4077,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     delete G.__DEMO_INITIAL_DB;
     await serverStarted; // the server sets up its database, then starts listening
     // Sample data version: 2 = real product photos, 3 = sample visas approved. Older demo data is upgraded in place (your own changes stay).
-    const SAMPLE_VERSION = 3, had = Number(all.get("sampleVersion") || 1);
+    const SAMPLE_VERSION = 4, had = Number(all.get("sampleVersion") || 1);
     if (fresh && G.__demoSeed) await G.__demoSeed({ call: seedCall, Buffer });
     else if (had < SAMPLE_VERSION && G.__demoUpgrade) { try { await G.__demoUpgrade({ call: seedCall, from: had }); } catch (e) { console.warn("Demo upgrade skipped:", e.message); } }
     if (fresh || had < SAMPLE_VERSION) await idbWrite([["sampleVersion", SAMPLE_VERSION]], []);
@@ -4471,8 +4491,27 @@ const SUUQ = (() => {
     if (vidObs) vidObs.disconnect();
     const boxes = root.querySelectorAll(".vid[data-auto]"); if (!boxes.length) return;
     if (!("IntersectionObserver" in window)) { boxes.forEach(playBox); return; }
-    vidObs = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.intersectionRatio >= 0.5 ? playBox(e.target) : pauseBox(e.target)), { threshold: [0, 0.5, 1] });
+    // Only one video plays at a time: the one most on screen (at least half of it showing).
+    const seen = new Map(); let playing = null;
+    const pick = () => {
+      // Of the videos at least half on screen, the one nearest the middle of the screen plays.
+      const mid = innerHeight / 2; let best = null, bestD = Infinity;
+      boxes.forEach(box => {
+        if ((seen.get(box) || 0) < 0.5) return;
+        const r = box.getBoundingClientRect(), d = Math.abs(r.top + r.height / 2 - mid);
+        if (d < bestD - 1) { best = box; bestD = d; }
+      });
+      if (best === playing) return;
+      if (playing) pauseBox(playing);
+      playing = best;
+      if (best) playBox(best);
+    };
+    bindAutoplay.recheck = () => { if (boxes[0] && boxes[0].isConnected) pick(); };
+    vidObs = new IntersectionObserver(es => { es.forEach(e => seen.set(e.target, e.isIntersecting ? e.intersectionRatio : 0)); pick(); }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
     boxes.forEach(b => vidObs.observe(b));
+    // Thresholds alone miss a video moving from the edge to the middle, so also re-check after scrolling stops.
+    clearTimeout(bindAutoplay.t);
+    if (!bindAutoplay.bound) { bindAutoplay.bound = true; document.addEventListener("scroll", () => { clearTimeout(bindAutoplay.t); bindAutoplay.t = setTimeout(() => bindAutoplay.recheck && bindAutoplay.recheck(), 150); }, { passive: true, capture: true }); }
   }
   async function copy(text, btn, done = "Copied") {
     try { if (navigator.share && /Mobi/i.test(navigator.userAgent)) { await navigator.share({ url: text }); return; } } catch {}
@@ -5664,7 +5703,7 @@ function vSoon() {
     <div class="soon-card"><div class="soon-art">${ART(h.art, h.photo)}</div>
       <h2 style="font-size:24px">${esc(h.name)}</h2><span class="soon">Coming soon</span>
       <p class="note" style="margin:0;max-width:30ch">We're building ${esc(h.name)} now. It will open here as soon as it's ready.</p></div>
-    ${h.video ? `<div class="svc-video">${SUUQ.videoEmbed(h.video, { autoplay: true, title: h.name })}</div>` : ""}
+    ${(h.videos || []).length ? `<div class="svc-videos">${h.videos.map((v, n) => `<div class="svc-video">${SUUQ.videoEmbed(v, { autoplay: true, title: `${h.name} video ${n + 1}` })}</div>`).join("")}</div>` : ""}
     ${ib ? `<button class="btn btn-primary btn-block" data-svcgo="ibedel">Use iBedel meanwhile</button>` : ""}
   </div>`;
 }
@@ -6283,7 +6322,7 @@ function renderSuper() {
     <div class="fields">
       <input class="input" data-f="name" data-i="${i}" value="${esc(sv.name)}" maxlength="30" aria-label="Name">
       <input class="input" data-f="sub" data-i="${i}" value="${esc(sv.sub)}" maxlength="60" aria-label="Description">
-      <input class="input" data-f="video" data-i="${i}" value="${esc(sv.video || "")}" maxlength="300" placeholder="YouTube video link (optional)" aria-label="YouTube video link">
+      <textarea class="input svc-vids" data-f="videos" data-i="${i}" rows="2" placeholder="YouTube video links, one per line (optional)" aria-label="YouTube video links, one per line">${esc(Array.isArray(sv.videos) ? sv.videos.join("\n") : (sv.videos || sv.video || ""))}</textarea>
       <select class="input" data-f="art" data-i="${i}" aria-label="Picture">${ARTS().map(k => `<option value="${k}" ${k === sv.art ? "selected" : ""}>${esc(window.SarrifArt.LABELS[k])}</option>`).join("")}</select>
     </div>
     <div class="acts">
@@ -6342,7 +6381,7 @@ $("#ns-add").onclick = async () => {
   let _photoData;
   if (file) { try { _photoData = await compressImage(file, 2_000_000); } catch { return msg("#st-ns", "That photo could not be used. Choose a JPG, PNG or WebP photo.", "bad"); } }
   const btn = $("#ns-add"); btn.disabled = true; msg("#st-ns", "Adding…");
-  svcDraft.push({ id: "", name, sub, video: $("#ns-video").value.trim(), art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
+  svcDraft.push({ id: "", name, sub, videos: $("#ns-video").value.trim(), art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
   try {
     const failed = await saveServices();
     $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = ""; $("#ns-video").value = "";
