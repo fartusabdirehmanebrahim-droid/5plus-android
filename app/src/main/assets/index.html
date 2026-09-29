@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790700892">
+<meta name="sarrif-build" content="1790701365">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -691,6 +691,15 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
 .yt-actions{display:flex;gap:8px;flex-wrap:wrap}
 .yt-actions .btn{flex:1;min-height:42px;white-space:nowrap;font-size:14px;padding:8px 12px}
 .yt-actions .btn-ghost{flex:0 0 auto}
+.yt-channel{display:flex;gap:12px;align-items:center}
+.yt-avatar.big{width:52px;height:52px;font-size:20px}
+.yt-channel b{font-size:18px}
+.yt-contact{display:flex;gap:8px;flex-wrap:wrap}
+.yt-contact .btn,.yt-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.yt-contact .btn{flex:1;min-height:44px;white-space:nowrap;font-size:14px;padding:8px 10px}
+.call-btn{background:var(--green);color:#fff}
+.tt-btn{background:#111;color:#fff}
+.vid[data-auto]{cursor:pointer}
 
 </style>
 </head>
@@ -736,6 +745,8 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
             <div class="mini"><label for="ns-art">Picture</label><select class="input" id="ns-art"></select></div>
             <div class="mini"><label for="ns-video">Videos (optional): one per line, the YouTube link then the title</label><textarea class="input" id="ns-video" rows="3" placeholder="https://youtu.be/… Our new shop"></textarea></div>
             <div class="mini"><label for="ns-wa">WhatsApp number (optional)</label><input class="input" id="ns-wa" inputmode="tel" placeholder="252634000000"></div>
+            <div class="mini"><label for="ns-phone">Phone for the Call button (optional)</label><input class="input" id="ns-phone" inputmode="tel" placeholder="0634000000"></div>
+            <div class="mini"><label for="ns-tiktok">TikTok link (optional)</label><input class="input" id="ns-tiktok" inputmode="url" placeholder="https://www.tiktok.com/@…"></div>
             <div class="mini"><label for="ns-photo">Your photo (optional)</label><input class="input" id="ns-photo" type="file" accept="image/jpeg,image/png,image/webp"></div>
           </div>
           <div class="row-actions"><button class="btn btn-ghost" id="ns-add">Add service</button><span class="status-msg" id="st-ns"></span></div>
@@ -1708,7 +1719,7 @@ function publicUser(u) {
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
-  return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "" })),
+  return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "" })),
     premierPayTo: s.agentNums.premier || "",
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };
 }
@@ -2098,6 +2109,8 @@ async function fillVideoTitles(videos) {
   }));
   return videos;
 }
+const cleanPhoneNo = v => { const d = String(v || "").replace(/[^\d+]/g, ""); if (d && !/^\+?\d{5,16}$/.test(d)) fail("Check the phone number to call."); return d; };
+const cleanTiktok = v => { v = String(v || "").trim().slice(0, 200); if (v && !/^https:\/\/(www\.)?tiktok\.com\/[^\s<>"']+$/i.test(v)) fail("The TikTok link must look like https://www.tiktok.com/@yourname"); return v; };
 const cleanWa = v => { const d = String(v || "").replace(/\D/g, ""); if (d && (d.length < 7 || d.length > 15)) fail("Check the WhatsApp number (country code and number, for example 252634000000)."); return d; };
 route("PUT", "/api/super/services", async (req, res) => {
   await needRole(req, "super");
@@ -2112,7 +2125,7 @@ route("PUT", "/api/super/services", async (req, res) => {
     if (!id) id = "service";
     while (seen.has(id)) id += "-2";
     seen.add(id);
-    out.push({ id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: await fillVideoTitles(cleanVideos(x.videos ?? x.video)), whatsapp: cleanWa(x.whatsapp) });
+    out.push({ id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: await fillVideoTitles(cleanVideos(x.videos ?? x.video)), whatsapp: cleanWa(x.whatsapp), phone: cleanPhoneNo(x.phone), tiktok: cleanTiktok(x.tiktok) });
   }
   for (const c of cur) if (c.builtIn && !out.some(o => o.id === c.id)) fail(`${c.name} can be hidden but not deleted.`);
   for (const c of cur) if (c.photo && !out.some(o => o.id === c.id)) await db.files.del(c.photo);
@@ -2943,7 +2956,7 @@ module.exports = function market(ctx) {
     const digits = /^[#\s]*\d+$/.test(q) ? q.replace(/\D/g, "") : "";
     const has = v => String(v || "").toLowerCase().includes(q);
     const s = await getSettings();
-    const services = s.services.filter(x => x.visible && (has(x.name) || has(x.sub))).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "" }));
+    const services = s.services.filter(x => x.visible && (has(x.name) || has(x.sub))).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "" }));
     const shopRows = (await db.all(`${SHOP_SELECT} ORDER BY s.shop_no`, now())).filter(r => {
       const pf = JSON.parse(r.profile || "{}");
       return (digits && String(r.shop_no).startsWith(digits)) || has(r.name) || has(pf.business_name) || has(pf.full_name) || has(r.owner_name);
@@ -3591,7 +3604,8 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
   }
 
   // Saba Multi Services with its YouTube videos (from youtube.com/@sabamulti.services). The one in the middle of the screen plays.
-  const SABA = { name: "Saba Multi Services", sub: "Watch our videos", art: "general", videos: [
+  const SABA = { name: "Saba Multi Services", sub: "Watch our videos", art: "general",
+    phone: "0634472066", whatsapp: "971559930106", tiktok: "https://www.tiktok.com/@saba.multi_services", videos: [
     { url: "https://youtu.be/CLVee3xFY_I", title: "Ma raadinaysay bir gaadhigaga" },
     { url: "https://youtu.be/dkDm6hFQAQI", title: "Bir gaadhi haddii aad raadinaysay, imika Saba ayaa si wacan kula adeegaysa" },
     { url: "https://youtu.be/X_tY0rbV2E8", title: "Hada dalbo oo ku hel muddo kooban" },
@@ -3606,6 +3620,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
       const vids = (Array.isArray(have.videos) ? have.videos : have.video ? [have.video] : []).map(v => typeof v === "string" ? { url: v, title: "" } : v);
       if (!vids.length) have.videos = SABA.videos;
       else have.videos = vids.map(v => v.title ? v : { url: v.url, title: (SABA.videos.find(x => ytId(x.url) === ytId(v.url)) || {}).title || "" });
+      for (const k of ["phone", "whatsapp", "tiktok"]) if (!have[k]) have[k] = SABA[k];
     }
     await sup("PUT", "/api/super/services", { services: list });
   }
@@ -3624,7 +3639,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     const t = await sup("POST", "/api/auth/login", { phone: A.super.phone, pin: A.super.pin });
     await sup("POST", "/api/auth/admin-password", { ticket: t.ticket, password: A.super.password });
     await m("POST", "/api/auth/login", { phone: A.merchant.phone, pin: A.merchant.pin });
-    if (from < 5) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
+    if (from < 6) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
     if (from >= 3) return;
     // The sample visas were left waiting for approval in older demos: approve them.
     const va = call();
@@ -4127,7 +4142,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     delete G.__DEMO_INITIAL_DB;
     await serverStarted; // the server sets up its database, then starts listening
     // Sample data version: 2 = real product photos, 3 = sample visas approved. Older demo data is upgraded in place (your own changes stay).
-    const SAMPLE_VERSION = 5, had = Number(all.get("sampleVersion") || 1);
+    const SAMPLE_VERSION = 6, had = Number(all.get("sampleVersion") || 1);
     if (fresh && G.__demoSeed) await G.__demoSeed({ call: seedCall, Buffer });
     else if (had < SAMPLE_VERSION && G.__demoUpgrade) { try { await G.__demoUpgrade({ call: seedCall, from: had }); } catch (e) { console.warn("Demo upgrade skipped:", e.message); } }
     if (fresh || had < SAMPLE_VERSION) await idbWrite([["sampleVersion", SAMPLE_VERSION]], []);
@@ -4559,6 +4574,11 @@ const SUUQ = (() => {
       if (best) playBox(best);
     };
     bindAutoplay.recheck = () => { if (boxes[0] && boxes[0].isConnected) pick(); };
+    // Tapping a video's picture plays it at once (and pauses the one playing).
+    boxes.forEach(box => box.addEventListener("click", () => {
+      if (playing && playing !== box) pauseBox(playing);
+      playing = box; playBox(box);
+    }));
     vidObs = new IntersectionObserver(es => { es.forEach(e => seen.set(e.target, e.isIntersecting ? e.intersectionRatio : 0)); pick(); }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
     boxes.forEach(b => vidObs.observe(b));
     // Thresholds alone miss a video moving from the edge to the middle, so also re-check after scrolling stops.
@@ -5760,26 +5780,32 @@ function vSoon() {
     ${ib ? `<button class="btn btn-primary btn-block" data-svcgo="ibedel">Use iBedel meanwhile</button>` : ""}
   </div>`;
 }
-// A service page made of videos, like YouTube: each video (it plays when it reaches the middle of the screen),
-// its title, and buttons to chat on WhatsApp or share it.
+// A service page made of videos, like YouTube: a header with Call, WhatsApp and TikTok, then each video
+// (it plays when tapped, or by itself when it reaches the middle of the screen), its title, and quick buttons.
+const SVC_ICONS = {
+  call: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>',
+  tiktok: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.6 2h-3.3v13.2a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9a6.3 6.3 0 1 0 5.3 6.2V8.5a7.9 7.9 0 0 0 4.4 1.3V6.5a4.5 4.5 0 0 1-4.4-4.5z"/></svg>',
+};
 function vVideos(h) {
   const wa = String(h.whatsapp || settings.support?.whatsapp || "").replace(/\D/g, "");
+  const phone = String(h.phone || "").replace(/[^\d+]/g, "");
   const initial = esc((h.name || "?").trim()[0] || "?").toUpperCase();
   const avatar = h.photo ? `<img src="${esc(h.photo)}" alt="">` : initial;
+  const callBtn = cls => phone ? `<button class="btn ${cls} call-btn" data-call="${esc(phone)}">${SVC_ICONS.call}Call</button>` : "";
+  const waBtn = (cls, text) => wa ? `<a class="btn ${cls} wa-btn" href="https://wa.me/${wa}${text ? "?text=" + encodeURIComponent(text) : ""}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>` : "";
   const card = (v, n) => {
     const title = v.title || `${h.name} video ${n + 1}`;
-    const ask = `Salaan ${h.name}, waxaan daawaday: ${title}`;
     return `<article class="yt-card">
       ${SUUQ.videoEmbed(v.url, { autoplay: true, title })}
       <div class="yt-meta"><span class="yt-avatar">${avatar}</span>
         <div class="yt-text"><b class="yt-title">${esc(title)}</b><small>${esc(h.name)}</small></div></div>
-      <div class="yt-actions">
-        ${wa ? `<a class="btn wa-btn" href="https://wa.me/${wa}?text=${encodeURIComponent(ask)}" target="_blank" rel="noopener">${ICON.wa}Chat on WhatsApp</a>` : ""}
-        <a class="btn btn-ghost" href="https://wa.me/?text=${encodeURIComponent(title + " " + v.url)}" target="_blank" rel="noopener">Share</a>
-      </div></article>`;
+      <div class="yt-actions">${callBtn("")}${waBtn("", `Salaan ${h.name}, waxaan daawaday: ${title}`)}
+        <a class="btn btn-ghost" href="https://wa.me/?text=${encodeURIComponent(title + " " + v.url)}" target="_blank" rel="noopener">Share</a></div></article>`;
   };
   return `<div class="view yt-view">
     <div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
+    <div class="yt-channel"><span class="yt-avatar big">${avatar}</span><div class="yt-text"><b>${esc(h.name)}</b><small>${esc(h.sub || "")}</small></div></div>
+    ${phone || wa || h.tiktok ? `<div class="yt-contact">${callBtn("")}${waBtn("", "")}${h.tiktok ? `<a class="btn tt-btn" href="${esc(h.tiktok)}" target="_blank" rel="noopener">${SVC_ICONS.tiktok}TikTok</a>` : ""}</div>` : ""}
     <div class="yt-feed">${h.videos.map(card).join("")}</div>
   </div>`;
 }
@@ -5939,6 +5965,7 @@ function bind() {
   bindHubSearch();
   if (["suuq", "visa", "wallet", "affiliate"].includes(S.service) && S.user?.role === "customer") SUUQ.bind(appEl);
   SUUQ.bindAutoplay(appEl);
+  appEl.querySelectorAll("[data-call]").forEach(b => b.onclick = () => dialUssd(b.dataset.call));
   appEl.querySelectorAll("[data-wtoggle]").forEach(b => b.onclick = () => {
     try { localStorage.setItem("sarrif.walletHidden", walletHidden() ? "0" : "1"); } catch {}
     render(); const t = appEl.querySelector("[data-wtoggle]"); if (t) t.focus();
@@ -6400,6 +6427,8 @@ function renderSuper() {
       <input class="input" data-f="sub" data-i="${i}" value="${esc(sv.sub)}" maxlength="60" aria-label="Description">
       <textarea class="input svc-vids" data-f="videos" data-i="${i}" rows="3" placeholder="Videos, one per line: the YouTube link, then the title (optional)" aria-label="Videos, one per line: the YouTube link, then the title">${esc(videoLines(sv))}</textarea>
       <input class="input" data-f="whatsapp" data-i="${i}" value="${esc(sv.whatsapp || "")}" inputmode="tel" placeholder="WhatsApp number for this service (optional)" aria-label="WhatsApp number for this service">
+      <input class="input" data-f="phone" data-i="${i}" value="${esc(sv.phone || "")}" inputmode="tel" placeholder="Phone number for the Call button (optional)" aria-label="Phone number for the Call button">
+      <input class="input" data-f="tiktok" data-i="${i}" value="${esc(sv.tiktok || "")}" inputmode="url" placeholder="TikTok link (optional)" aria-label="TikTok link">
       <select class="input" data-f="art" data-i="${i}" aria-label="Picture">${ARTS().map(k => `<option value="${k}" ${k === sv.art ? "selected" : ""}>${esc(window.SarrifArt.LABELS[k])}</option>`).join("")}</select>
     </div>
     <div class="acts">
@@ -6461,10 +6490,10 @@ $("#ns-add").onclick = async () => {
   let _photoData;
   if (file) { try { _photoData = await compressImage(file, 2_000_000); } catch { return msg("#st-ns", "That photo could not be used. Choose a JPG, PNG or WebP photo.", "bad"); } }
   const btn = $("#ns-add"); btn.disabled = true; msg("#st-ns", "Adding…");
-  svcDraft.push({ id: "", name, sub, videos: $("#ns-video").value.trim(), whatsapp: $("#ns-wa").value.trim(), art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
+  svcDraft.push({ id: "", name, sub, videos: $("#ns-video").value.trim(), whatsapp: $("#ns-wa").value.trim(), phone: $("#ns-phone").value.trim(), tiktok: $("#ns-tiktok").value.trim(), art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
   try {
     const failed = await saveServices();
-    $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = ""; $("#ns-video").value = ""; $("#ns-wa").value = "";
+    $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = ""; $("#ns-video").value = ""; $("#ns-wa").value = ""; $("#ns-phone").value = ""; $("#ns-tiktok").value = "";
     msg("#st-ns", failed ? `${name} is on the services page now, but its photo could not be uploaded. Use Change photo in the list.` : `${name} is on the services page now, marked “Coming soon”.`, failed ? "bad" : "ok");
   } catch (e) {
     svcDraft = svcDraft.filter(x => !(x.id === "" && x.name === name)); renderSuper();
