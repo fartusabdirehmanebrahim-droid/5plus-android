@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790700325">
+<meta name="sarrif-build" content="1790700892">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -672,6 +672,26 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
 .svc-vids{grid-column:1/-1;resize:vertical;min-height:44px;font-size:13px}
 .svc-video .vid{margin:0}
 
+/* YouTube-style video pages for services */
+.yt-view{gap:10px}
+.yt-feed{display:flex;flex-direction:column;gap:22px}
+.yt-card{display:flex;flex-direction:column;gap:10px}
+.yt-card .vid{display:block;margin:0;border-radius:14px}
+.vid-thumb{position:absolute;inset:0;background:#111 center/cover no-repeat}
+.vid-play{position:absolute;left:50%;top:50%;width:62px;height:44px;margin:-22px 0 0 -31px;border-radius:12px;background:rgba(0,0,0,.72)}
+.vid-play::after{content:"";position:absolute;left:25px;top:13px;border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #fff}
+.vid iframe[src]{z-index:1}
+.vid iframe:not([src]){display:none}
+.yt-meta{display:flex;gap:10px;align-items:flex-start}
+.yt-avatar{flex:none;width:38px;height:38px;border-radius:50%;overflow:hidden;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:700}
+.yt-avatar img{width:100%;height:100%;object-fit:cover}
+.yt-text{min-width:0;display:flex;flex-direction:column;gap:2px}
+.yt-title{font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.yt-text small{color:var(--ink-3);font-size:12.5px}
+.yt-actions{display:flex;gap:8px;flex-wrap:wrap}
+.yt-actions .btn{flex:1;min-height:42px;white-space:nowrap;font-size:14px;padding:8px 12px}
+.yt-actions .btn-ghost{flex:0 0 auto}
+
 </style>
 </head>
 <body>
@@ -714,7 +734,8 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
             <div class="mini"><label for="ns-name">Name</label><input class="input" id="ns-name" maxlength="30" placeholder="Caafimaad"></div>
             <div class="mini"><label for="ns-sub">Short description</label><input class="input" id="ns-sub" maxlength="60" placeholder="Book a doctor"></div>
             <div class="mini"><label for="ns-art">Picture</label><select class="input" id="ns-art"></select></div>
-            <div class="mini"><label for="ns-video">YouTube video links (optional, one per line)</label><textarea class="input" id="ns-video" rows="3" inputmode="url" placeholder="https://youtu.be/…"></textarea></div>
+            <div class="mini"><label for="ns-video">Videos (optional): one per line, the YouTube link then the title</label><textarea class="input" id="ns-video" rows="3" placeholder="https://youtu.be/… Our new shop"></textarea></div>
+            <div class="mini"><label for="ns-wa">WhatsApp number (optional)</label><input class="input" id="ns-wa" inputmode="tel" placeholder="252634000000"></div>
             <div class="mini"><label for="ns-photo">Your photo (optional)</label><input class="input" id="ns-photo" type="file" accept="image/jpeg,image/png,image/webp"></div>
           </div>
           <div class="row-actions"><button class="btn btn-ghost" id="ns-add">Add service</button><span class="status-msg" id="st-ns"></span></div>
@@ -1687,7 +1708,7 @@ function publicUser(u) {
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
-  return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x) })),
+  return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "" })),
     premierPayTo: s.agentNums.premier || "",
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };
 }
@@ -2047,16 +2068,37 @@ route("GET", "/api/super/overview", async (req, res) => {
   const sentMonth = await db.all("SELECT cur, COUNT(*) AS n, SUM(fee) AS fees FROM requests WHERE status = 'sent' AND sent_at >= ? GROUP BY cur", month.getTime());
   send(res, 200, { services: s.services.map(x => ({ ...x, photo: x.photo ? "/media/" + x.photo : null })), staff, customers, ibedel: { waiting, sentMonth } });
 });
-// A service's videos: up to 10 web links (YouTube and others). Accepts a list, or text with one link per line.
+// A service's videos: up to 10, each a web link (YouTube and others) with an optional title.
+// Accepts a list, or text with one video per line: the link, then the title ("https://youtu.be/… Our new shop").
 const MAX_SERVICE_VIDEOS = 10;
 function cleanVideos(v) {
-  const list = (Array.isArray(v) ? v : String(v || "").split(/[\s,]+/)).map(x => String(x || "").trim()).filter(Boolean);
-  if (list.length > MAX_SERVICE_VIDEOS) fail(`A service can have up to ${MAX_SERVICE_VIDEOS} videos.`);
-  for (const x of list) if (x.length > 300 || !/^https?:\/\/[^\s<>"']+$/i.test(x)) fail("Each video link must be a web address, for example https://youtu.be/…");
-  return [...new Set(list)];
+  const items = Array.isArray(v) ? v : String(v || "").split(/\r?\n/);
+  const out = [];
+  for (const it of items) {
+    let url, title;
+    if (it && typeof it === "object") { url = String(it.url || "").trim(); title = String(it.title || "").trim(); }
+    else { const line = String(it || "").trim(); if (!line) continue; const sp = line.search(/\s/); url = sp < 0 ? line : line.slice(0, sp); title = sp < 0 ? "" : line.slice(sp).trim(); }
+    if (!url) continue;
+    if (url.length > 300 || !/^https?:\/\/[^\s<>"']+$/i.test(url)) fail("Each video must start with its link, for example https://youtu.be/…");
+    if (!out.some(x => x.url === url)) out.push({ url, title: title.slice(0, 120) });
+  }
+  if (out.length > MAX_SERVICE_VIDEOS) fail(`A service can have up to ${MAX_SERVICE_VIDEOS} videos.`);
+  return out;
 }
-// Services saved before several videos were allowed have one "video".
-const serviceVideos = x => Array.isArray(x.videos) ? x.videos : x.video ? [x.video] : [];
+// Older saves kept one "video", or plain links.
+const serviceVideos = x => (Array.isArray(x.videos) ? x.videos : x.video ? [x.video] : []).map(v => typeof v === "string" ? { url: v, title: "" } : { url: v.url, title: v.title || "" });
+// Fills in missing YouTube titles from YouTube itself (skipped quietly when YouTube can't be reached).
+async function fillVideoTitles(videos) {
+  await Promise.all(videos.map(async v => {
+    if (v.title || !/youtu\.?be/.test(v.url) || typeof fetch !== "function") return;
+    try {
+      const r = await fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(v.url), { signal: AbortSignal.timeout(4000) });
+      if (r.ok) v.title = String((await r.json()).title || "").slice(0, 120);
+    } catch {}
+  }));
+  return videos;
+}
+const cleanWa = v => { const d = String(v || "").replace(/\D/g, ""); if (d && (d.length < 7 || d.length > 15)) fail("Check the WhatsApp number (country code and number, for example 252634000000)."); return d; };
 route("PUT", "/api/super/services", async (req, res) => {
   await needRole(req, "super");
   const b = await readJson(req), cur = (await getSettings()).services;
@@ -2070,7 +2112,7 @@ route("PUT", "/api/super/services", async (req, res) => {
     if (!id) id = "service";
     while (seen.has(id)) id += "-2";
     seen.add(id);
-    out.push({ id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: cleanVideos(x.videos ?? x.video) });
+    out.push({ id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: await fillVideoTitles(cleanVideos(x.videos ?? x.video)), whatsapp: cleanWa(x.whatsapp) });
   }
   for (const c of cur) if (c.builtIn && !out.some(o => o.id === c.id)) fail(`${c.name} can be hidden but not deleted.`);
   for (const c of cur) if (c.photo && !out.some(o => o.id === c.id)) await db.files.del(c.photo);
@@ -2148,7 +2190,7 @@ function serveStatic(req, res, pathname) {
 
 /* ---------- server ---------- */
 const SECURITY_HEADERS = {
-  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.tiktok.com https://www.facebook.com https://www.instagram.com https://www.dailymotion.com https://geo.dailymotion.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://i.ytimg.com; media-src 'self' blob: https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.tiktok.com https://www.facebook.com https://www.instagram.com https://www.dailymotion.com https://geo.dailymotion.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "same-origin",
   "X-Frame-Options": "DENY",
@@ -2901,7 +2943,7 @@ module.exports = function market(ctx) {
     const digits = /^[#\s]*\d+$/.test(q) ? q.replace(/\D/g, "") : "";
     const has = v => String(v || "").toLowerCase().includes(q);
     const s = await getSettings();
-    const services = s.services.filter(x => x.visible && (has(x.name) || has(x.sub))).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x) }));
+    const services = s.services.filter(x => x.visible && (has(x.name) || has(x.sub))).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "" }));
     const shopRows = (await db.all(`${SHOP_SELECT} ORDER BY s.shop_no`, now())).filter(r => {
       const pf = JSON.parse(r.profile || "{}");
       return (digits && String(r.shop_no).startsWith(digits)) || has(r.name) || has(pf.business_name) || has(pf.full_name) || has(r.owner_name);
@@ -3548,15 +3590,23 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     return c.toDataURL("image/jpeg", 0.82);
   }
 
-  // Saba Multi Services with its YouTube videos (they play one after another as the customer scrolls).
+  // Saba Multi Services with its YouTube videos (from youtube.com/@sabamulti.services). The one in the middle of the screen plays.
   const SABA = { name: "Saba Multi Services", sub: "Watch our videos", art: "general", videos: [
-    "https://youtu.be/CLVee3xFY_I", "https://youtu.be/dkDm6hFQAQI", "https://youtu.be/X_tY0rbV2E8", "https://youtu.be/9LML6owF-UA"] };
+    { url: "https://youtu.be/CLVee3xFY_I", title: "Ma raadinaysay bir gaadhigaga" },
+    { url: "https://youtu.be/dkDm6hFQAQI", title: "Bir gaadhi haddii aad raadinaysay, imika Saba ayaa si wacan kula adeegaysa" },
+    { url: "https://youtu.be/X_tY0rbV2E8", title: "Hada dalbo oo ku hel muddo kooban" },
+    { url: "https://youtu.be/9LML6owF-UA", title: "Hada dalbo oo ku hel muddo kooban" }] };
+  const ytId = u => (String(u).match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/) || [])[1] || u;
   async function addSaba(sup) {
     const { services } = await sup("GET", "/api/super/overview");
     const list = services.map(({ photo, ...x }) => x);
     const have = list.find(x => x.name.trim().toLowerCase() === SABA.name.toLowerCase());
-    if (have) { if (!(have.videos || []).length) have.videos = SABA.videos; else return; }
-    else list.push({ id: "", visible: true, ...SABA });
+    if (!have) list.push({ id: "", visible: true, ...SABA });
+    else {
+      const vids = (Array.isArray(have.videos) ? have.videos : have.video ? [have.video] : []).map(v => typeof v === "string" ? { url: v, title: "" } : v);
+      if (!vids.length) have.videos = SABA.videos;
+      else have.videos = vids.map(v => v.title ? v : { url: v.url, title: (SABA.videos.find(x => ytId(x.url) === ytId(v.url)) || {}).title || "" });
+    }
     await sup("PUT", "/api/super/services", { services: list });
   }
 
@@ -3574,7 +3624,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     const t = await sup("POST", "/api/auth/login", { phone: A.super.phone, pin: A.super.pin });
     await sup("POST", "/api/auth/admin-password", { ticket: t.ticket, password: A.super.password });
     await m("POST", "/api/auth/login", { phone: A.merchant.phone, pin: A.merchant.pin });
-    if (from < 4) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
+    if (from < 5) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
     if (from >= 3) return;
     // The sample visas were left waiting for approval in older demos: approve them.
     const va = call();
@@ -4077,7 +4127,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     delete G.__DEMO_INITIAL_DB;
     await serverStarted; // the server sets up its database, then starts listening
     // Sample data version: 2 = real product photos, 3 = sample visas approved. Older demo data is upgraded in place (your own changes stay).
-    const SAMPLE_VERSION = 4, had = Number(all.get("sampleVersion") || 1);
+    const SAMPLE_VERSION = 5, had = Number(all.get("sampleVersion") || 1);
     if (fresh && G.__demoSeed) await G.__demoSeed({ call: seedCall, Buffer });
     else if (had < SAMPLE_VERSION && G.__demoUpgrade) { try { await G.__demoUpgrade({ call: seedCall, from: had }); } catch (e) { console.warn("Demo upgrade skipped:", e.message); } }
     if (fresh || had < SAMPLE_VERSION) await idbWrite([["sampleVersion", SAMPLE_VERSION]], []);
@@ -4467,9 +4517,11 @@ const SUUQ = (() => {
     else if (/facebook\.com|fb\.watch/.test(url)) src = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false`;
     // The demo page can't show videos from other sites inside it, so it links to them instead.
     const watch = `<a class="btn btn-ghost btn-block" href="${esc(url)}" target="_blank" rel="noopener">▶ Watch the ${auto ? "video" : "product video"}</a>`;
-    if (window.SARRIF_NO_EMBED) return watch;
+    const thumb = yt ? `<span class="vid-thumb" style="background-image:url('https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg')" aria-hidden="true"></span><span class="vid-play" aria-hidden="true"></span>` : "";
+    // Where videos can't play inside the page (the demo page), the picture opens the video on YouTube.
+    if (window.SARRIF_NO_EMBED) return yt && auto ? `<a class="vid" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Watch ${esc(title)} on YouTube">${thumb}</a>` : watch;
     // An autoplaying YouTube video loads only when it first scrolls into view, so it starts right then.
-    if (src && yt && auto) return `<div class="vid" data-auto="yt"><iframe data-src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
+    if (src && yt && auto) return `<div class="vid" data-auto="yt">${thumb}<iframe data-src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
     if (src) return `<div class="vid"${yt ? ` data-auto-yt` : ""}><iframe src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>`;
     if (/\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(url)) return `<div class="vid"${auto ? ` data-auto="file"` : ""}><video src="${esc(url)}" controls playsinline preload="metadata"${auto ? " muted loop" : ""}></video></div>`;
     return watch;
@@ -5596,7 +5648,8 @@ function vSignup() {
 }
 
 const ART = (k, photo) => window.SarrifArt ? window.SarrifArt.art(k, photo) : "";
-const hubServices = () => (settings.services || []);
+// A service with videos is open: its page shows the videos.
+const hubServices = () => (settings.services || []).map(x => (x.videos || []).length ? { ...x, ready: true } : x);
 const SUUQ_ICONS = {
   wallet: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></svg>',
   shop: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l1.5-5h13L20 9"/><path d="M4 9h16v2a3 3 0 0 1-5.3 1.9A3 3 0 0 1 12 14a3 3 0 0 1-2.7-1.1A3 3 0 0 1 4 11z"/><path d="M5 13.5V20h14v-6.5M10 20v-4h4v4"/></svg>',
@@ -5697,14 +5750,37 @@ function vHub() {
 function vSoon() {
   const h = hubServices().find(x => x.id === S.service);
   if (!h) { S.service = null; return vHub(); }
+  if ((h.videos || []).length) return vVideos(h);
   const ib = hubServices().some(x => x.id === "ibedel");
   return `<div class="view">
     <button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button>
     <div class="soon-card"><div class="soon-art">${ART(h.art, h.photo)}</div>
       <h2 style="font-size:24px">${esc(h.name)}</h2><span class="soon">Coming soon</span>
       <p class="note" style="margin:0;max-width:30ch">We're building ${esc(h.name)} now. It will open here as soon as it's ready.</p></div>
-    ${(h.videos || []).length ? `<div class="svc-videos">${h.videos.map((v, n) => `<div class="svc-video">${SUUQ.videoEmbed(v, { autoplay: true, title: `${h.name} video ${n + 1}` })}</div>`).join("")}</div>` : ""}
     ${ib ? `<button class="btn btn-primary btn-block" data-svcgo="ibedel">Use iBedel meanwhile</button>` : ""}
+  </div>`;
+}
+// A service page made of videos, like YouTube: each video (it plays when it reaches the middle of the screen),
+// its title, and buttons to chat on WhatsApp or share it.
+function vVideos(h) {
+  const wa = String(h.whatsapp || settings.support?.whatsapp || "").replace(/\D/g, "");
+  const initial = esc((h.name || "?").trim()[0] || "?").toUpperCase();
+  const avatar = h.photo ? `<img src="${esc(h.photo)}" alt="">` : initial;
+  const card = (v, n) => {
+    const title = v.title || `${h.name} video ${n + 1}`;
+    const ask = `Salaan ${h.name}, waxaan daawaday: ${title}`;
+    return `<article class="yt-card">
+      ${SUUQ.videoEmbed(v.url, { autoplay: true, title })}
+      <div class="yt-meta"><span class="yt-avatar">${avatar}</span>
+        <div class="yt-text"><b class="yt-title">${esc(title)}</b><small>${esc(h.name)}</small></div></div>
+      <div class="yt-actions">
+        ${wa ? `<a class="btn wa-btn" href="https://wa.me/${wa}?text=${encodeURIComponent(ask)}" target="_blank" rel="noopener">${ICON.wa}Chat on WhatsApp</a>` : ""}
+        <a class="btn btn-ghost" href="https://wa.me/?text=${encodeURIComponent(title + " " + v.url)}" target="_blank" rel="noopener">Share</a>
+      </div></article>`;
+  };
+  return `<div class="view yt-view">
+    <div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
+    <div class="yt-feed">${h.videos.map(card).join("")}</div>
   </div>`;
 }
 function vHome() {
@@ -6322,7 +6398,8 @@ function renderSuper() {
     <div class="fields">
       <input class="input" data-f="name" data-i="${i}" value="${esc(sv.name)}" maxlength="30" aria-label="Name">
       <input class="input" data-f="sub" data-i="${i}" value="${esc(sv.sub)}" maxlength="60" aria-label="Description">
-      <textarea class="input svc-vids" data-f="videos" data-i="${i}" rows="2" placeholder="YouTube video links, one per line (optional)" aria-label="YouTube video links, one per line">${esc(Array.isArray(sv.videos) ? sv.videos.join("\n") : (sv.videos || sv.video || ""))}</textarea>
+      <textarea class="input svc-vids" data-f="videos" data-i="${i}" rows="3" placeholder="Videos, one per line: the YouTube link, then the title (optional)" aria-label="Videos, one per line: the YouTube link, then the title">${esc(videoLines(sv))}</textarea>
+      <input class="input" data-f="whatsapp" data-i="${i}" value="${esc(sv.whatsapp || "")}" inputmode="tel" placeholder="WhatsApp number for this service (optional)" aria-label="WhatsApp number for this service">
       <select class="input" data-f="art" data-i="${i}" aria-label="Picture">${ARTS().map(k => `<option value="${k}" ${k === sv.art ? "selected" : ""}>${esc(window.SarrifArt.LABELS[k])}</option>`).join("")}</select>
     </div>
     <div class="acts">
@@ -6362,6 +6439,9 @@ function renderSuper() {
   $("#sup-admins").innerHTML = supAdmins.length ? supAdmins.map(u => personCard(u, true)).join("") : `<div class="empty">No service admins yet. Add one above.</div>`;
   bindPeople($("#sup-admins"), loadSupAdminsAndPaint);
 }
+// Videos as the admin edits them: one per line, the link then the title.
+const videoLines = sv => typeof sv.videos === "string" ? sv.videos
+  : (Array.isArray(sv.videos) ? sv.videos : sv.video ? [sv.video] : []).map(v => typeof v === "string" ? v : `${v.url}${v.title ? " " + v.title : ""}`).join("\n");
 // A new photo only changes that one service; any other edits not saved yet stay in the draft.
 async function svcPhotoDone(r, note) {
   const byId = Object.fromEntries(r.services.map(x => [x.id, x.photo]));
@@ -6381,10 +6461,10 @@ $("#ns-add").onclick = async () => {
   let _photoData;
   if (file) { try { _photoData = await compressImage(file, 2_000_000); } catch { return msg("#st-ns", "That photo could not be used. Choose a JPG, PNG or WebP photo.", "bad"); } }
   const btn = $("#ns-add"); btn.disabled = true; msg("#st-ns", "Adding…");
-  svcDraft.push({ id: "", name, sub, videos: $("#ns-video").value.trim(), art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
+  svcDraft.push({ id: "", name, sub, videos: $("#ns-video").value.trim(), whatsapp: $("#ns-wa").value.trim(), art: $("#ns-art").value, visible: true, ready: false, builtIn: false, ...(_photoData ? { _photoData } : {}) });
   try {
     const failed = await saveServices();
-    $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = ""; $("#ns-video").value = "";
+    $("#ns-name").value = ""; $("#ns-sub").value = ""; $("#ns-photo").value = ""; $("#ns-video").value = ""; $("#ns-wa").value = "";
     msg("#st-ns", failed ? `${name} is on the services page now, but its photo could not be uploaded. Use Change photo in the list.` : `${name} is on the services page now, marked “Coming soon”.`, failed ? "bad" : "ok");
   } catch (e) {
     svcDraft = svcDraft.filter(x => !(x.id === "" && x.name === name)); renderSuper();
