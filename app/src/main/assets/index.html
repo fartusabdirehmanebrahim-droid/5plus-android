@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790703043">
+<meta name="sarrif-build" content="1790703599">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -723,6 +723,8 @@ body.no-top .screen{min-height:100dvh}
 .yt-channel .back{flex:none}
 .yt-channel .yt-avatar.big:has(img){background:#fff;border:1px solid var(--line)}
 .yt-channel .yt-avatar.big img{object-fit:contain}
+.vid-sound{position:absolute;right:10px;top:10px;z-index:3;width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.62);color:#fff;display:grid;place-items:center;cursor:pointer}
+.vid-sound:focus-visible{outline:3px solid #fff;outline-offset:2px}
 
 </style>
 </head>
@@ -4612,9 +4614,9 @@ const SUUQ = (() => {
     let m, src = null, yt = false;
     if ((m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/))) {
       yt = true;
-      // Browsers only start a video by itself when it is muted; inside the 5PLUS Android app it can play with sound.
-      const mute = window.SarrifAndroid ? 0 : 1;
-      src = `https://www.youtube-nocookie.com/embed/${m[1]}?enablejsapi=1&playsinline=1&rel=0` + (auto ? `&autoplay=1&mute=${mute}&loop=1&playlist=${m[1]}` : "");
+      // Videos play with sound. Browsers only start a video by itself when it is muted, so there the sound comes on
+      // at the customer's first tap; inside the 5PLUS Android app it plays with sound straight away.
+      src = `https://www.youtube-nocookie.com/embed/${m[1]}?enablejsapi=1&playsinline=1&rel=0` + (auto ? `&autoplay=1&mute=${canSound() ? 0 : 1}&loop=1&playlist=${m[1]}` : "");
     }
     else if ((m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/))) src = `https://player.vimeo.com/video/${m[1]}`;
     else if ((m = url.match(/tiktok\.com\/.*\/video\/(\d+)/))) src = `https://www.tiktok.com/embed/v2/${m[1]}`;
@@ -4627,24 +4629,61 @@ const SUUQ = (() => {
     // Where videos can't play inside the page (the demo page), the picture opens the video on YouTube.
     if (window.SARRIF_NO_EMBED) return yt && auto ? `<a class="vid" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Watch ${esc(title)} on YouTube">${thumb}</a>` : watch;
     // An autoplaying YouTube video loads only when it first scrolls into view, so it starts right then.
-    if (src && yt && auto) return `<div class="vid" data-auto="yt">${thumb}<iframe data-src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
+    if (src && yt && auto) return `<div class="vid" data-auto="yt">${thumb}<iframe data-src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>${soundBtn()}</div>`;
     if (src) return `<div class="vid"${yt ? ` data-auto-yt` : ""}><iframe src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>`;
     if (/\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(url)) return `<div class="vid"${auto ? ` data-auto="file"` : ""}><video src="${esc(url)}" controls playsinline preload="metadata"${auto ? " muted loop" : ""}></video></div>`;
     return watch;
   }
   // Plays autoplay videos while at least half of them is on screen, and pauses them otherwise.
   let vidObs = null;
-  function ytCommand(frame, func) { try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*"); } catch {} }
+  // Sound: on, unless the customer turned it off with the 🔊 button (remembered). In a browser it can only come on
+  // after the customer has tapped the page once.
+  let soundWanted = (() => { try { return localStorage.getItem("sarrif.videoSound") !== "off"; } catch { return true; } })();
+  let tapped = !!window.SarrifAndroid;
+  const canSound = () => soundWanted && tapped;
+  const ICON_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>';
+  const ICON_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z"/></svg>';
+  const soundBtn = () => `<button type="button" class="vid-sound" data-sound aria-label="${canSound() ? "Turn sound off" : "Turn sound on"}">${canSound() ? ICON_ON : ICON_OFF}</button>`;
+  function ytCommand(frame, func, args = []) { try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*"); } catch {} }
+  function applySound(f) { if (canSound()) { ytCommand(f, "unMute"); ytCommand(f, "setVolume", [100]); } else ytCommand(f, "mute"); }
+  function paintSoundButtons() {
+    document.querySelectorAll("[data-sound]").forEach(b => { b.innerHTML = canSound() ? ICON_ON : ICON_OFF; b.setAttribute("aria-label", canSound() ? "Turn sound off" : "Turn sound on"); });
+  }
+  let playingBox = null;
   function playBox(box) {
     const f = box.querySelector("iframe"), v = box.querySelector("video");
-    if (v) { v.play().catch(() => {}); return; }
+    playingBox = box;
+    if (v) { v.muted = !canSound(); v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); return; }
     if (!f) return;
-    if (!f.getAttribute("src")) f.setAttribute("src", f.dataset.src); else ytCommand(f, "playVideo");
+    if (!f.getAttribute("src")) {
+      // First time: load it. Once YouTube is ready, set the sound the way the customer wants it.
+      f.addEventListener("load", () => { setTimeout(() => { if (playingBox === box) applySound(f); }, 800); setTimeout(() => { if (playingBox === box) applySound(f); }, 2000); }, { once: true });
+      f.setAttribute("src", f.dataset.src);
+    } else { applySound(f); ytCommand(f, "playVideo"); }
   }
+  // A video that leaves the screen is paused and silenced, so its sound stops at once.
   function pauseBox(box) {
     const f = box.querySelector("iframe"), v = box.querySelector("video");
-    if (v) v.pause(); else if (f && f.getAttribute("src")) ytCommand(f, "pauseVideo");
+    if (playingBox === box) playingBox = null;
+    if (v) v.pause(); else if (f && f.getAttribute("src")) { ytCommand(f, "mute"); ytCommand(f, "pauseVideo"); }
   }
+  function setSound(on) {
+    soundWanted = on; tapped = true;
+    try { localStorage.setItem("sarrif.videoSound", on ? "on" : "off"); } catch {}
+    paintSoundButtons();
+    if (playingBox) { const f = playingBox.querySelector("iframe"), v = playingBox.querySelector("video"); if (f) applySound(f); if (v) v.muted = !canSound(); }
+  }
+  // In a browser the first tap anywhere lets the sound come on.
+  if (!tapped) document.addEventListener("pointerdown", e => {
+    if (tapped || e.target.closest?.("[data-sound]")) return;
+    tapped = true; paintSoundButtons();
+    if (playingBox) { const f = playingBox.querySelector("iframe"); if (f && f.getAttribute("src")) applySound(f); }
+  }, { capture: true });
+  // Leaving the app (or switching to another app) stops the sound.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && playingBox) { const box = playingBox; pauseBox(box); playingBox = box; }
+    else if (!document.hidden && playingBox && playingBox.isConnected) playBox(playingBox);
+  });
   function bindAutoplay(root) {
     if (vidObs) vidObs.disconnect();
     const boxes = root.querySelectorAll(".vid[data-auto]"); if (!boxes.length) return;
@@ -4665,6 +4704,12 @@ const SUUQ = (() => {
       if (best) playBox(best);
     };
     bindAutoplay.recheck = () => { if (boxes[0] && boxes[0].isConnected) pick(); };
+    root.querySelectorAll("[data-sound]").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      const box = b.closest(".vid");
+      setSound(!canSound());
+      if (box && playingBox !== box) { if (playing && playing !== box) pauseBox(playing); playing = box; playBox(box); }
+    }));
     // Tapping a video's picture plays it at once (and pauses the one playing).
     boxes.forEach(box => box.addEventListener("click", () => {
       if (playing && playing !== box) pauseBox(playing);
