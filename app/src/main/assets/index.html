@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790701365">
+<meta name="sarrif-build" content="1790701521">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -2133,6 +2133,30 @@ route("PUT", "/api/super/services", async (req, res) => {
   broadcast("settings", publicSettings(s));
   send(res, 200, { services: s.services.map(x => ({ ...x, photo: x.photo ? "/media/" + x.photo : null })) });
 });
+// The videos page of one service (videos, Call, WhatsApp, TikTok). The super admin can edit any service;
+// a service admin only their own. Merchants and customers can't.
+async function needPageEditor(req, id) {
+  const u = await needRole(req, "super", "admin");
+  if (!isSuper(u) && u.service !== id) fail("You can only change your own service's page.", 403);
+  const s = await getSettings(), i = s.services.findIndex(x => x.id === id);
+  if (i < 0) fail("That service was not found.", 404);
+  return { s, i };
+}
+const pageOf = x => ({ videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "" });
+route("GET", "/api/admin/service-page/:id", async (req, res, url, [id]) => {
+  const { s, i } = await needPageEditor(req, id);
+  send(res, 200, pageOf(s.services[i]));
+});
+route("PUT", "/api/admin/service-page/:id", async (req, res, url, [id]) => {
+  const { i } = await needPageEditor(req, id);
+  const b = await readJson(req);
+  const page = { videos: await fillVideoTitles(cleanVideos(b.videos)), whatsapp: cleanWa(b.whatsapp), phone: cleanPhoneNo(b.phone), tiktok: cleanTiktok(b.tiktok) };
+  const fresh = await getSettings(); // read again: titles may have taken a moment to fetch
+  const services = fresh.services.map((x, j) => x.id === id ? { ...x, ...page, video: undefined } : x);
+  const ns = await saveSettings({ services });
+  broadcast("settings", publicSettings(ns));
+  send(res, 200, pageOf(ns.services.find(x => x.id === id)));
+});
 route("POST", "/api/super/admins", async (req, res) => {
   await needRole(req, "super");
   const b = await readJson(req);
@@ -3567,6 +3591,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     visaSeller: { phone: "634111222", pin: "4826" },
     agent: { name: "Ayaan Agent", phone: "634700700", pin: "8642" },
     suuqAdmin: { name: "Suuq Admin", phone: "634500500", pin: "2468", password: "suuq-admin1" },
+    sabaAdmin: { name: "Saba Admin", phone: "634600600", pin: "3579", password: "saba-admin1" },
   };
   globalThis.__DEMO_ACCOUNTS = ACCOUNTS;
 
@@ -3622,7 +3647,10 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
       else have.videos = vids.map(v => v.title ? v : { url: v.url, title: (SABA.videos.find(x => ytId(x.url) === ytId(v.url)) || {}).title || "" });
       for (const k of ["phone", "whatsapp", "tiktok"]) if (!have[k]) have[k] = SABA[k];
     }
-    await sup("PUT", "/api/super/services", { services: list });
+    const r = await sup("PUT", "/api/super/services", { services: list });
+    // Its own admin, who can change the Saba videos page (and nothing else).
+    const saba = r.services.find(x => x.name.trim().toLowerCase() === SABA.name.toLowerCase()), A = ACCOUNTS.sabaAdmin;
+    if (saba) try { await sup("POST", "/api/super/admins", { name: A.name, phone: A.phone, pin: A.pin, password: A.password, service: saba.id }); } catch {}
   }
 
   // Demo data made before the sample products had real photos: give those products their real photos
@@ -3639,7 +3667,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     const t = await sup("POST", "/api/auth/login", { phone: A.super.phone, pin: A.super.pin });
     await sup("POST", "/api/auth/admin-password", { ticket: t.ticket, password: A.super.password });
     await m("POST", "/api/auth/login", { phone: A.merchant.phone, pin: A.merchant.pin });
-    if (from < 6) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
+    if (from < 7) { try { await addSaba(sup); } catch (e) { console.warn("Saba Multi Services not added:", e.message); } }
     if (from >= 3) return;
     // The sample visas were left waiting for approval in older demos: approve them.
     const va = call();
@@ -4142,7 +4170,7 @@ module.exports = { sqliteDb, postgresDb, schemaForPg, toPg };
     delete G.__DEMO_INITIAL_DB;
     await serverStarted; // the server sets up its database, then starts listening
     // Sample data version: 2 = real product photos, 3 = sample visas approved. Older demo data is upgraded in place (your own changes stay).
-    const SAMPLE_VERSION = 6, had = Number(all.get("sampleVersion") || 1);
+    const SAMPLE_VERSION = 7, had = Number(all.get("sampleVersion") || 1);
     if (fresh && G.__demoSeed) await G.__demoSeed({ call: seedCall, Buffer });
     else if (had < SAMPLE_VERSION && G.__demoUpgrade) { try { await G.__demoUpgrade({ call: seedCall, from: had }); } catch (e) { console.warn("Demo upgrade skipped:", e.message); } }
     if (fresh || had < SAMPLE_VERSION) await idbWrite([["sampleVersion", SAMPLE_VERSION]], []);
@@ -6530,9 +6558,10 @@ $("#sa-add").onclick = async () => {
 };
 
 /* ---------- dashboard for services that are not built yet ---------- */
-let svcAgents = [];
+let svcAgents = [], svcPage = null;
 async function loadSvcAgents() {
   try { svcAgents = (await api(`/api/admin/users?role=agent&service=${encodeURIComponent(currentService())}`)).users; } catch { svcAgents = []; }
+  try { svcPage = currentService() === "ibedel" ? null : await api(`/api/admin/service-page/${encodeURIComponent(currentService())}`); } catch { svcPage = null; }
   renderSvcDash(true);
 }
 function renderSvcDash(fromLoad) {
@@ -6547,8 +6576,19 @@ function renderSvcDash(fromLoad) {
   }
   if (!fromLoad) { el.innerHTML = `<div class="panel empty">Loading…</div>`; loadSvcAgents(); return; }
   el.innerHTML = (id === "suuq" ? `<div class="admin-head"><div><span class="label">Suuq admin</span><h2>Suuq dashboard</h2><p>Sellers, their products and the subscription plans.</p></div></div>${SUUQ.adminTabs()}<div hidden>`
-    : id === "visa" ? `<div class="admin-head"><div><span class="label">Visa admin</span><h2>Visa dashboard</h2><p>Visas that sellers list, and the words they can show instead of a price.</p></div></div>${SUUQ.visaTabs()}<div hidden>` : "") + `<div class="admin-head"><div><span class="label">${esc(name)} admin</span><h2>${esc(name)} dashboard</h2><p>This service is ${sv?.ready ? "open" : "still being built. Customers see it as “Coming soon”"}. You can already set up its agents.</p></div></div>
+    : id === "visa" ? `<div class="admin-head"><div><span class="label">Visa admin</span><h2>Visa dashboard</h2><p>Visas that sellers list, and the words they can show instead of a price.</p></div></div>${SUUQ.visaTabs()}<div hidden>` : "") + `<div class="admin-head"><div><span class="label">${esc(name)} admin</span><h2>${esc(name)} dashboard</h2><p>${(svcPage?.videos || []).length ? "Customers see this service's videos page, with your Call, WhatsApp and TikTok buttons." : `This service is ${sv?.ready ? "open" : "still being built. Customers see it as “Coming soon”"}. You can already set up its agents.`}</p></div></div>
     ${sv ? `<div class="sup-card" style="max-width:420px"><span class="hub-art">${ART(sv.art, sv.photo)}</span></div>` : ""}
+    ${svcPage ? `<div class="panel">
+      <div class="panel-head"><div><h3>${esc(name)} videos page</h3><p>With videos, customers see a page like YouTube instead of “Coming soon”. Only admins can change it.</p></div></div>
+      <div class="mini"><label for="sp-videos">Videos: one per line, the YouTube link then the title</label>
+        <textarea class="input" id="sp-videos" rows="5" placeholder="https://youtu.be/… Our new shop">${esc(videoLines(svcPage))}</textarea></div>
+      <div class="grid2">
+        <div class="mini"><label for="sp-phone">Phone for the Call button</label><input class="input" id="sp-phone" inputmode="tel" value="${esc(svcPage.phone)}" placeholder="0634000000"></div>
+        <div class="mini"><label for="sp-wa">WhatsApp number</label><input class="input" id="sp-wa" inputmode="tel" value="${esc(svcPage.whatsapp)}" placeholder="252634000000"></div>
+        <div class="mini"><label for="sp-tiktok">TikTok link</label><input class="input" id="sp-tiktok" inputmode="url" value="${esc(svcPage.tiktok)}" placeholder="https://www.tiktok.com/@…"></div>
+      </div>
+      <div class="row-actions"><button class="btn btn-primary" id="sp-save">Save page</button><span class="status-msg" id="st-sp"></span></div>
+    </div>` : ""}
     <div class="panel">
       <div class="panel-head"><div><h3>Add a ${esc(name)} agent</h3><p>Agents only see ${esc(name)} work.</p></div></div>
       <div class="grid2">
@@ -6561,6 +6601,15 @@ function renderSvcDash(fromLoad) {
     <div class="panel"><div class="panel-head"><div><h3>${esc(name)} agents</h3></div></div><div class="people" id="sg-list">${svcAgents.length ? svcAgents.map(u => personCard(u)).join("") : `<div class="empty">No agents yet.</div>`}</div></div>`;
   if (id === "suuq" || id === "visa") { const extra = el.querySelector("div[hidden]"); if (extra) { const head = extra.querySelector(".admin-head"); if (head) head.remove(); const art = extra.querySelector(".sup-card"); if (art) art.remove(); extra.hidden = false; } if (id === "suuq") SUUQ.bindAdminTabs(el); else SUUQ.bindVisaTabs(el); }
   bindPeople($("#sg-list"), loadSvcAgents);
+  const spSave = $("#sp-save");
+  if (spSave) spSave.onclick = async () => {
+    spSave.disabled = true; msg("#st-sp", "Saving…");
+    try {
+      svcPage = await api(`/api/admin/service-page/${encodeURIComponent(id)}`, { method: "PUT", body: { videos: $("#sp-videos").value, phone: $("#sp-phone").value, whatsapp: $("#sp-wa").value, tiktok: $("#sp-tiktok").value } });
+      $("#sp-videos").value = videoLines(svcPage);
+      msg("#st-sp", `Saved. Customers see the ${name} page now.`, "ok");
+    } catch (e) { msg("#st-sp", e.message, "bad"); } finally { spSave.disabled = false; }
+  };
   $("#sg-add").onclick = async () => {
     try { await api("/api/admin/agents", { body: { name: $("#sg-name").value, phone: $("#sg-phone").value, pin: $("#sg-pin").value, service: id } }); await loadSvcAgents(); msg("#st-sg", "Agent added.", "ok"); }
     catch (e) { msg("#st-sg", e.message, "bad"); }
@@ -6616,6 +6665,7 @@ function renderSvcDash(fromLoad) {
       ${A.visaSeller ? row("Visa seller", A.visaSeller) : ""}
       ${A.agent ? row("iBedel agent", A.agent) : ""}
       ${A.suuqAdmin ? row("Suuq admin", A.suuqAdmin) : ""}
+      ${A.sabaAdmin ? row("Saba Multi Services admin", A.sabaAdmin) : ""}
     </table>
     <p>The customer has $300 in the wallet to try buying. Open this page in a second tab to be the buyer in one and the seller or agent in the other; they update each other live.</p>
     <p>USSD codes open the dialer only on a phone.</p>
