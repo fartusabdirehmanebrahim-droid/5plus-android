@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790801644">
+<meta name="sarrif-build" content="1790802473">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -6867,7 +6867,7 @@ const walletHidden = () => { try { return localStorage.getItem("sarrif.walletHid
 // One service tile, the same on "Choose a service" and in search results.
 const hubTile = h => `<button class="hub-tile ${h.ready ? "is-ready" : ""}" data-svcgo="${esc(h.id)}">
       <span class="hub-art">${(h.gallery || []).length ? slideShow(h.gallery) : ART(h.art, h.photo)}${window.SarrifArt ? SarrifArt.icon(h.art) : ""}</span>
-      <span class="hub-body"><b>${esc(h.name)}</b><small>${esc(h.sub)}</small>${h.ready ? "" : `<span class="soon">Coming soon</span>`}</span></button>`;
+      <span class="hub-body"><b>${esc(h.name)}</b><small>${esc(h.sub)}</small></span></button>`;
 // Services match by name or description, in English or in the chosen language, as soon as the person types.
 function hubServiceMatches(q) {
   const k = q.trim().toLowerCase(); if (!k) return [];
@@ -6999,13 +6999,14 @@ function vSoon() {
   if (!h) { S.service = null; return vHub(); }
   if (h.id === "ticket") return vTicket(h);
   if ((h.videos || []).length || (h.gallery || []).length) return vVideos(h);
-  const ib = hubServices().some(x => x.id === "ibedel");
+  // A service without its own page yet: its photo, name and description, and a way to contact it.
+  const wa = String(h.whatsapp || settings.support?.whatsapp || "").replace(/\D/g, ""), phone = String(h.phone || "").replace(/[^\d+]/g, "");
   return `<div class="view">
-    <button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button>
+    <div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
     <div class="soon-card"><div class="soon-art">${ART(h.art, h.photo)}${window.SarrifArt ? SarrifArt.icon(h.art) : ""}</div>
-      <h2 style="font-size:24px">${esc(h.name)}</h2><span class="soon">Coming soon</span>
-      <p class="note" style="margin:0;max-width:30ch">We're building ${esc(h.name)} now. It will open here as soon as it's ready.</p></div>
-    ${ib ? `<button class="btn btn-primary btn-block" data-svcgo="ibedel">Use iBedel meanwhile</button>` : ""}
+      <h2 style="font-size:24px">${esc(h.name)}</h2>
+      ${h.sub ? `<p class="note" style="margin:0;max-width:30ch">${esc(h.sub)}</p>` : ""}</div>
+    ${phone || wa ? `<div class="yt-contact">${phone ? `<button class="btn call-btn" data-call="${esc(phone)}">${SVC_ICONS.call}Call</button>` : ""}${wa ? `<a class="btn wa-btn" href="https://wa.me/${wa}?text=${encodeURIComponent("Salaan, " + h.name)}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>` : ""}</div>` : ""}
   </div>`;
 }
 // Moving pictures: the photos fade from one to the next (tiles), or slide along (service page).
