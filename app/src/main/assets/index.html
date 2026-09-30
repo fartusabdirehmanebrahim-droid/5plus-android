@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790794446">
+<meta name="sarrif-build" content="1790794845">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -6660,7 +6660,7 @@ function vTicket(h) {
   const list = T.list.filter(a => !q || [a.name, a.city, a.country, String(a.shop_no || "")].some(x => (x || "").toLowerCase().includes(q)));
   return `<div class="view">
     <div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
-    <div><h2 style="font-size:20px">Travel agencies</h2><p class="note" style="margin:2px 0 0">Ask an agency for a ticket price, pay from your wallet, or chat with them. Share an agency and earn when someone buys a ticket; you earn it too when you buy yourself.</p></div>
+    <div><h2 style="font-size:20px">Travel agencies</h2></div>
     <div class="sq-search"><input class="input" id="tk-q" placeholder="Search agency or city" value="${esc(T.q)}" aria-label="Search agency or city"></div>
     ${list.length ? `<div class="agency-list">${list.map(a => `<div class="agency ${T.open === a.id ? "open" : ""}">
       <div class="agency-row">
