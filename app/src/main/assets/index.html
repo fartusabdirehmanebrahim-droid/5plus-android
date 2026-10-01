@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790878449">
+<meta name="sarrif-build" content="1790879125">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -1026,27 +1026,6 @@ body.zv-open{overflow:hidden}
 .ts-card-ic svg{width:44px;height:44px}
 .ts-card-l{position:absolute;left:0;right:0;bottom:0;padding:8px;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:13px;font-weight:700;text-align:center}
 .ts-card-l small{font-weight:600;opacity:.85}
-/* Ticket: "How can I help you today?" trip request */
-.trip-card{display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:20px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 18px rgba(15,39,36,.07)}
-.trip-card .mini{display:flex;flex-direction:column;gap:6px}
-.trip-chips{display:flex;flex-wrap:wrap;gap:8px}
-.trip-chips .chip{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
-.trip-chips .chip.on{background:var(--green);border-color:var(--green);color:#fff}
-.trip-card .seg{align-self:flex-start}
-.trip-sent{background:var(--green-soft)}
-.trip-card .row-btns{display:flex;gap:8px;flex-wrap:wrap}
-/* Voice ordering */
-.vo-card{align-items:center;text-align:center}
-.vo-btn{position:relative;width:104px;height:104px;border-radius:50%;border:0;background:var(--green);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 28px rgba(15,110,80,.35);margin:6px 0}
-.vo-btn svg{position:relative;z-index:1}
-.vo-ring{position:absolute;inset:0;border-radius:50%;border:3px solid var(--green);opacity:0}
-.vo-card.live .vo-btn{background:#c0392b;box-shadow:0 10px 28px rgba(192,57,43,.35)}
-.vo-card.live .vo-ring{border-color:#c0392b;animation:vring 1.6s ease-out infinite}
-.vo-btn.talking .vo-ring{animation-duration:.7s}
-@keyframes vring{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.6);opacity:0}}
-.vo-label{font-size:15px}
-.trip-sent-box{display:flex;flex-direction:column;gap:8px;align-items:center;padding:12px;border-radius:14px;background:var(--green-soft);width:100%}
-@media (prefers-reduced-motion:reduce){.vo-card.live .vo-ring{animation:none;opacity:.6}}
 
 </style>
 </head>
@@ -1079,15 +1058,6 @@ body.zv-open{overflow:hidden}
       </div>
       <div data-spane="overview"><div class="sup-grid" id="sup-overview"></div></div>
       <div data-spane="services" class="sup-col">
-        <div class="panel" id="voice-ai-panel">
-          <div class="panel-head"><div><h3>Voice ordering (Ticket)</h3><p>Customers tap the microphone in Ticket and say what they need in their own language; the voice assistant asks the destination and who travels, then sends the request to the travel agencies. It uses Google Gemini Live: paste a Gemini API key from Google AI Studio (aistudio.google.com). Google charges your account for its use. The key stays on the server; customers never see it.</p></div></div>
-          <div class="grid2">
-            <div class="mini"><label for="vai-key">Gemini API key <small id="vai-state"></small></label><input class="input" id="vai-key" type="password" autocomplete="off" placeholder="Paste a new key to set or change it"></div>
-            <div class="mini"><label for="vai-model">Model</label><input class="input" id="vai-model" placeholder="gemini-3.1-flash-live-preview"></div>
-            <div class="mini"><label for="vai-voice">Voice</label><select class="input" id="vai-voice"><option>Kore</option><option>Aoede</option><option>Leda</option><option>Zephyr</option><option>Puck</option><option>Charon</option><option>Fenrir</option><option>Orus</option></select></div>
-          </div>
-          <div class="row-actions"><button class="btn btn-primary" id="vai-save">Save</button><button class="btn btn-ghost" id="vai-off">Turn off</button><span class="status-msg" id="st-vai"></span></div>
-        </div>
         <div class="panel">
           <div class="panel-head"><div><h3>Services on the home page</h3><p>Hide a service to remove it from every customer's home page. Built-in services can be hidden but not deleted.</p></div>
             <div class="row-actions"><span class="status-msg" id="st-svcs"></span><button class="btn btn-primary" id="save-svcs">Save services</button></div></div>
@@ -2085,7 +2055,7 @@ function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
   return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "", gallery: galleryOut(x) })),
     premierPayTo: s.agentNums.premier || "", minUsd: MIN_USD_RECEIVE,
-    safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct, voiceOrder: !!s.voiceOrderOn,
+    safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct,
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };
 }
 
@@ -3093,7 +3063,7 @@ async function getSettings() {
   // Older installs had "1 month / 12 months" plans with no tiers: switch to the tiered plans.
   if (!s.suuq.plans.some(p => p.id === "free")) s.suuq.plans = structuredClone(DEFAULT_SETTINGS.suuq.plans);
   if (Number(saved.earnFeePct) >= 0) s.earnFeePct = Number(saved.earnFeePct);
-  s.voiceOrderOn = !!saved.voiceOrderOn; // voice ordering is set up (its key is kept apart, in settings "voiceai")
+  s.ticketAdminAgency = Number(saved.ticketAdminAgency) || 0; // the Ticket admin's agency: it gets half of all ticket requests
   if (saved.safePay) s.safePay = { ...s.safePay, ...saved.safePay, codes: { SLSH: { ...s.safePay.codes.SLSH, ...(saved.safePay.codes?.SLSH || {}) }, USD: { ...s.safePay.codes.USD, ...(saved.safePay.codes?.USD || {}) } } };
   if (saved.walletTopup) s.walletTopup = { ...s.walletTopup, ...saved.walletTopup, ussd: { ...s.walletTopup.ussd, ...(saved.walletTopup.ussd || {}) }, numbers: { ...s.walletTopup.numbers, ...(saved.walletTopup.numbers || {}) } };
   return s;
@@ -3800,8 +3770,11 @@ module.exports = function market(ctx) {
 
   route("POST", "/api/suuq/orders", async (req, res) => {
     const u = await needRole(req, "customer"), b = await readJson(req);
-    const p = await db.get(`${PROD_SELECT} WHERE p.id = ? AND ${LIVE_T}`, String(b.product_id), now());
+    let p = await db.get(`${PROD_SELECT} WHERE p.id = ? AND ${LIVE_T}`, String(b.product_id), now());
     if (!p) fail("This product is not available any more.", 404);
+    // Ticket: every second request goes to the Ticket admin's agency.
+    let chosen = "";
+    if (p.service === "ticket" && p.owner_id !== u.id) { const a = await ticketRoute(p, u); if (a) { chosen = p.shop_name; p = a; } }
     if (!await marketOpen(p.service || "suuq")) fail(`${MNAME[p.service || "suuq"]} is not available right now.`);
     if (p.owner_id === u.id) fail("You can't order your own product.");
     // Hidden price + Buy: the buyer asks for the price first. Nothing is paid until the seller sends the price.
@@ -3819,7 +3792,7 @@ module.exports = function market(ctx) {
     const plan = p.mode === "buy" && !ask && method !== "wallet" ? await payPlan(method, b.via, p.cur, total, p.shop_profile) : null;
     const commission = p.mode === "buy" && aff && !ask ? COMMISSION(p, qty) : 0;
     const id = crypto.randomUUID(), ref = "SQ" + crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 7);
-    const note = String(b.note || "").trim().slice(0, 300);
+    const note = ((chosen ? `Customer chose ${chosen}. ` : "") + String(b.note || "").trim()).slice(0, 300);
     const limited = Number(p.stock) >= 0;
     await tx(async () => {
       // Limited items (hotel rooms…): one is held for this order until it ends.
@@ -4266,75 +4239,32 @@ module.exports = function market(ctx) {
     if (o.from_order) await db.run("UPDATE orders SET forwarded_to = ? WHERE id = ?", nid, o.from_order);
     return nid;
   }
-  // "How can I help you today?": the customer says what they need, where they want to go and who travels.
-  // The request goes to one travel agency, which rings; if it rejects, the request passes to another agency.
-  route("POST", "/api/ticket/request", async (req, res) => {
-    const u = await needRole(req, "customer"), b = await readJson(req);
-    const help = String(b.help || "").trim().slice(0, 120), dest = String(b.destination || "").trim().slice(0, 80);
-    if (!dest) fail("Write where you would like to go.");
-    const people = b.company === "others" ? Math.min(50, Math.max(2, Math.floor(Number(b.people) || 2))) : 1;
-    const when = String(b.when || "").trim().slice(0, 60);
-    const note = [help && `Help: ${help}`, `Destination: ${dest}`, people > 1 ? `With others: ${people} people` : "Travelling alone", when && `When: ${when}`].filter(Boolean).join(" · ").slice(0, 300);
-    if (!await marketOpen("ticket")) fail("Ticket is not available right now.");
-    let id, agency;
-    await tx(async () => {
-      const c = await pickAgency(new Set([u.id]));
-      if (!c) fail((await travelShops()).length ? "Your own agency can't take your request. Log in as a customer to send one." : "No travel agency can take requests right now. Try again later.");
-      const me = await earner(u.ref_code), aff = me && me.id === u.id && me.id !== c.owner_id ? me.id : null;
-      id = await addRequest({ buyer_id: u.id, affiliate_id: aff, qty: people, note }, c); agency = c.shop_name;
-    });
-    await pushOrder(id);
-    send(res, 200, { order: orderRow(await db.get(`${ORDER_SELECT} WHERE o.id = ?`, id), false), agency });
+  // The Ticket admin's own agency gets half of all new ticket requests: every second request goes to it, whichever
+  // agency the customer chose (the other half goes to the agency they chose). Requests passed on after a rejection don't count.
+  async function ticketStats(adminShop) {
+    const r = await db.get(`SELECT COUNT(*) AS total, SUM(CASE WHEN o.shop_id = ? THEN 1 ELSE 0 END) AS admin FROM orders o JOIN products p ON p.id = o.product_id
+      WHERE p.service = 'ticket' AND o.from_order = ''`, adminShop || 0);
+    return { total: Number(r.total) || 0, admin: Number(r.admin) || 0 };
+  }
+  async function ticketRoute(p, u) {
+    const id = (await getSettings()).ticketAdminAgency; if (!id || p.shop_id === id) return null;
+    const shop = (await travelShops()).find(x => x.id === id); if (!shop || shop.owner_id === u.id) return null;
+    const { total, admin } = await ticketStats(id);
+    if (admin * 2 >= total + 1) return null; // the admin agency already has its half
+    const t = await ticketProduct(shop);
+    return await db.get(`${PROD_SELECT} WHERE p.id = ?`, t.id);
+  }
+  route("GET", "/api/admin/ticket-agency", async (req, res) => {
+    await needPageEditor(req, "ticket");
+    const id = (await getSettings()).ticketAdminAgency;
+    send(res, 200, { agency: id, agencies: (await travelShops()).map(s => { const pf = JSON.parse(s.profile || "{}"); return { id: s.id, name: s.name, city: pf.city || "" }; }), stats: await ticketStats(id) });
   });
-  /* ---------- Voice ordering (Ticket) ---------- */
-  // The customer talks; a voice assistant (Google Gemini Live, the super admin's key) asks what they need, where they
-  // want to go and who travels, then sends the trip request. The key never leaves the server: the app gets a
-  // one-use token that works for a few minutes.
-  const VOICE_MODEL = "gemini-3.1-flash-live-preview";
-  async function voiceCfg() { const r = await db.get("SELECT value FROM settings WHERE key = 'voiceai'"); try { return r ? JSON.parse(r.value) : {}; } catch { return {}; } }
-  route("GET", "/api/super/voice-ai", async (req, res) => {
-    await needRole(req, "super"); const c = await voiceCfg();
-    send(res, 200, { set: !!c.key, last4: c.key ? c.key.slice(-4) : "", model: c.model || VOICE_MODEL, voice: c.voice || "Kore" });
-  });
-  route("PUT", "/api/super/voice-ai", async (req, res) => {
-    await needRole(req, "super"); const b = await readJson(req), c = await voiceCfg();
-    const key = b.clear ? "" : String(b.key || "").trim() || c.key || "";
-    if (key && !/^[\w-]{20,200}$/.test(key)) fail("Check the API key.");
-    const model = String(b.model || c.model || VOICE_MODEL).trim().replace(/^models\//, "").slice(0, 80);
-    if (!/^[\w.-]+$/.test(model)) fail("Check the model name.");
-    const voice = String(b.voice || c.voice || "Kore").trim().slice(0, 30);
-    await db.run("INSERT INTO settings (key, value) VALUES ('voiceai', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", JSON.stringify({ key, model, voice }));
-    const s = await saveSettings({ voiceOrderOn: !!key });
-    broadcast("settings", publicSettings(s));
-    send(res, 200, { set: !!key, last4: key ? key.slice(-4) : "", model, voice });
-  });
-  const voiceUse = new Map(); // user id → start times in the last hour
-  route("POST", "/api/voice/start", async (req, res) => {
-    const u = await needRole(req, "customer"), b = await readJson(req), c = await voiceCfg();
-    if (!c.key) fail("Voice ordering is not available right now.", 404);
-    const t = now(), list = (voiceUse.get(u.id) || []).filter(x => t - x < 3600000);
-    if (list.length >= 20) fail("Please wait a little before starting again.", 429);
-    list.push(t); voiceUse.set(u.id, list);
-    const iso = ms => new Date(ms).toISOString();
-    let r, j;
-    try {
-      r = await fetch("https://generativelanguage.googleapis.com/v1alpha/auth_tokens", { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": c.key },
-        body: JSON.stringify({ uses: 1, expireTime: iso(t + 15 * 60000), newSessionExpireTime: iso(t + 2 * 60000) }) });
-      j = await r.json().catch(() => ({}));
-    } catch { fail("Voice ordering can't connect right now. Try again.", 502); }
-    if (!r.ok || !j.name) { console.warn("Voice token:", r.status, JSON.stringify(j).slice(0, 300)); fail("Voice ordering can't start right now. Try again later.", 502); }
-    const LANGS = { so: "Somali", en: "English", ar: "Arabic", am: "Amharic", fr: "French" }, lang = LANGS[String(b.lang || "")] || "Somali";
-    const agencies = (await travelShops()).filter(s => s.owner_id !== u.id).length;
-    const prompt = `You are the friendly voice of the Ticket desk in the 5PLUS app (Somaliland and Somalia). You speak with ${u.name || "a customer"} by voice.
-Your job: take their travel request and send it to the travel agencies.
-1. Greet them warmly in ${lang} and ask: "How can I help you today?" (for example an air ticket, a visa, Hajj or Umrah, a hotel booking).
-2. Ask where they would like to go (the destination city or country).
-3. Ask if they travel alone or with someone; if with others, how many people in total.
-4. If it helps, ask when they want to travel (optional).
-5. Repeat the request back in one short sentence and ask them to confirm. When they agree, call send_trip_request.
-6. After it is sent, tell them which agency received it, that the agency will contact them in the app to agree the price in chat, and that they pay in the app. If the agency can't take it, it goes to another agency automatically.
-Rules: Always answer in the language the customer speaks (Somali, English, Arabic, Amharic, French, Swahili, Oromo or any other) and switch when they switch. Keep every reply short and natural, like a helpful person on the phone. Ask one question at a time. Never invent prices, flights or dates; the agency gives the price. Only talk about travel requests in this app. Do not describe how you work or which company built you. If the customer sincerely asks whether they are talking to a real person, say honestly that you are the app's automatic voice assistant and that a real travel agency will handle their request.${agencies ? "" : " Right now no travel agency is online; still take the request, and if sending fails, apologise and ask them to try again later."}`;
-    send(res, 200, { token: j.name, model: c.model || VOICE_MODEL, voice: c.voice || "Kore", prompt });
+  route("PUT", "/api/admin/ticket-agency", async (req, res) => {
+    await needPageEditor(req, "ticket");
+    const b = await readJson(req), id = Number(b.agency) || 0;
+    if (id && !(await travelShops()).some(s => s.id === id)) fail("Choose one of the travel agencies.");
+    await saveSettings({ ticketAdminAgency: id });
+    send(res, 200, { agency: id, stats: await ticketStats(id) });
   });
   route("GET", "/api/ticket/agencies", async (req, res) => {
     await needUser(req);
@@ -7659,11 +7589,9 @@ const SUUQ = (() => {
   async function openTicket(pid) { st.fromTicket = true; st.tab = "shop"; st.shopView = null; st.chat = null; S.service = "suuq"; await Promise.all([openProduct(pid), loadWallet()]); render(); }
   async function shareTicket(pid, btn) { try { const p = (await api("/api/suuq/products/" + encodeURIComponent(pid))).product; await copy(shareLink(pid, p.share_code), btn, "Link copied"); } catch {} }
   const earnLabel = (type, value, cur = "USD") => Number(value) > 0 ? `Earn ${type === "percent" ? value + "%" : money(value, cur)} by sharing` : "";
-  // The customer's orders (My orders), opened from another service (Ticket's trip request); Back returns there.
-  async function openOrders() { st.fromTicket = true; st.tab = "orders"; st.product = null; st.shopView = null; st.chat = null; S.service = "suuq"; await loadOrders(); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { openOrders, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; }, state: st };
 })();
 
@@ -7796,7 +7724,6 @@ async function playVoice() {
 const appEl = $("#app");
 function render() {
   if (S.screen !== "welcome" && speaking) stopVoice();
-  if (typeof VOICE !== "undefined" && VOICE.st !== "idle" && (S.service !== "ticket" || !S.user)) { voiceStop(); return; }
   applyRole();
   if (S.user && S.user.role !== "customer") return;
   if (S.user) normalizeQuote();
@@ -8128,165 +8055,6 @@ async function loadAgencies() {
   try { S.ticket.list = (await api("/api/ticket/agencies")).agencies; } catch (e) { S.ticket.list = []; S.ticket.err = e.message; }
   if (S.service === "ticket") render();
 }
-// "How can I help you today?": the customer's trip request goes to a travel agency, which accepts or rejects it
-// (a rejected request passes to another agency). The agency then agrees the price in chat and sends it.
-const TRIP_HELP = ["Air ticket", "Visa", "Hajj & Umrah", "Hotel booking"];
-function tripForm(T) {
-  const t = T.trip || (T.trip = { help: "", dest: "", company: "alone", people: 2, sent: null, err: "" });
-  if (t.sent) return `<div class="trip-card trip-sent"><b>Your request was sent</b>
-    <p class="note" style="margin:0">${esc(t.sent)} will reply soon. If they can't take it, it goes to another travel agency. You'll agree the price in chat, then pay.</p>
-    <div class="row-btns"><button class="btn btn-primary" id="trip-orders">See my request</button><button class="btn btn-ghost" id="trip-new">New request</button></div></div>`;
-  return `<div class="trip-card">
-    <h2 style="font-size:20px;margin:0">How can I help you today?</h2>
-    <div class="trip-chips">${TRIP_HELP.map(x => `<button type="button" class="chip ${t.help === x ? "on" : ""}" data-triphelp="${esc(x)}" aria-pressed="${t.help === x}">${esc(x)}</button>`).join("")}</div>
-    <input class="input" id="trip-help" placeholder="Or write what you need" value="${esc(TRIP_HELP.includes(t.help) ? "" : t.help)}" aria-label="What do you need">
-    <label class="mini"><span class="label">Where would you like to go?</span><input class="input" id="trip-dest" placeholder="Destination, e.g. Dubai" value="${esc(t.dest)}"></label>
-    <div class="mini"><span class="label">Alone or with someone?</span>
-      <div class="seg" role="group" aria-label="Alone or with someone">
-        <button type="button" data-tripco="alone" aria-pressed="${t.company === "alone"}" class="${t.company === "alone" ? "on" : ""}">Alone</button>
-        <button type="button" data-tripco="others" aria-pressed="${t.company === "others"}" class="${t.company === "others" ? "on" : ""}">With someone</button></div></div>
-    ${t.company === "others" ? `<label class="mini"><span class="label">How many people in total?</span><input class="input" id="trip-people" inputmode="numeric" value="${esc(t.people)}"></label>` : ""}
-    ${t.err ? `<small class="err">${esc(t.err)}</small>` : ""}
-    <button class="btn btn-primary btn-block" id="trip-send">Send to travel agencies</button></div>`;
-}
-/* ---------- Voice ordering ---------- */
-// The customer taps the microphone and talks in their own language. A voice assistant asks what they need, where
-// they want to go and who travels, then sends the trip request to a travel agency (accept or reject, passed on when
-// rejected). Audio: microphone → 16 kHz PCM → Gemini Live (one-use token from our server) → 24 kHz PCM → speaker.
-const VOICE = { st: "idle", err: "", ws: null, mic: null, ctxIn: null, ctxOut: null, proc: null, playAt: 0, srcs: new Set(), speakingUntil: 0, done: false, idleT: null };
-const MIC_ICON = '<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/></svg>';
-function voiceCard(T) {
-  const t = T.trip || (T.trip = { help: "", dest: "", company: "alone", people: 2, sent: null, err: "" });
-  const live = VOICE.st === "live" || VOICE.st === "connecting", talking = VOICE.st === "live" && performance.now() < VOICE.speakingUntil;
-  const label = VOICE.st === "connecting" ? "Connecting…" : VOICE.st === "live" ? (talking ? "Speaking…" : "Listening… talk now") : "Tap and talk";
-  return `<div class="trip-card vo-card ${live ? "live" : ""}" id="vo-card">
-    <h2 style="font-size:20px;margin:0">How can I help you today?</h2>
-    <p class="note" style="margin:0">Tell us where you want to go and who travels with you, in your own language.</p>
-    <button class="vo-btn ${talking ? "talking" : ""}" id="vo-btn" aria-label="${live ? "End the call" : "Tap and talk"}">${MIC_ICON}<span class="vo-ring"></span></button>
-    <b class="vo-label" id="vo-label" aria-live="polite">${label}</b>
-    ${live ? `<button class="btn btn-ghost" id="vo-end">End</button>` : ""}
-    ${t.sent ? `<div class="trip-sent-box"><b>Your request was sent</b><p class="note" style="margin:0">${esc(t.sent)} will reply soon. If they can't take it, it goes to another travel agency. You'll agree the price in chat, then pay.</p>
-      <button class="btn btn-primary" id="trip-orders">See my request</button></div>` : ""}
-    ${VOICE.err ? `<small class="err">${esc(VOICE.err)}</small>` : ""}</div>`;
-}
-function voicePaint() { if (S.service === "ticket" && !S.sheet) { render(); } }
-const b64 = buf => { let s = "", u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
-function voiceStop(keepErr) {
-  const V = VOICE;
-  try { V.ws && V.ws.close(); } catch {}
-  try { V.proc && V.proc.disconnect(); } catch {}
-  try { V.mic && V.mic.getTracks().forEach(x => x.stop()); } catch {}
-  for (const x of V.srcs) try { x.stop(); } catch {}
-  try { V.ctxIn && V.ctxIn.close(); } catch {}
-  try { V.ctxOut && V.ctxOut.close(); } catch {}
-  clearTimeout(V.idleT);
-  Object.assign(V, { st: "idle", ws: null, mic: null, ctxIn: null, ctxOut: null, proc: null, srcs: new Set(), playAt: 0, speakingUntil: 0, done: false });
-  if (!keepErr) V.err = "";
-  voicePaint();
-}
-function voicePlay(b64data) {
-  const V = VOICE, ctx = V.ctxOut; if (!ctx) return;
-  const bin = atob(b64data), n = bin.length >> 1, f = new Float32Array(n);
-  for (let i = 0; i < n; i++) { let v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); if (v >= 32768) v -= 65536; f[i] = v / 32768; }
-  const buf = ctx.createBuffer(1, n, 24000); buf.copyToChannel(f, 0);
-  const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
-  const at = Math.max(ctx.currentTime + 0.03, V.playAt); src.start(at); V.playAt = at + buf.duration;
-  V.srcs.add(src); src.onended = () => { V.srcs.delete(src); voiceLabel(); };
-  V.speakingUntil = performance.now() + (V.playAt - ctx.currentTime) * 1000; voiceLabel();
-}
-function voiceLabel() {
-  const el = document.getElementById("vo-label"), btn = document.getElementById("vo-btn"); if (!el || VOICE.st !== "live") return;
-  const talking = VOICE.srcs.size > 0; el.textContent = talking ? "Speaking…" : "Listening… talk now"; btn?.classList.toggle("talking", talking);
-}
-async function voiceStart() {
-  const V = VOICE, T = S.ticket; if (V.st !== "idle") return;
-  V.err = ""; V.st = "connecting"; voicePaint();
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error("This phone can't use the microphone here.");
-    V.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
-  } catch (e) { V.err = e.name === "NotAllowedError" ? "Allow the microphone to talk." : (e.message || "The microphone is not available."); return voiceStop(true); }
-  let cfg;
-  try { cfg = await api("/api/voice/start", { method: "POST", body: { lang: I18N.lang || "so" } }); }
-  catch (e) { V.err = e.message; return voiceStop(true); }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  V.ctxOut = new AC({ sampleRate: 24000 }); try { await V.ctxOut.resume(); } catch {}
-  const ws = V.ws = new WebSocket("wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=" + encodeURIComponent(cfg.token));
-  const sendJ = o => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
-  ws.onopen = () => sendJ({ setup: {
-    model: "models/" + cfg.model,
-    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: cfg.voice } } } },
-    systemInstruction: { parts: [{ text: cfg.prompt }] },
-    tools: [{ functionDeclarations: [{ name: "send_trip_request", description: "Send the customer's confirmed travel request to the travel agencies.",
-      parameters: { type: "OBJECT", properties: {
-        help: { type: "STRING", description: "What they need, in English, e.g. Air ticket, Visa, Hajj & Umrah, Hotel booking" },
-        destination: { type: "STRING", description: "Where they want to go, in English" },
-        people: { type: "INTEGER", description: "How many people travel in total (1 = alone)" },
-        when: { type: "STRING", description: "When they want to travel, if they said it" } }, required: ["destination", "people"] } }] }],
-  } });
-  ws.onmessage = async ev => {
-    let m; try { m = JSON.parse(typeof ev.data === "string" ? ev.data : await ev.data.text()); } catch { return; }
-    if (m.setupComplete) { V.st = "live"; voicePaint(); voiceMic(sendJ); sendJ({ realtimeInput: { text: "The customer just opened voice ordering. Greet them and ask how you can help." } }); return; }
-    const sc = m.serverContent;
-    if (sc) {
-      if (sc.interrupted) { for (const x of V.srcs) try { x.stop(); } catch {} V.srcs.clear(); V.playAt = 0; voiceLabel(); }
-      for (const p of sc.modelTurn?.parts || []) if (p.inlineData?.data) voicePlay(p.inlineData.data);
-      if (sc.turnComplete && V.done) { clearTimeout(V.idleT); V.idleT = setTimeout(function wait() { if (VOICE.srcs.size) { VOICE.idleT = setTimeout(wait, 800); return; } voiceStop(); }, 1500); }
-    }
-    for (const fc of m.toolCall?.functionCalls || []) {
-      let result;
-      if (fc.name === "send_trip_request") {
-        const a = fc.args || {}, people = Math.max(1, Math.floor(Number(a.people) || 1));
-        try {
-          const r = await api("/api/ticket/request", { method: "POST", body: { help: a.help || "", destination: a.destination || "", company: people > 1 ? "others" : "alone", people, when: a.when || "" } });
-          T.trip = T.trip || {}; T.trip.sent = r.agency || "A travel agency"; V.done = true; voicePaint();
-          result = { ok: true, agency: r.agency, ref: r.order?.ref };
-        } catch (e) { result = { ok: false, error: e.message }; }
-      } else result = { ok: false, error: "Unknown action" };
-      sendJ({ toolResponse: { functionResponses: [{ id: fc.id, name: fc.name, response: result }] } });
-    }
-    if (m.goAway) voiceStop();
-  };
-  ws.onerror = () => { V.err = "The connection was lost. Tap to try again."; };
-  ws.onclose = () => { if (VOICE.ws === ws && VOICE.st !== "idle") voiceStop(true); };
-}
-function voiceMic(sendJ) {
-  const V = VOICE, AC = window.AudioContext || window.webkitAudioContext;
-  let ctx; try { ctx = new AC({ sampleRate: 16000 }); } catch { ctx = new AC(); }
-  V.ctxIn = ctx; ctx.resume?.();
-  const src = ctx.createMediaStreamSource(V.mic), proc = ctx.createScriptProcessor(4096, 1, 1), ratio = ctx.sampleRate / 16000;
-  proc.onaudioprocess = e => {
-    if (VOICE.st !== "live") return;
-    const inp = e.inputBuffer.getChannelData(0), n = Math.floor(inp.length / ratio), out = new Int16Array(n);
-    for (let i = 0; i < n; i++) { const v = Math.max(-1, Math.min(1, inp[Math.floor(i * ratio)])); out[i] = v < 0 ? v * 32768 : v * 32767; }
-    sendJ({ realtimeInput: { audio: { data: b64(out.buffer), mimeType: "audio/pcm;rate=16000" } } });
-  };
-  const mute = ctx.createGain(); mute.gain.value = 0;
-  src.connect(proc); proc.connect(mute); mute.connect(ctx.destination); V.proc = proc;
-}
-function bindVoice() {
-  const b = document.getElementById("vo-btn"); if (!b) return;
-  b.onclick = () => VOICE.st === "idle" ? voiceStart() : voiceStop();
-  const e = document.getElementById("vo-end"); if (e) e.onclick = () => voiceStop();
-  const o = document.getElementById("trip-orders"); if (o) o.onclick = () => { voiceStop(); SUUQ.openOrders(); };
-}
-function bindTrip(T) {
-  const t = T.trip; if (!t) return;
-  const val = id => document.getElementById(id)?.value ?? "";
-  const keep = () => { const h = val("trip-help").trim(); if (h || !TRIP_HELP.includes(t.help)) t.help = h; t.dest = val("trip-dest"); if (document.getElementById("trip-people")) t.people = val("trip-people"); };
-  appEl.querySelectorAll("[data-triphelp]").forEach(b => b.onclick = () => { keep(); t.help = t.help === b.dataset.triphelp ? "" : b.dataset.triphelp; render(); });
-  appEl.querySelectorAll("[data-tripco]").forEach(b => b.onclick = () => { keep(); t.company = b.dataset.tripco; render(); });
-  const send = document.getElementById("trip-send");
-  if (send) send.onclick = async () => {
-    keep(); t.err = "";
-    if (!t.dest.trim()) { t.err = "Write where you would like to go."; return render(); }
-    send.disabled = true;
-    try { const r = await api("/api/ticket/request", { method: "POST", body: { help: t.help, destination: t.dest, company: t.company, people: t.people } }); t.sent = r.agency || "A travel agency"; }
-    catch (e) { t.err = e.message; }
-    render();
-  };
-  const o = document.getElementById("trip-orders"); if (o) o.onclick = () => SUUQ.openOrders();
-  const n = document.getElementById("trip-new"); if (n) n.onclick = () => { T.trip = null; render(); };
-}
 function vTicket(h) {
   const T = S.ticket || (S.ticket = { list: null, q: "", open: null });
   if (T.list === null) { loadAgencies(); return `<div class="view"><div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div><div class="empty">Loading…</div></div>`; }
@@ -8294,7 +8062,6 @@ function vTicket(h) {
   const list = T.list.filter(a => !q || [a.name, a.city, a.country, String(a.shop_no || "")].some(x => (x || "").toLowerCase().includes(q)));
   return `<div class="view">
     <div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
-    ${settings.voiceOrder ? voiceCard(T) : tripForm(T)}
     <div><h2 style="font-size:20px">Travel agencies</h2></div>
     <div class="sq-search"><input class="input" id="tk-q" placeholder="Search agency or city" value="${esc(T.q)}" aria-label="Search agency or city"></div>
     ${list.length ? `<div class="agency-list">${list.map(a => `<div class="agency ${T.open === a.id ? "open" : ""}">
@@ -8319,7 +8086,6 @@ function vTicket(h) {
 }
 function bindTicket() {
   const T = S.ticket; if (!T) return;
-  bindTrip(T); bindVoice();
   const q = document.getElementById("tk-q");
   if (q) { let t; q.oninput = () => { T.q = q.value; clearTimeout(t); t = setTimeout(() => { render(); const i = document.getElementById("tk-q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); }; }
   appEl.querySelectorAll("[data-agmore]").forEach(b => b.onclick = () => { const id = Number(b.dataset.agmore); T.open = T.open === id ? null : id; render(); });
@@ -9213,17 +8979,7 @@ function paintSuperTabs() {
   const t = { wallets: ["Wallets", "Top up or withdraw for customers and sellers, and see your income."], overview: ["Overview", "Every service at a glance. Open a dashboard to work inside a service."], services: ["Services", "Choose what customers see on the home page. Use your own photo on any tile."], admins: ["Admins", "Give each service its own admin."] }[supTab];
   $("#sup-title").textContent = t[0]; $("#sup-sub").textContent = t[1];
 }
-// Voice ordering settings (super admin): the Gemini key is sent once and never shown again.
-async function loadVoiceAi() {
-  try { const r = await api("/api/super/voice-ai"); $("#vai-state").textContent = r.set ? `· set (…${r.last4})` : "· not set"; $("#vai-model").value = r.model; $("#vai-voice").value = r.voice; } catch {}
-}
-async function saveVoiceAi(off) {
-  try { const r = await api("/api/super/voice-ai", { method: "PUT", body: off ? { clear: true } : { key: $("#vai-key").value.trim(), model: $("#vai-model").value.trim(), voice: $("#vai-voice").value } });
-    $("#vai-key").value = ""; await loadVoiceAi(); msg("#st-vai", r.set ? "Saved. Customers see the microphone in Ticket." : "Voice ordering is off. Paste a key to turn it on.", r.set ? "ok" : ""); }
-  catch (e) { msg("#st-vai", e.message, "bad"); }
-}
-if (document.getElementById("vai-save")) { $("#vai-save").onclick = () => saveVoiceAi(false); $("#vai-off").onclick = () => saveVoiceAi(true); }
-document.querySelectorAll("#sup-tabs [data-stab]").forEach(b => b.onclick = async () => { supTab = b.dataset.stab; paintSuperTabs(); if (supTab === "services") loadVoiceAi(); if (supTab === "wallets") { SUUQ.resetSuper(); return SUUQ.renderSuperWallets(); } if (supTab === "admins") await loadSupAdmins(); renderSuper(); });
+document.querySelectorAll("#sup-tabs [data-stab]").forEach(b => b.onclick = async () => { supTab = b.dataset.stab; paintSuperTabs(); if (supTab === "wallets") { SUUQ.resetSuper(); return SUUQ.renderSuperWallets(); } if (supTab === "admins") await loadSupAdmins(); renderSuper(); });
 function staffCount(role, service) { return (overview?.staff || []).filter(x => x.role === role && x.service === service).reduce((a, x) => a + x.n, 0); }
 function renderSuper() {
   if (!overview) return;
@@ -9354,6 +9110,17 @@ $("#sa-add").onclick = async () => {
 };
 
 /* ---------- dashboard for services that are not built yet ---------- */
+// Ticket admin: choose the admin's own travel agency. It gets half of all new ticket requests (every second one).
+async function loadTicketAgency() {
+  const el = document.getElementById("tk-admin-agency"); if (!el) return;
+  let r; try { r = await api("/api/admin/ticket-agency"); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const pct = r.stats.total ? Math.round(r.stats.admin * 100 / r.stats.total) : 0;
+  el.innerHTML = `<div class="panel-head"><div><h3>Admin agency</h3><p>Your own travel agency gets half of all ticket requests: every second request goes to it, whichever agency the customer chose. The agency accepts or rejects; a rejected request goes to another agency.</p></div></div>
+    <div class="grid2"><div class="mini"><label for="tk-ag">Admin agency</label><select class="input" id="tk-ag"><option value="0">None (customers' choice only)</option>${r.agencies.map(a => `<option value="${a.id}" ${a.id === r.agency ? "selected" : ""}>${esc(a.name)}${a.city ? " · " + esc(a.city) : ""}</option>`).join("")}</select></div></div>
+    <div class="kpis"><div class="kpi"><span class="label">Ticket requests</span><b class="num">${r.stats.total}</b></div><div class="kpi"><span class="label">To the admin agency</span><b class="num">${r.stats.admin} (${pct}%)</b></div></div>
+    <div class="row-actions"><button class="btn btn-primary" id="tk-ag-save">Save</button><span class="status-msg" id="st-tkag"></span></div>`;
+  $("#tk-ag-save").onclick = async () => { try { await api("/api/admin/ticket-agency", { method: "PUT", body: { agency: Number($("#tk-ag").value) } }); await loadTicketAgency(); msg("#st-tkag", "Saved.", "ok"); } catch (e) { msg("#st-tkag", e.message, "bad"); } };
+}
 let svcAgents = [], svcPage = null;
 async function loadSvcAgents() {
   try { svcAgents = (await api(`/api/admin/users?role=agent&service=${encodeURIComponent(currentService())}`)).users; } catch { svcAgents = []; }
@@ -9470,6 +9237,7 @@ function renderSvcDash(fromLoad) {
       <div class="row-actions"><label class="btn btn-ghost">Add photos<input type="file" id="sp-gal" accept="image/jpeg,image/png,image/webp" multiple hidden></label><span class="status-msg" id="st-gal"></span></div>
     </div>` : ""}
     ${svcPage ? trkAdminPanel(id, name) : ""}
+    ${id === "ticket" ? `<div class="panel" id="tk-admin-agency"><div class="empty">Loading…</div></div>` : ""}
     ${svcPage && !["suuq", "visa", "scholarship", "ticket", "ibedel"].includes(id) ? SUUQ.itemsPanel(id, name) : ""}
     ${svcPage && !["suuq", "visa", "scholarship", "ticket", "ibedel"].includes(id) ? (SUUQ.deskName(name), SUUQ.deskPanel(id, name)) : ""}
     <div class="panel">
@@ -9484,6 +9252,7 @@ function renderSvcDash(fromLoad) {
     <div class="panel"><div class="panel-head"><div><h3>${esc(name)} agents</h3></div></div><div class="people" id="sg-list">${svcAgents.length ? svcAgents.map(u => personCard(u)).join("") : `<div class="empty">No agents yet.</div>`}</div></div>`;
   if (id === "suuq" || id === "visa" || id === "scholarship") { const extra = el.querySelector("div[hidden]"); if (extra) { const head = extra.querySelector(".admin-head"); if (head) head.remove(); const art = extra.querySelector(".sup-card"); if (art) art.remove(); extra.hidden = false; } if (id === "suuq") SUUQ.bindAdminTabs(el); else if (id === "visa") SUUQ.bindVisaTabs(el); else SUUQ.bindScholarTabs(el); }
   bindPeople($("#sg-list"), loadSvcAgents);
+  if (id === "ticket") loadTicketAgency();
   if (svcPage) bindTrkAdmin(id);
   const galIn = $("#sp-gal");
   if (galIn) galIn.onchange = async () => {

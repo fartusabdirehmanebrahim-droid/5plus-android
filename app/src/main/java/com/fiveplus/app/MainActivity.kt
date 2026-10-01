@@ -16,7 +16,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
-import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -116,13 +115,6 @@ class MainActivity : AppCompatActivity() {
         pendingCode = null
         if (code != null) placeCall(code, granted)
         if (!granted) Toast.makeText(this, "Phone calls are off: press call in the dialer.", Toast.LENGTH_LONG).show()
-    }
-
-    // Voice ordering: the page asks for the microphone; Android asks the customer once, then the page gets it.
-    private var micRequest: PermissionRequest? = null
-    private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        val r = micRequest; micRequest = null
-        if (r != null) { if (granted) r.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) else r.deny() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -245,15 +237,6 @@ class MainActivity : AppCompatActivity() {
                 fullView?.let { (window.decorView as FrameLayout).removeView(it) }
                 fullView = null
                 fullCallback?.onCustomViewHidden(); fullCallback = null
-            }
-
-            override fun onPermissionRequest(request: PermissionRequest) {
-                runOnUiThread {
-                    if (!request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) { request.deny(); return@runOnUiThread }
-                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-                    } else { micRequest?.deny(); micRequest = request; askMic.launch(Manifest.permission.RECORD_AUDIO) }
-                }
             }
 
             // Picture uploads: Premier Wallet payment screenshots, product and visa pictures.
