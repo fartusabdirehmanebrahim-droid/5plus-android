@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790846898">
+<meta name="sarrif-build" content="1790847378">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -7444,7 +7444,9 @@ function vDrawer() {
     </nav></div>`;
 }
 // The wallet card on the services page can be hidden to save space; the choice is remembered on this phone.
-const walletHidden = () => { try { return localStorage.getItem("sarrif.walletHidden") === "1"; } catch { return false; } };
+// The wallet on the home screen is always hidden; it shows only after pressing Show, and hides again on leaving home.
+let walletShown = false;
+const walletHidden = () => !walletShown;
 // Search on the services page: shop number, shop or company name, merchant name, product name or service name.
 // One service tile, the same on "Choose a service" and in search results.
 const hubTile = h => `<button class="hub-tile ${h.ready ? "is-ready" : ""}" data-svcgo="${esc(h.id)}">
@@ -7471,6 +7473,7 @@ function hubResults() {
   return parts.join("") || `<div class="empty">Nothing found for “${esc(q)}”. Try a shop number like 1001, a shop name or a product.</div>`;
 }
 function openService(v) {
+  if (v !== "hub") walletShown = false;
   S.drawer = false; S.service = v === "hub" ? null : v; S.tab = "send"; S.sheet = null; S.ytTab = "videos"; S.trk = null;
   if (v === "ibedel") loadMine();
   if (v === "ticket") S.ticket = { list: null, q: "", open: null };
@@ -7892,7 +7895,7 @@ function bind() {
     strip.addEventListener("scroll", () => { const at = Math.round(strip.scrollLeft / (strip.clientWidth || 1)); [at, at + 1].forEach(k => strip.children[k]?.querySelectorAll("img").forEach(loadImg)); }, { passive: true });
   });
   appEl.querySelectorAll("[data-wtoggle]").forEach(b => b.onclick = () => {
-    try { localStorage.setItem("sarrif.walletHidden", walletHidden() ? "0" : "1"); } catch {}
+    walletShown = !walletShown;
     render(); const t = appEl.querySelector("[data-wtoggle]"); if (t) t.focus();
   });
   appEl.querySelectorAll("[data-drawer]").forEach(b => b.onclick = () => {
