@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so">
 <head>
-<meta name="sarrif-build" content="1790879918">
+<meta name="sarrif-build" content="1790953304">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -1077,6 +1077,12 @@ body.zv-open{overflow:hidden}
       </div>
       <div data-spane="overview"><div class="sup-grid" id="sup-overview"></div></div>
       <div data-spane="services" class="sup-col">
+        <div class="panel" id="push-panel">
+          <div class="panel-head"><div><h3>Push notifications</h3><p>Makes order alarms ring on merchants' and admins' phones even when 5PLUS is closed or the phone is locked. In Firebase (console.firebase.google.com) open your project → Project settings → Service accounts → Generate new private key, then paste the whole file here. The key stays on the server.</p></div></div>
+          <p class="note" style="margin:0" id="push-state">…</p>
+          <div class="mini"><label for="push-key">Service account key (JSON)</label><textarea class="input" id="push-key" rows="4" autocomplete="off" spellcheck="false" placeholder='{"type": "service_account", "project_id": "…", …}'></textarea></div>
+          <div class="row-actions"><button class="btn btn-primary" id="push-save">Save</button><button class="btn btn-ghost" id="push-test">Send a test alarm to my phone</button><button class="btn btn-ghost" id="push-off">Remove key</button><span class="status-msg" id="st-push"></span></div>
+        </div>
         <div class="panel">
           <div class="panel-head"><div><h3>Services on the home page</h3><p>Hide a service to remove it from every customer's home page. Built-in services can be hidden but not deleted.</p></div>
             <div class="row-actions"><span class="status-msg" id="st-svcs"></span><button class="btn btn-primary" id="save-svcs">Save services</button></div></div>
@@ -2905,6 +2911,11 @@ CREATE TABLE IF NOT EXISTS service_docs (
   status     TEXT    NOT NULL DEFAULT 'new',
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS push_tokens (
+  token      TEXT    PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -3786,10 +3797,98 @@ module.exports = function market(ctx) {
     if (forSeller) Object.assign(r, { buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, commission: o.commission, net: round(o.cur, o.total - o.commission), has_affiliate: !!o.affiliate_id });
     return r;
   }
+  /* ---------- Push notifications (Firebase Cloud Messaging) ---------- */
+  // Order alarms reach the phone even when 5PLUS is closed or the phone is locked. The super admin pastes the Firebase
+  // service account key (Super admin → Services → Push notifications), or the server gets FCM_SERVICE_ACCOUNT.
+  // The key never leaves the server. Each phone sends its push address after login.
+  async function fcmAccount() {
+    let raw = process.env.FCM_SERVICE_ACCOUNT || "";
+    if (!raw) { const r = await db.get("SELECT value FROM settings WHERE key = 'fcm'"); raw = r ? r.value : ""; }
+    if (!raw) return null;
+    try { if (!raw.trim().startsWith("{")) raw = Buffer.from(raw, "base64").toString("utf8"); const a = JSON.parse(raw); return a.private_key && a.client_email && a.project_id ? a : null; } catch { return null; }
+  }
+  let fcmAuth = { token: "", until: 0, email: "" };
+  async function fcmToken(a) {
+    if (fcmAuth.token && fcmAuth.email === a.client_email && fcmAuth.until > now() + 60000) return fcmAuth.token;
+    const b64u = x => Buffer.from(typeof x === "string" ? x : JSON.stringify(x)).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const iat = Math.floor(now() / 1000);
+    const head = b64u({ alg: "RS256", typ: "JWT" }), body = b64u({ iss: a.client_email, scope: "https://www.googleapis.com/auth/firebase.messaging", aud: "https://oauth2.googleapis.com/token", iat, exp: iat + 3600 });
+    const sig = crypto.sign("RSA-SHA256", Buffer.from(head + "." + body), a.private_key).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "grant_type=" + encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer") + "&assertion=" + head + "." + body + "." + sig });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.access_token) throw new Error("Firebase login failed: " + (j.error_description || j.error || r.status));
+    fcmAuth = { token: j.access_token, until: now() + (Number(j.expires_in) || 3600) * 1000, email: a.client_email };
+    return fcmAuth.token;
+  }
+  // kind: "ring" (25 s alarm), "paid" (10 s alarm) or "info". goto: the page to open when tapped.
+  async function pushTo(userIds, msg) {
+    try {
+      const ids = [...new Set(userIds.filter(Boolean))]; if (!ids.length) return;
+      const a = await fcmAccount(); if (!a) return;
+      const rows = await db.all(`SELECT token FROM push_tokens WHERE user_id IN (${ids.map(() => "?").join(",")})`, ...ids);
+      if (!rows.length) return;
+      const bearer = await fcmToken(a);
+      const data = { kind: msg.kind || "info", title: String(msg.title || "5PLUS").slice(0, 100), body: String(msg.body || "").slice(0, 300), goto: msg.goto || "", tag: msg.tag || "" };
+      await Promise.all(rows.map(async ({ token }) => {
+        const r = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(a.project_id)}/messages:send`, { method: "POST",
+          headers: { Authorization: "Bearer " + bearer, "Content-Type": "application/json" },
+          body: JSON.stringify({ message: { token, data, android: { priority: "HIGH", ttl: data.kind === "info" ? "86400s" : "60s" } } }) }).catch(() => null);
+        if (r && (r.status === 404 || r.status === 400)) { const j = await r.json().catch(() => ({})); if (/UNREGISTERED|INVALID_ARGUMENT/.test(JSON.stringify(j))) await db.run("DELETE FROM push_tokens WHERE token = ?", token); }
+      }));
+    } catch (e) { console.warn("Push not sent:", e.message); }
+  }
+  const pushLater = (ids, msg) => { setTimeout(() => pushTo(ids, msg), 0); };
+  route("POST", "/api/push/register", async (req, res) => {
+    const u = await needUser(req), b = await readJson(req), token = String(b.token || "").trim();
+    if (!/^[\w:.-]{20,4096}$/.test(token)) fail("Bad push address.");
+    await db.run("DELETE FROM push_tokens WHERE token = ?", token);
+    await db.run("INSERT INTO push_tokens (token, user_id, created_at) VALUES (?, ?, ?)", token, u.id, now());
+    send(res, 200, { ok: true, on: !!(await fcmAccount()) });
+  });
+  route("POST", "/api/push/unregister", async (req, res) => {
+    const b = await readJson(req); await db.run("DELETE FROM push_tokens WHERE token = ?", String(b.token || "")); send(res, 200, { ok: true });
+  });
+  route("GET", "/api/super/push", async (req, res) => {
+    await needRole(req, "super"); const a = await fcmAccount();
+    const phones = (await db.get("SELECT COUNT(*) AS n FROM push_tokens")).n;
+    send(res, 200, { set: !!a, project: a?.project_id || "", email: a?.client_email || "", fromEnv: !!process.env.FCM_SERVICE_ACCOUNT, phones: Number(phones) || 0 });
+  });
+  route("PUT", "/api/super/push", async (req, res) => {
+    const u = await needRole(req, "super"), b = await readJson(req, 64 * 1024);
+    if (b.clear) { await db.run("DELETE FROM settings WHERE key = 'fcm'"); fcmAuth = { token: "", until: 0, email: "" }; return send(res, 200, { set: false }); }
+    let a; try { a = JSON.parse(String(b.key || "")); } catch { fail("Paste the whole service account key file (it starts with {)."); }
+    if (a.type !== "service_account" || !a.private_key || !a.client_email || !a.project_id) fail("This is not a Firebase service account key.");
+    try { await fcmToken(a); } catch (e) { fail("Firebase did not accept this key: " + e.message); }
+    await db.run("INSERT INTO settings (key, value) VALUES ('fcm', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", JSON.stringify(a));
+    send(res, 200, { set: true, project: a.project_id, email: a.client_email });
+  });
+  // Test: sends an alarm to the super admin's own phones.
+  route("POST", "/api/super/push/test", async (req, res) => {
+    const u = await needRole(req, "super");
+    if (!await fcmAccount()) fail("Add the Firebase key first.");
+    const n = (await db.get("SELECT COUNT(*) AS n FROM push_tokens WHERE user_id = ?", u.id)).n;
+    if (!Number(n)) fail("Open the 5PLUS app on your phone and log in first, then try again.");
+    await pushTo([u.id], { kind: "ring", title: "Test alarm", body: "Push notifications work. This rings for 25 seconds.", tag: "test" });
+    send(res, 200, { ok: true, phones: Number(n) });
+  });
+
   async function pushOrder(id) {
     const o = await db.get(`${ORDER_SELECT} WHERE o.id = ?`, id); if (!o) return;
     broadcast("order", orderRow(o, true), u => u.id === o.seller_id);
     broadcast("order", orderRow(o, false), u => u.id === o.buyer_id);
+    // The same news by push, for phones where 5PLUS is closed.
+    {
+      const svc = String(o.p_service || "").startsWith("svc:") ? o.p_service.slice(4) : null, ref = `${o.product_name} × ${o.qty}`;
+      const staff = svc ? (await db.all("SELECT id FROM users WHERE (role = 'admin' AND service = ?) OR role = 'super'", svc)).map(x => x.id) : [o.seller_id];
+      const st = o.status, who = o.buyer_name || "A customer";
+      if (st === "requested") pushLater(staff, { kind: "ring", title: o.kind === "book" ? "New booking" : "New request", body: `${who} · ${ref}${o.note ? " · “" + o.note + "”" : ""}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
+      else if (st === "paid") pushLater(staff, { kind: "paid", title: "Order paid", body: `${who} paid ${o.total} ${o.cur} · ${ref}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
+      else if (st === "awaiting_payment" && o.pay_method === "shop") pushLater(staff, { kind: "info", title: "Check the money", body: `${who} says they paid ${o.total} ${o.cur} to your number · ${ref}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
+      else if (st === "accepted") pushLater([o.buyer_id], { kind: "info", title: "Request accepted", body: `${ref}: agree the price in chat.`, goto: "orders", tag: o.id });
+      else if (st === "quoted") pushLater([o.buyer_id], { kind: "info", title: "Price sent", body: `${ref}: ${o.total} ${o.cur}. Open 5PLUS to pay.`, goto: "orders", tag: o.id });
+      else if (st === "delivered") pushLater([o.buyer_id], { kind: "info", title: "Delivered", body: `${ref}: confirm you received it.`, goto: "orders", tag: o.id });
+    }
     if (String(o.p_service || "").startsWith("svc:")) {
       const sid = o.p_service.slice(4);
       broadcast("svcorder", { ...orderRow(o, true), desk: sid }, u => u.role === "super" || (u.role === "admin" && u.service === sid));
@@ -4210,6 +4309,8 @@ module.exports = function market(ctx) {
     if (u.id === c.buyer_id && (await db.get("SELECT COUNT(*) AS n FROM messages WHERE conv_id = ? AND sender_id = ?", c.id, u.id)).n === 1)
       Object.assign(m, { new_chat: true, from_name: u.name, product_name: (await db.get("SELECT name FROM products WHERE id = ?", c.product_id))?.name || "" });
     broadcast("chat", m, x => x.id === c.buyer_id || x.id === c.seller_id);
+    if (m.new_chat) pushLater([c.seller_id], { kind: "ring", title: "New chat", body: `${u.name}: ${body.slice(0, 120)}`, goto: "chats", tag: "chat-" + c.id });
+    else pushLater([u.id === c.buyer_id ? c.seller_id : c.buyer_id], { kind: "info", title: u.name || "New message", body: body.slice(0, 160), goto: "chats", tag: "chat-" + c.id });
     send(res, 200, { message: { ...m, mine: true } });
   });
 
@@ -4246,6 +4347,7 @@ module.exports = function market(ctx) {
     await db.run("INSERT INTO service_docs (id, service, user_id, note, files, status, created_at) VALUES (?, ?, ?, ?, ?, 'new', ?)", id, svc, u.id, note, JSON.stringify(files), now());
     const d = await db.get("SELECT * FROM service_docs WHERE id = ?", id);
     broadcast("servicedoc", docOut(d, { name: u.name, phone: u.phone, service: svc }), x => isDocAdmin(x, svc));
+    pushLater((await db.all("SELECT id FROM users WHERE (role = 'admin' AND service = ?) OR role = 'super'", svc)).map(x => x.id), { kind: "info", title: "New documents", body: `${u.name} sent ${files.length} file${files.length > 1 ? "s" : ""}${note ? ": " + note.slice(0, 100) : ""}`, goto: "docs", tag: "doc-" + id });
     send(res, 200, { doc: docOut(d) });
   });
   route("GET", "/api/services/:id/docs", async (req, res, url, [svc]) => {
@@ -7685,9 +7787,12 @@ const SUUQ = (() => {
   async function openTicket(pid) { st.fromTicket = true; st.tab = "shop"; st.shopView = null; st.chat = null; S.service = "suuq"; await Promise.all([openProduct(pid), loadWallet()]); render(); }
   async function shareTicket(pid, btn) { try { const p = (await api("/api/suuq/products/" + encodeURIComponent(pid))).product; await copy(shareLink(pid, p.share_code), btn, "Link copied"); } catch {} }
   const earnLabel = (type, value, cur = "USD") => Number(value) > 0 ? `Earn ${type === "percent" ? value + "%" : money(value, cur)} by sharing` : "";
+  // From a push notification: the customer's orders, or the chats list.
+  async function openMyOrders() { S.service = "suuq"; S.drawer = false; st.tab = "orders"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
+  async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; }, state: st };
 })();
 
@@ -8742,10 +8847,34 @@ async function openSharedProduct() {
   let pid = null; try { pid = localStorage.getItem("sarrif.open"); localStorage.removeItem("sarrif.open"); } catch {}
   if (pid && S.user?.role === "customer") { S.service = "suuq"; await SUUQ.open("suuq", { product: pid }); }
 }
+/* ---------- Push notifications (in the 5PLUS Android app) ---------- */
+// The app gives this phone's Firebase address; the server uses it to ring the phone when 5PLUS is closed.
+let pushSent = "";
+function registerPush(tries = 0) {
+  const A = window.SarrifAndroid; if (!A || !A.pushToken || !S.user) return;
+  let t = ""; try { t = A.pushToken() || ""; } catch {}
+  if (!t) { if (tries < 15) setTimeout(() => registerPush(tries + 1), 2000); return; } // Firebase is still starting
+  if (t === pushSent) return;
+  api("/api/push/register", { body: { token: t } }).then(() => { pushSent = t; }).catch(() => {});
+}
+async function unregisterPush() {
+  const A = window.SarrifAndroid; let t = ""; try { t = A && A.pushToken ? A.pushToken() : ""; } catch {}
+  if (t) { try { await api("/api/push/unregister", { body: { token: t } }); } catch {} } pushSent = "";
+}
+// A tapped notification opens the page it is about.
+window.__pushOpen = goto => {
+  if (!S.user) return;
+  if (S.user.role === "customer") {
+    if (goto === "sellerorders") SUUQ.goSellerOrders();
+    else if (goto === "orders") SUUQ.openMyOrders();
+    else if (goto === "chats") SUUQ.openChats();
+  }
+};
 async function loggedIn(user) {
   SUUQ.reset();
   S.user = user; S.err = ""; S.tab = "send"; S.screen = "home"; S.service = null; S.viewAs = null;
   connectEvents();
+  registerPush();
   if (user.role !== "customer") { try { allServices = (await api("/api/me")).services || []; } catch {} }
   if (user.role === "customer") { loadMine(); await SUUQ.loadWallet(); syncWithdrawAt(); }
   if (mode().startsWith("ibedel")) loadRequests();
@@ -8754,6 +8883,7 @@ async function loggedIn(user) {
   if (user.role === "customer") setTimeout(openSharedProduct, 0);
 }
 async function logout() {
+  await unregisterPush();
   try { await api("/api/auth/logout", { body: {} }); } catch {}
   S.user = null; S.viewAs = null; S.screen = "welcome"; S.sheet = null; if (es) { es.close(); es = null; } stopRing(); render();
 }
@@ -9125,7 +9255,19 @@ function paintSuperTabs() {
   const t = { wallets: ["Wallets", "Top up or withdraw for customers and sellers, and see your income."], overview: ["Overview", "Every service at a glance. Open a dashboard to work inside a service."], services: ["Services", "Choose what customers see on the home page. Use your own photo on any tile."], admins: ["Admins", "Give each service its own admin."] }[supTab];
   $("#sup-title").textContent = t[0]; $("#sup-sub").textContent = t[1];
 }
-document.querySelectorAll("#sup-tabs [data-stab]").forEach(b => b.onclick = async () => { supTab = b.dataset.stab; paintSuperTabs(); if (supTab === "wallets") { SUUQ.resetSuper(); return SUUQ.renderSuperWallets(); } if (supTab === "admins") await loadSupAdmins(); renderSuper(); });
+// Push notifications settings (super admin).
+async function loadPush() {
+  const el = document.getElementById("push-state"); if (!el) return;
+  try { const r = await api("/api/super/push");
+    el.textContent = r.set ? `On · Firebase project ${r.project}${r.fromEnv ? " (from the server settings)" : ""} · ${r.phones} phone${r.phones === 1 ? "" : "s"} registered` : `Off · ${r.phones} phone${r.phones === 1 ? "" : "s"} ready. Paste the key to turn it on.`;
+  } catch (e) { el.textContent = e.message; }
+}
+if (document.getElementById("push-save")) {
+  $("#push-save").onclick = async () => { try { await api("/api/super/push", { method: "PUT", body: { key: $("#push-key").value.trim() } }); $("#push-key").value = ""; msg("#st-push", "Saved. Alarms now reach phones when 5PLUS is closed.", "ok"); loadPush(); } catch (e) { msg("#st-push", e.message, "bad"); } };
+  $("#push-test").onclick = async () => { try { const r = await api("/api/super/push/test", { body: {} }); msg("#st-push", `Sent to ${r.phones} phone${r.phones === 1 ? "" : "s"}. Close the app to hear it ring.`, "ok"); } catch (e) { msg("#st-push", e.message, "bad"); } };
+  $("#push-off").onclick = async () => { try { await api("/api/super/push", { method: "PUT", body: { clear: true } }); msg("#st-push", "Removed.", ""); loadPush(); } catch (e) { msg("#st-push", e.message, "bad"); } };
+}
+document.querySelectorAll("#sup-tabs [data-stab]").forEach(b => b.onclick = async () => { supTab = b.dataset.stab; paintSuperTabs(); if (supTab === "services") loadPush(); if (supTab === "wallets") { SUUQ.resetSuper(); return SUUQ.renderSuperWallets(); } if (supTab === "admins") await loadSupAdmins(); renderSuper(); });
 function staffCount(role, service) { return (overview?.staff || []).filter(x => x.role === role && x.service === service).reduce((a, x) => a + x.n, 0); }
 function renderSuper() {
   if (!overview) return;

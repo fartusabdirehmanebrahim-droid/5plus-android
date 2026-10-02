@@ -117,6 +117,33 @@ class MainActivity : AppCompatActivity() {
         if (!granted) Toast.makeText(this, "Phone calls are off: press call in the dialer.", Toast.LENGTH_LONG).show()
     }
 
+    /* ---------- push notifications ---------- */
+    private var pendingGoto: String? = null
+    private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private fun setupPush() {
+        if (!App.pushReady) return
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnSuccessListener { t ->
+                if (!t.isNullOrEmpty()) prefs.edit().putString("fcmToken", t).apply()
+            }
+        } catch (e: Exception) { return }
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    // A tapped notification: open the page it is about (the web app decides, e.g. the seller's orders).
+    private fun openGoto(goto: String?) {
+        if (goto.isNullOrEmpty()) return
+        val js = "window.__pushOpen && window.__pushOpen(" + org.json.JSONObject.quote(goto) + ")"
+        web?.postDelayed({ web?.evaluateJavascript(js, null) }, 600)
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openGoto(intent.getStringExtra("push_goto"))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -125,6 +152,8 @@ class MainActivity : AppCompatActivity() {
                 if (w != null && w.canGoBack()) w.goBack() else finish()
             }
         })
+        setupPush()
+        pendingGoto = intent?.getStringExtra("push_goto")
         val fixed = BuildConfig.APP_URL.trim()
         val saved = prefs.getString("start", null)
         when {
@@ -220,6 +249,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            override fun onPageFinished(view: WebView, url: String) {
+                val g = pendingGoto; pendingGoto = null
+                if (!g.isNullOrEmpty()) view.postDelayed({ openGoto(g) }, 2500) // the app logs in first
+            }
+
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) showOffline()
             }
@@ -292,6 +326,10 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun isApp(): Boolean = true
+
+        // Push notifications: the web app sends this phone's address to the server after login ("" = not ready / off).
+        @JavascriptInterface
+        fun pushToken(): String = prefs.getString("fcmToken", "") ?: ""
     }
 
     private fun dial(telUrl: String) {

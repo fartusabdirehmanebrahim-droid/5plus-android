@@ -1,3 +1,24 @@
+import groovy.json.JsonSlurper
+
+// Push notifications: put the google-services.json file from your Firebase project (Android app "com.fiveplus.app")
+// next to this file (app/google-services.json). Without it the app builds and works, with no push notifications.
+val fcm: Map<String, String> = run {
+    val f = file("google-services.json")
+    if (!f.exists()) return@run emptyMap()
+    try {
+        val j = JsonSlurper().parse(f) as Map<*, *>
+        val pi = j["project_info"] as Map<*, *>
+        val clients = (j["client"] as List<*>).map { it as Map<*, *> }
+        val c = clients.firstOrNull { (((it["client_info"] as Map<*, *>)["android_client_info"] as Map<*, *>)["package_name"]) == "com.fiveplus.app" } ?: clients.first()
+        mapOf(
+            "APP_ID" to ((c["client_info"] as Map<*, *>)["mobilesdk_app_id"]?.toString() ?: ""),
+            "API_KEY" to (((c["api_key"] as List<*>).first() as Map<*, *>)["current_key"]?.toString() ?: ""),
+            "PROJECT_ID" to (pi["project_id"]?.toString() ?: ""),
+            "SENDER_ID" to (pi["project_number"]?.toString() ?: ""),
+        )
+    } catch (e: Exception) { logger.warn("google-services.json could not be read: ${e.message}"); emptyMap() }
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -19,6 +40,7 @@ android {
         buildConfigField("String", "APP_URL", "\"https://your-5plus-website.com\"")
         // The demo inside the app checks this address for a newer version every time it opens,
         // so changes show up without installing a new APK. (The GitHub repository must be public.)
+        for (k in listOf("APP_ID", "API_KEY", "PROJECT_ID", "SENDER_ID")) buildConfigField("String", "FCM_$k", "\"${fcm[k] ?: ""}\"")
         buildConfigField("String", "DEMO_UPDATE_URL", "\"https://raw.githubusercontent.com/fartusabdirehmanebrahim-droid/5plus-android/main/app/src/main/assets/index.html\"")
     }
 
@@ -43,4 +65,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("androidx.webkit:webkit:1.11.0")
+    implementation("com.google.firebase:firebase-messaging:24.0.0")
 }
