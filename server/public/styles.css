@@ -1,5 +1,5 @@
 :root{
-  --ground:#E9EFEC; --surface:#FFFFFF; --surface-2:#F3F7F5; --line:#D5DFDA;
+  --ground:#FFFFFF; --surface:#FFFFFF; --surface-2:#F3F7F5; --line:#D5DFDA;
   --ink:#0F2724; --ink-2:#4B605B; --ink-3:#7A8C87;
   --green:#0E7A55; --green-ink:#FFFFFF; --green-soft:#DDF0E7;
   --usd:#2457A6; --usd-soft:#E1EAF8; --slsh:#A5731A; --slsh-soft:#F6ECD6;
@@ -1032,3 +1032,23 @@ body.zv-open{overflow:hidden}
 .doc-chip small{font-size:11.5px;color:var(--ink-2)}
 .doc-chip svg{color:var(--green);flex:none}
 .docs-card{display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:20px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 18px rgba(15,39,36,.07)}
+/* ---------- Responsive: every screen fits phones (320px+), tablets and computers ---------- */
+img, video, iframe{max-width:100%}
+.admin{align-self:stretch;width:auto;max-width:100%}
+.admin > *, .panel, .person, .kpi, .sup-card{min-width:0;max-width:100%}
+.agent-tabs{max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.agent-tabs::-webkit-scrollbar{display:none}
+.agent-tabs button{flex:none;white-space:nowrap}
+.kpi, .person-top .t, .onote, .note{overflow-wrap:anywhere}
+.person-top .t{min-width:min(160px,100%)}
+.sum-row{flex-wrap:wrap}
+.sup-grid{grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr))}
+@media (max-width:520px){
+
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2{grid-template-columns:minmax(0,1fr)}
+  .admin-head h2{font-size:21px}
+}
+@media (max-width:340px){
+  .kpis{grid-template-columns:minmax(0,1fr)}
+}
