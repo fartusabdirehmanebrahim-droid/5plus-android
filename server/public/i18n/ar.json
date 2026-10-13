@@ -1202,7 +1202,8 @@
   "Choose at least one file.": "اختر ملفاً واحداً على الأقل.",
   "The files together are bigger than 30 MB. Send fewer at a time.": "الملفات معاً أكبر من 30 ميغابايت. أرسل عدداً أقل في كل مرة.",
   "Documents": "المستندات",
-  "Note (optional), e.g. invoice for my order": "ملاحظة (اختياري)، مثلاً فاتورة طلبي"
+  "Note (optional), e.g. invoice for my order": "ملاحظة (اختياري)، مثلاً فاتورة طلبي",
+  "Choose a 4-digit PIN.": "اختر رمزاً من 4 أرقام."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",

@@ -940,7 +940,8 @@
   "Choose at least one file.",
   "The files together are bigger than 30 MB. Send fewer at a time.",
   "Documents",
-  "Note (optional), e.g. invoice for my order"
+  "Note (optional), e.g. invoice for my order",
+  "Choose a 4-digit PIN."
  ],
  "patterns": [
   "A gallery can have up to {0} photos.",

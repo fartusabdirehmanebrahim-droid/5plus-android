@@ -360,7 +360,7 @@ module.exports = function market(ctx) {
     const b = await readJson(req), p = readProfile(b.profile || {}), pin = String(b.pin || "");
     const phone = cleanPhone(p.phone);
     if (phone.length < 7 || phone.length > 12) fail("Enter a valid phone number.");
-    if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN that is hard to guess.");
+    if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
     if (await db.get("SELECT 1 FROM users WHERE phone = ?", phone)) fail("This phone number already has an account. Log in, then choose “Become a merchant” in Account.");
     p.phone = phone;
     const u = await tx(async () => {

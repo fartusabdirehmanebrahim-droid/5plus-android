@@ -1202,7 +1202,8 @@
   "Choose at least one file.": "ቢያንስ አንድ ፋይል ይምረጡ።",
   "The files together are bigger than 30 MB. Send fewer at a time.": "ፋይሎቹ በአንድ ላይ ከ30 MB በላይ ናቸው። በአንድ ጊዜ ጥቂት ይላኩ።",
   "Documents": "ሰነዶች",
-  "Note (optional), e.g. invoice for my order": "ማስታወሻ (አማራጭ)፣ ለምሳሌ የትዕዛዜ ደረሰኝ"
+  "Note (optional), e.g. invoice for my order": "ማስታወሻ (አማራጭ)፣ ለምሳሌ የትዕዛዜ ደረሰኝ",
+  "Choose a 4-digit PIN.": "ባለ 4 አሃዝ ፒን ይምረጡ።"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

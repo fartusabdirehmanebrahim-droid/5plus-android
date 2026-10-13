@@ -1201,7 +1201,8 @@
   "Choose at least one file.": "Dooro ugu yaraan hal fayl.",
   "The files together are bigger than 30 MB. Send fewer at a time.": "Faylasha oo dhan waxay ka weyn yihiin 30 MB. Mar kasta in yar dir.",
   "Documents": "Dukumentiyo",
-  "Note (optional), e.g. invoice for my order": "Qoraal (ikhtiyaari), tusaale qaansheegta dalabkayga"
+  "Note (optional), e.g. invoice for my order": "Qoraal (ikhtiyaari), tusaale qaansheegta dalabkayga",
+  "Choose a 4-digit PIN.": "Dooro PIN 4 god ah."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
