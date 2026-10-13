@@ -1,0 +1,10 @@
+{
+  "name": "Sarrif",
+  "short_name": "Sarrif",
+  "description": "Send money between your ZAAD, eDahab, Soltelco and Premier wallets.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#E9EFEC",
+  "theme_color": "#0E7A55",
+  "icons": [{ "src": "/logos/icon.png", "sizes": "512x512", "type": "image/png" }]
+}

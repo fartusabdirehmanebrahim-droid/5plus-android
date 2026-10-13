@@ -1,0 +1,11 @@
+{
+  "name": "sarrif",
+  "version": "1.0.0",
+  "description": "Sarrif wallet-to-wallet transfer app: customers, agents and admin with secure PIN logins.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js"
+  },
+  "engines": { "node": ">=22.5" },
+  "dependencies": {}
+}

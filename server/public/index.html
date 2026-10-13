@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="so">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E7A55">
+<title>Sarrif</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/logos/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div><b>Sarrif</b><small>Wallet-to-wallet transfers · USD and SLSH</small></div>
+    </div>
+    <div class="userbar" id="userbar" hidden></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="phone-wrap" id="customer-area">
+      <div class="phone"><div class="screen">
+        <div id="app" style="display:flex;flex-direction:column;flex:1;min-height:0;position:relative"></div>
+      </div></div>
+    </div>
+
+    <div class="viewbar" id="viewbar" hidden></div>
+
+    <section class="admin" id="super" aria-label="Super admin dashboard" hidden>
+      <div class="admin-head"><div><span class="label">Super admin</span><h2 id="sup-title">Overview</h2><p id="sup-sub">Every service at a glance.</p></div></div>
+      <div class="agent-tabs" id="sup-tabs" role="group" aria-label="Super admin sections">
+        <button data-stab="overview" aria-pressed="true">Overview</button>
+        <button data-stab="services" aria-pressed="false">Services</button>
+        <button data-stab="admins" aria-pressed="false">Admins</button>
+        <button data-stab="wallets" aria-pressed="false">Wallets</button>
+      </div>
+      <div data-spane="overview"><div class="sup-grid" id="sup-overview"></div></div>
+      <div data-spane="services" class="sup-col">
+        <div class="panel" id="push-panel">
+          <div class="panel-head"><div><h3>Push notifications</h3><p>Makes order alarms ring on merchants' and admins' phones even when 5PLUS is closed or the phone is locked. In Firebase (console.firebase.google.com) open your project → Project settings → Service accounts → Generate new private key, then paste the whole file here. The key stays on the server.</p></div></div>
+          <p class="note" style="margin:0" id="push-state">…</p>
+          <div class="mini"><label for="push-key">Service account key (JSON)</label><textarea class="input" id="push-key" rows="4" autocomplete="off" spellcheck="false" placeholder='{"type": "service_account", "project_id": "…", …}'></textarea></div>
+          <div class="row-actions"><button class="btn btn-primary" id="push-save">Save</button><button class="btn btn-ghost" id="push-test">Send a test alarm to my phone</button><button class="btn btn-ghost" id="push-off">Remove key</button><span class="status-msg" id="st-push"></span></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><h3>Services on the home page</h3><p>Hide a service to remove it from every customer's home page. Built-in services can be hidden but not deleted.</p></div>
+            <div class="row-actions"><span class="status-msg" id="st-svcs"></span><button class="btn btn-primary" id="save-svcs">Save services</button></div></div>
+          <div class="svc-edit-list" id="svc-edit"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><h3>Add a new service</h3><p>It appears as “Coming soon” until it is built. Give it an admin in the Admins tab.</p></div></div>
+          <div class="grid2">
+            <div class="mini"><label for="ns-name">Name</label><input class="input" id="ns-name" maxlength="30" placeholder="Caafimaad"></div>
+            <div class="mini"><label for="ns-sub">Short description</label><input class="input" id="ns-sub" maxlength="60" placeholder="Book a doctor"></div>
+            <div class="mini"><label for="ns-art">Picture</label><select class="input" id="ns-art"></select></div>
+            <div class="mini"><label for="ns-video">Videos (optional): one per line, the YouTube link then the title</label><textarea class="input" id="ns-video" rows="3" placeholder="https://youtu.be/… Our new shop"></textarea></div>
+            <div class="mini"><label for="ns-wa">WhatsApp number (optional)</label><input class="input" id="ns-wa" inputmode="tel" placeholder="252634000000"></div>
+            <div class="mini"><label for="ns-phone">Phone for the Call button (optional)</label><input class="input" id="ns-phone" inputmode="tel" placeholder="0634000000"></div>
+            <div class="mini"><label for="ns-tiktok">TikTok link (optional)</label><input class="input" id="ns-tiktok" inputmode="url" placeholder="https://www.tiktok.com/@…"></div>
+            <div class="mini"><label for="ns-photo">Your photo (optional)</label><input class="input" id="ns-photo" type="file" accept="image/jpeg,image/png,image/webp"></div>
+          </div>
+          <div class="row-actions"><button class="btn btn-ghost" id="ns-add">Add service</button><span class="status-msg" id="st-ns"></span></div>
+        </div>
+      </div>
+      <div data-spane="wallets" class="sup-col" id="sup-wallets"></div>
+      <div data-spane="admins" class="sup-col">
+        <div class="panel">
+          <div class="panel-head"><div><h3>Add a service admin</h3><p>Each admin runs one service and only sees that service's dashboard and agents. Admins log in with phone, PIN and password.</p></div></div>
+          <div class="grid2">
+            <div class="mini"><label for="sa-service">Service</label><select class="input" id="sa-service"></select></div>
+            <div class="mini"><label for="sa-name">Full name</label><input class="input" id="sa-name"></div>
+            <div class="mini"><label for="sa-phone">Phone number</label><input class="input" id="sa-phone" inputmode="tel" placeholder="63 4000000"></div>
+            <div class="mini"><label for="sa-pin">4-digit PIN</label><input class="input" id="sa-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password"></div>
+            <div class="mini"><label for="sa-pw">Password (8+ characters)</label><input class="input" id="sa-pw" type="password" autocomplete="new-password"></div>
+          </div>
+          <div class="row-actions"><button class="btn btn-primary" id="sa-add">Add admin</button><span class="status-msg" id="st-sa"></span></div>
+        </div>
+        <div class="panel"><div class="panel-head"><div><h3>Service admins</h3></div></div><div class="people" id="sup-admins"></div></div>
+      </div>
+    </section>
+
+    <section class="admin" id="svcdash" aria-label="Service dashboard" hidden></section>
+
+    <section class="admin" id="admin" aria-label="Admin dashboard" hidden>
+      <div class="admin-head">
+        <div>
+          <span class="label">Admin dashboard</span>
+          <h2 id="adm-title">Requests</h2>
+          <p id="adm-sub"></p>
+        </div>
+      </div>
+      <div class="agent-tabs" id="adm-tabs" role="group" aria-label="Admin sections">
+        <button data-atab="requests" aria-pressed="true">Requests</button>
+        <button data-atab="customers" aria-pressed="false">Customers</button>
+        <button data-atab="agents" aria-pressed="false">Agents</button>
+        <button data-atab="finance" aria-pressed="false">Finance</button>
+        <button data-atab="settings" aria-pressed="false">Settings</button>
+      </div>
+
+      <div data-pane="finance" id="finance-root"></div>
+
+      <div class="panel" data-pane="customers">
+        <div class="panel-head"><div><h3>Registered customers</h3><p>Reset a customer's PIN or suspend their account. Suspended customers can't log in.</p></div>
+          <input class="input search" id="cust-search" placeholder="Search name or phone" aria-label="Search customers"></div>
+        <div class="people" id="cust-list"></div>
+      </div>
+
+      <div class="panel" data-pane="agents">
+        <div class="panel-head"><div><h3>Add an agent</h3><p>Agents log in on the same screen with their phone number and PIN, and only see transfer requests.</p></div></div>
+        <div class="grid2">
+          <div class="mini"><label for="ag-name">Full name</label><input class="input" id="ag-name" placeholder="Abdi Yusuf"></div>
+          <div class="mini"><label for="ag-phone">Phone number</label><input class="input" id="ag-phone" inputmode="tel" placeholder="63 4000000"></div>
+          <div class="mini"><label for="ag-pin">4-digit PIN</label><input class="input" id="ag-pin" inputmode="numeric" maxlength="4" type="password" autocomplete="new-password"></div>
+        </div>
+        <div class="row-actions"><button class="btn btn-primary" id="ag-add">Add agent</button><span class="status-msg" id="st-ag"></span></div>
+      </div>
+      <div class="panel" data-pane="agents">
+        <div class="panel-head"><div><h3>Agents</h3><p>Reset an agent's PIN or suspend them.</p></div></div>
+        <div class="people" id="agent-list"></div>
+      </div>
+
+      <div class="panel" data-pane="settings">
+        <div class="panel-head">
+          <div><h3>Service charges</h3><p>A flat charge in the currency the customer sends. The last band covers everything above.</p></div>
+          <div class="row-actions"><span class="status-msg" id="st-fees"></span><button class="btn btn-primary" id="save-fees">Save charges</button></div>
+        </div>
+        <div class="grid2" id="tier-editor"></div>
+      </div>
+      <div class="panel" data-pane="settings">
+        <div class="panel-head">
+          <div><h3>Earnings withdraw charge</h3><p>A percentage taken when someone sends their affiliate earnings to ZAAD, eDahab, Soltelco or Premier with iBedel.</p></div>
+          <div class="row-actions"><span class="status-msg" id="st-earnfee"></span><button class="btn btn-primary" id="save-earnfee">Save</button></div>
+        </div>
+        <div class="inline-form"><div class="suffix" style="max-width:160px"><input id="earn-fee" inputmode="decimal" aria-label="Earnings withdraw charge in percent"><span>%</span></div></div>
+      </div>
+      <div class="panel" data-pane="settings">
+        <div class="panel-head">
+          <div><h3>Show or hide in the app</h3><p>Anything you turn off disappears from the customer's app.</p></div>
+          <div class="row-actions"><span class="status-msg" id="st-svc"></span><button class="btn btn-primary" id="save-svc">Save</button></div>
+        </div>
+        <div class="svc-admin" id="svc-admin"></div>
+      </div>
+      <div class="panel" data-pane="settings">
+        <div class="panel-head">
+          <div><h3>Agent numbers and USSD codes</h3><p>After “Send request”, the customer's phone dials code + agent number + amount, for example *220*634000000*100000#.</p></div>
+          <div class="row-actions"><span class="status-msg" id="st-agentnums"></span><button class="btn btn-primary" id="save-agentnums">Save numbers</button></div>
+        </div>
+        <div class="grid2" id="agentnums" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"></div>
+      </div>
+      <div class="panel" data-pane="settings">
+        <div class="panel-head">
+          <div><h3>Technical support</h3><p>The WhatsApp button on each customer's Account page opens a chat with this number.</p></div>
+          <div class="row-actions"><span class="status-msg" id="st-support"></span><button class="btn btn-primary" id="save-support">Save</button></div>
+        </div>
+        <div class="grid2"><div class="mini"><label for="wa-num">Support WhatsApp number</label><div class="suffix"><span>+</span><input id="wa-num" inputmode="tel" placeholder="252 63 4000000"></div></div></div>
+      </div>
+      <div class="panel" data-pane="settings">
+        <div class="panel-head"><div><h3>Voice guide</h3><p>Plays on the app's first screen when a customer taps “Listen”.</p></div></div>
+        <div class="voice-now" id="voice-now"></div>
+        <label class="drop" for="voice-file">
+          <div class="t"><b>Upload a recording</b><small>Any audio file up to 5 MB. Record it in Somali so every customer understands.</small></div>
+          <span class="btn btn-ghost" style="min-height:40px;padding:8px 14px;font-size:14px">Choose file</span>
+          <input type="file" id="voice-file" accept="audio/*" hidden>
+        </label>
+        <div class="field"><label for="voice-script">Spoken text (used when no recording is uploaded)</label><textarea class="input" id="voice-script"></textarea></div>
+        <div class="row-actions">
+          <button class="btn btn-primary" id="save-voice">Save voice guide</button>
+          <button class="btn btn-ghost" id="remove-audio" hidden>Remove recording</button>
+          <span class="status-msg" id="st-voice"></span>
+        </div>
+      </div>
+      <div class="panel" data-pane="settings">
+        <div class="panel-head"><div><h3>Change admin password</h3></div>
+          <div class="row-actions"><span class="status-msg" id="st-pw"></span><button class="btn btn-primary" id="save-pw">Change password</button></div></div>
+        <div class="grid2">
+          <div class="mini"><label for="pw-cur">Current password</label><input class="input" id="pw-cur" type="password" autocomplete="current-password"></div>
+          <div class="mini"><label for="pw-new">New password (8+ characters)</label><input class="input" id="pw-new" type="password" autocomplete="new-password"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="side" id="agent" aria-label="Transfer requests" hidden>
+      <div class="admin-head" id="agent-head">
+        <div><span class="label">Agent dashboard</span><h2>Transfer requests</h2><p>Send the money to the customer's number, then mark the request as sent.</p></div>
+        <span class="sync" id="sync"><i></i><span>Connecting…</span></span>
+      </div>
+      <div class="alarm" id="alarm" role="status" aria-live="assertive"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="agent-tabs" role="group" aria-label="Filter requests">
+        <button id="at-waiting" aria-pressed="true">Waiting</button>
+        <button id="at-sent" aria-pressed="false">Sent</button>
+      </div>
+      <div class="req-list" id="req-list"></div>
+    </section>
+  </div>
+</div>
+<script src="/i18n_data.js"></script>
+<script src="/i18n.js"></script>
+<script src="/art.js"></script>
+<script src="/finance.js"></script>
+<script src="/suuq.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
