@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "29730265797",
+    "project_id": "plus-notifications",
+    "storage_bucket": "plus-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:29730265797:android:e13f0f3f6459ceded1eeac",
+        "android_client_info": {
+          "package_name": "com.fiveplus.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDF7NgB6SYfuKox8Iq6VY07TDQsYNf9rWE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
