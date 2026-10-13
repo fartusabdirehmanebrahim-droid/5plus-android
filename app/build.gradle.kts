@@ -37,7 +37,7 @@ android {
 
         // Optional: put the address of your 5PLUS website here (the real app on your server) so the app always opens it.
         // Left as it is, the app asks on first launch: your website, or the demo built into the app.
-        buildConfigField("String", "APP_URL", "\"https://your-5plus-website.com\"")
+        buildConfigField("String", "APP_URL", "\"https://fiveplus.onrender.com\"")
         // The demo inside the app checks this address for a newer version every time it opens,
         // so changes show up without installing a new APK. (The GitHub repository must be public.)
         for (k in listOf("APP_ID", "API_KEY", "PROJECT_ID", "SENDER_ID")) buildConfigField("String", "FCM_$k", "\"${fcm[k] ?: ""}\"")
