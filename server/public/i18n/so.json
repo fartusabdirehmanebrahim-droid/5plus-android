@@ -1362,7 +1362,26 @@
   "New category": "Nooc cusub",
   "Saved. New merchants see this list.": "Waa la keydiyay. Ganacsatada cusub ayaa arka liiskan.",
   "Added. Press Save to keep it.": "Waa la daray. Riix Keydi si uu u haro.",
-  "Internet calls": "Wicitaanada internetka"
+  "Internet calls": "Wicitaanada internetka",
+  "Read": "Waa la akhriyay",
+  "Voice call": "Wicitaan cod",
+  "Call declined": "Wicitaanka waa la diiday",
+  "Calls": "Wicitaanada",
+  "Taking calls": "Wicitaanada waa la qaadayaa",
+  "Stop customers calling you for:": "Jooji macaamiisha inay ku soo wacaan muddo:",
+  "1 hour": "1 saac",
+  "5 hours": "5 saacadood",
+  "10 hours": "10 saacadood",
+  "Until I turn them on": "Ilaa aan furo",
+  "Pause for these days": "Jooji maalmahan",
+  "Take calls again": "Mar kale qaado wicitaanada",
+  "Enter 1 to 365 days.": "Geli 1 ilaa 365 maalmood.",
+  "Choose up to 365 days.": "Dooro ilaa 365 maalmood.",
+  "Only sellers can pause calls.": "Iibiyeyaasha oo keliya ayaa joojin kara wicitaanada.",
+  "Not taking calls right now": "Hadda wicitaan ma qaato",
+  "Paused · until you turn calls back on": "La joojiyay · ilaa aad dib u furto wicitaanada",
+  "Number of days": "Tirada maalmaha",
+  "Pause calls": "Jooji wicitaanada"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
@@ -1558,6 +1577,9 @@
   "{0} is on another call. Try again later.": "{0} wicitaan kale ayuu ku jiraa. Isku day mar dambe.",
   "{0} called you on 5PLUS": "{0} ayaa kuu soo wacay 5PLUS",
   "{0} is calling you on 5PLUS": "{0} ayaa kugu soo wacaya 5PLUS",
-  "Business categories ({0})": "Noocyada ganacsiga ({0})"
+  "Business categories ({0})": "Noocyada ganacsiga ({0})",
+  "Not taking calls until {0}": "Wicitaan ma qaato ilaa {0}",
+  "Paused until {0}": "La joojiyay ilaa {0}",
+  "{0} isn't taking calls right now. Send a message instead.": "{0} hadda wicitaan ma qaato. Fariin u dir."
  }
 }

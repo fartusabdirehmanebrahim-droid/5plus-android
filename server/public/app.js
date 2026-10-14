@@ -288,6 +288,7 @@ const SUUQ_ICONS = {
   aff: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.6 10.7l6.8-3.4M8.6 13.3l6.8 3.4"/></svg>',
 };
 const MENU_ICONS = {
+  phone: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>',
   menu: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
   close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   search: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -395,6 +396,22 @@ async function setPause(mode) {
   catch (e) { alert(e.message); }
   render();
 }
+// Calls: a seller stops incoming internet calls for a while (customers then see "Not taking calls").
+const callsOff = () => { const v = Number(S.user?.calls_off_until) || 0; return v === -1 || v > Date.now() ? v : 0; };
+function callsMenu() {
+  const off = callsOff(), open = S.callsMenu;
+  return `<button class="drawer-item" data-callsmenu aria-expanded="${!!open}"><span class="hm-ic ${off ? "calls-off" : "calls"}">${MENU_ICONS.phone}</span><span class="pi-t"><b>Calls</b><small>${off ? SUUQ.callsOffText(off, false) : "Taking calls"}</small></span><span aria-hidden="true">${open ? "▴" : "▾"}</span></button>
+    ${open ? `<div class="calls-menu" role="group" aria-label="Pause calls">
+      <span class="note">Stop customers calling you for:</span>
+      <div class="cm-opts">${[[1, "1 hour"], [5, "5 hours"], [10, "10 hours"]].map(([h, l]) => `<button class="btn btn-ghost" data-calloff-h="${h}">${l}</button>`).join("")}<button class="btn btn-ghost" data-calloff-forever>Until I turn them on</button></div>
+      <div class="cm-days"><input class="input" id="calloff-days" type="number" min="1" max="365" inputmode="numeric" placeholder="Days" aria-label="Number of days"><button class="btn btn-ghost" data-calloff-days>Pause for these days</button></div>
+      ${off ? `<button class="btn btn-primary btn-block" data-calloff-clear>Take calls again</button>` : ""}
+      <span class="status-msg" id="st-calloff" role="status"></span></div>` : ""}`;
+}
+async function setCallsOff(body) {
+  try { const r = await api("/api/me/calls-off", { body }); S.user.calls_off_until = r.calls_off_until; S.callsMenu = false; render(); }
+  catch (e) { msg("#st-calloff", e.message, "bad"); }
+}
 function vDrawer() {
   if (!S.drawer) return "";
   const item = (go, icon, cls, title, sub) => `<button class="drawer-item" data-svcgo="${go}"><span class="hm-ic ${cls}">${icon}</span><span><b>${title}</b><small>${sub}</small></span></button>`;
@@ -406,6 +423,7 @@ function vDrawer() {
       ${S.user.account_type === "merchant" ? item("myshop", SUUQ_ICONS.shop, "shop", "My shop", "Products, orders and report") : ""}
       ${item("affiliate", SUUQ_ICONS.aff, "aff", "Affiliate", "Share products and earn")}
       ${item("account", MENU_ICONS.user, "", "Account and support", "Your details, PIN and WhatsApp help")}
+      ${canPause() ? callsMenu() : ""}
       ${canPause() ? ["salah", "sleep"].map(m => `<label class="drawer-item pause-item"><span class="hm-ic ${m}">${PAUSE_ICONS[m]}</span><span class="pi-t"><b>${PAUSE_TEXT[m].name}</b><small>${S.user.pause === m ? PAUSE_TEXT[m].on : PAUSE_TEXT[m].off}</small></span>
         <span class="switch"><input type="checkbox" role="switch" data-pause="${m}" aria-label="${PAUSE_TEXT[m].name}" ${S.user.pause === m ? "checked" : ""}><span></span></span></label>`).join("") : ""}
       ${I18N ? `<button class="drawer-item" data-lang-open><span class="hm-ic flag-ic">${I18N.flag(I18N.lang || "en")}</span><span><b>Language</b><small>${esc((I18N.LANGS.find(l => l.code === I18N.lang) || I18N.LANGS[2]).name)}</small></span></button>` : ""}
@@ -1106,6 +1124,11 @@ function bind() {
     walletShown = !walletShown;
     render(); const t = appEl.querySelector("[data-wtoggle]"); if (t) t.focus();
   });
+  appEl.querySelectorAll("[data-callsmenu]").forEach(b => b.onclick = () => { S.callsMenu = !S.callsMenu; render(); });
+  appEl.querySelectorAll("[data-calloff-h]").forEach(b => b.onclick = () => setCallsOff({ hours: Number(b.dataset.calloffH) }));
+  appEl.querySelectorAll("[data-calloff-forever]").forEach(b => b.onclick = () => setCallsOff({ forever: true }));
+  appEl.querySelectorAll("[data-calloff-days]").forEach(b => b.onclick = () => { const d = Number($("#calloff-days").value); if (!(d >= 1 && d <= 365)) return msg("#st-calloff", "Enter 1 to 365 days.", "bad"); setCallsOff({ days: d }); });
+  appEl.querySelectorAll("[data-calloff-clear]").forEach(b => b.onclick = () => setCallsOff({}));
   appEl.querySelectorAll("[data-pause]").forEach(i => i.onchange = () => setPause(i.checked ? i.dataset.pause : ""));
   appEl.querySelectorAll("[data-pause-off]").forEach(b => b.onclick = () => { b.disabled = true; setPause(""); });
   appEl.querySelectorAll("[data-drawer]").forEach(b => b.onclick = () => {
@@ -1264,6 +1287,7 @@ function connectEvents() {
   es.addEventListener("tracking", e => { const d = JSON.parse(e.data || "{}"); if (S.trk && S.trk.svc === d.service && S.ytTab === "track" && S.user?.role === "customer") { S.trk.mine = null; if (S.trk.result) api(`/api/track/${encodeURIComponent(d.service)}?code=${encodeURIComponent(S.trk.result.code)}`).then(r => { S.trk.result = r.tracking; render(); }).catch(() => {}); render(); } if (typeof trkAdminReload === "function") trkAdminReload(d.service); });
   es.addEventListener("settings", e => { settings = JSON.parse(e.data); if (S.user?.role === "customer" && !S.sheet) { if (S.service && !hubServices().some(x => x.id === S.service)) S.service = null; render(); } });
   es.addEventListener("logout", () => { S.user = null; S.screen = "login"; S.err = "This account is suspended. Contact support."; es.close(); es = null; render(); });
+  es.addEventListener("chatread", e => { try { SUUQ.onChatRead(JSON.parse(e.data)); } catch {} });
   es.addEventListener("call", e => { try { SUUQ.CALL.onEvent(JSON.parse(e.data)); } catch {} });
   es.addEventListener("chat", e => { if (S.user?.role === "customer") SUUQ.onChat(JSON.parse(e.data)); });
   es.addEventListener("order", e => { if (S.user?.role === "customer") SUUQ.onOrder(JSON.parse(e.data)); });
@@ -1832,7 +1856,7 @@ async function loadDeskChats(keepOpen) {
   const o = deskChat.open;
   el.innerHTML = `<div class="panel-head"><div><h3>Customer chats${deskChat.list.some(c => c.unread) ? ` <span class="pill warn">${deskChat.list.reduce((a, c) => a + c.unread, 0)} new</span>` : ""}</h3><p>Customers chat from the Chat tab on the service page. Only admins of this service see these chats.</p></div></div>
     ${o ? `<div class="desk-thread"><div class="svc-bar"><button class="btn btn-ghost" data-dcback>‹ All chats</button><div style="flex:1;min-width:0"><b>${esc(o.name)}</b><small class="note" style="display:block">+252 ${esc(o.phone)}</small></div>${C.callBtn(o.id, o.name, "+252" + o.phone)}</div>
-      <div class="msgs" id="desk-msgs">${deskChat.msgs.map(C.msgHtml).join("") || `<div class="empty">No messages yet.</div>`}</div>${C.composerHtml("desk-composer")}</div>`
+      <div class="msgs" id="desk-msgs" data-conv="${esc(o.id)}">${deskChat.msgs.map(m => C.msgHtml(m, o.other_read_at)).join("") || `<div class="empty">No messages yet.</div>`}</div>${C.composerHtml("desk-composer")}</div>`
     : deskChat.list.length ? `<div class="olist">${deskChat.list.map(c => `<button class="ccard" data-dcopen="${esc(c.id)}"><span class="noimg">${esc((c.name || "?")[0].toUpperCase())}</span>
         <span class="t"><b>${esc(c.name)}</b><small>+252 ${esc(c.phone)}</small><small class="last">${c.last.mine ? "You: " : ""}${esc(c.last.body)}</small></span>${c.unread ? `<span class="badge">${c.unread}</span>` : ""}</button>`).join("")}</div>`
     : `<div class="empty">No chats yet.</div>`}`;

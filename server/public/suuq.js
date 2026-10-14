@@ -989,12 +989,23 @@ const SUUQ = (() => {
     doc: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
   };
   const fmtDur = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
-  function msgHtml(m) {
+  // readAt: when the other person last opened this chat. My messages show one tick (sent) or two green ticks (read).
+  const TICK1 = '<svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6.5l3 3 6.5-7"/></svg>';
+  const TICK2 = '<svg width="20" height="12" viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 6.5l3 3 6.5-7"/><path d="M8.5 9.5l.5.5 6.5-7.5"/></svg>';
+  const ticks = (m, readAt) => { const read = readAt && m.created_at <= readAt; return `<span class="ticks ${read ? "read" : ""}" data-at="${m.created_at}" role="img" aria-label="${read ? "Read" : "Sent"}">${read ? TICK2 : TICK1}</span>`; };
+  const CALL_IC = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>';
+  function msgHtml(m, readAt) {
     const a = m.att, t = new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    // A call record: answered (and how long), declined, or missed.
+    if (a && a.kind === "call") {
+      const dur = `${Math.floor(a.secs / 60)}:${String(a.secs % 60).padStart(2, "0")}`;
+      const label = a.status === "answered" ? "Voice call" : a.status === "declined" ? "Call declined" : m.mine ? "No answer" : "Missed call";
+      return `<div class="msg-call ${m.mine ? "mine" : ""} ${a.status}"><span class="mc-ic">${CALL_IC}</span><span class="mc-t"><b>${label}</b><small>${a.status === "answered" ? `<span class="num">${dur}</span> · ` : ""}${t}</small></span></div>`;
+    }
     const att = !a ? "" : a.kind === "image" ? `<button class="msg-img" data-chatimg="${esc(a.url)}" aria-label="Open picture"><img src="${esc(a.url)}" alt="" loading="lazy"></button>`
       : a.kind === "voice" ? `<audio class="msg-voice" controls preload="none" src="${esc(a.url)}"></audio>`
       : `<a class="msg-file" href="${esc(a.url)}" target="_blank" rel="noopener" download="${esc(a.name)}">${CI.doc}<span>${esc(a.name)}</span></a>`;
-    return `<div class="msg ${m.mine ? "mine" : ""} ${a ? "has-att" : ""}">${att}${m.body ? `<span>${esc(m.body)}</span>` : ""}<small>${t}</small></div>`;
+    return `<div class="msg ${m.mine ? "mine" : ""} ${a ? "has-att" : ""}">${att}${m.body ? `<span>${esc(m.body)}</span>` : ""}<small>${t}${m.mine ? ticks(m, readAt) : ""}</small></div>`;
   }
   // The message box: text, a picture or file, or a voice message (tap the mic, tap again to send).
   const composerHtml = (id = "composer") => `<form class="composer chat-comp" id="${id}">
@@ -1229,8 +1240,8 @@ const SUUQ = (() => {
   function vThread() {
     const c = st.chat;
     return `<div class="view thread-view">
-      <div class="svc-bar">${back("closechat")}<div style="min-width:0;flex:1"><b>${esc(c.with_name)}</b><small class="note" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.product_name)} · only you two can see this chat</small></div>${callBtn(c.id, c.with_name, c.with_phone)}</div>
-      <div class="msgs" id="msgs">${st.messages.length ? st.messages.map(msgHtml).join("") : `<div class="empty">Say hello and ask about ${esc(c.product_name)}.</div>`}</div>
+      <div class="svc-bar">${back("closechat")}<div style="min-width:0;flex:1"><b>${esc(c.with_name)}</b><small class="note" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.with_calls_off ? `<span class="calls-off-note">${callsOffText(c.with_calls_off, true)}</span>` : `${esc(c.product_name)} · only you two can see this chat`}</small></div>${c.with_calls_off ? "" : callBtn(c.id, c.with_name, c.with_phone)}</div>
+      <div class="msgs" id="msgs" data-conv="${esc(c.id)}">${st.messages.length ? st.messages.map(m => msgHtml(m, c.other_read_at)).join("") : `<div class="empty">Say hello and ask about ${esc(c.product_name)}.</div>`}</div>
       ${composerHtml()}
     </div>`;
   }
@@ -1716,15 +1727,28 @@ const SUUQ = (() => {
     const typed = (document.querySelector("#composer [data-chatin]") || {}).value; render();
     const i = document.querySelector("#composer [data-chatin]"); if (i) i.value = typed || "";
   }
+  // "Not taking calls until 9:30 PM" (other = said about the person you chat with).
+  function callsOffText(until, other) {
+    if (!until) return "";
+    if (until === -1) return other ? "Not taking calls right now" : "Paused · until you turn calls back on";
+    const d = new Date(until), today = d.toDateString() === new Date().toDateString();
+    const when = d.toLocaleString([], today ? { hour: "2-digit", minute: "2-digit" } : { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    return other ? `Not taking calls until ${when}` : `Paused until ${when}`;
+  }
+  // The other person opened the chat: my ticks turn green.
+  function onChatRead(d) {
+    if (st.chat && st.chat.id === d.conv_id) st.chat.other_read_at = Math.max(st.chat.other_read_at || 0, d.at);
+    document.querySelectorAll(`[data-conv="${CSS.escape(d.conv_id)}"] .ticks:not(.read)`).forEach(el => { if (Number(el.dataset.at) <= d.at) { el.classList.add("read"); el.innerHTML = TICK2; el.setAttribute("aria-label", "Read"); } });
+  }
   function onChat(m) {
-    ringChat(m);
+    if (!m.calllog) ringChat(m);
     if (st.chat && m.conv_id === st.chat.id) {
       if (!st.messages.some(x => x.id === m.id)) st.messages.push({ ...m, mine: m.sender_id === S.user.id });
       if (inMarket() && !m.mine) api(`/api/suuq/chats/${st.chat.id}/messages`).catch(() => {});
       if (inMarket() && !rec) { const typed = (document.querySelector("#composer [data-chatin]") || {}).value; render(); const i = document.querySelector("#composer [data-chatin]"); if (i) { i.value = typed || ""; i.focus(); } }
     } else {
       loadChats().then(() => { if (inMarket() && !st.orderSheet && !st.paySheet && !st.edit && !rec) render(); });
-      if (m.sender_id !== S.user?.id && !m.new_chat && S.user?.role === "customer") msgBanner(m, () => openChatById(m.conv_id));
+      if (m.sender_id !== S.user?.id && !m.new_chat && !m.calllog && S.user?.role === "customer") msgBanner(m, () => openChatById(m.conv_id));
     }
   }
   function onOrder(d) { ringFor(d); if (document.getElementById("pf-full_name")) keepPf(); Promise.all([loadOrders(), loadShop()]).then(() => { if (inMarket() && !st.orderSheet && !st.paySheet && !st.edit && !st.chat) render(); }); }
@@ -2096,6 +2120,6 @@ const SUUQ = (() => {
   async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { CALL, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { CALL, onChatRead, callsOffText, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; heldList = null; }, state: st };
 })();

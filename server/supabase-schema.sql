@@ -412,3 +412,6 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS pause TEXT NOT NULL DEFAULT ''
 
 -- Private face photo (only admins can see it).
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS face TEXT NOT NULL DEFAULT '';
+
+-- A seller can pause incoming calls until a time (-1 = until they turn calls back on).
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS calls_off_until BIGINT NOT NULL DEFAULT 0;

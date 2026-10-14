@@ -1363,7 +1363,26 @@
   "New category": "አዲስ ዘርፍ",
   "Saved. New merchants see this list.": "ተቀምጧል። አዳዲስ ነጋዴዎች ይህን ዝርዝር ያያሉ።",
   "Added. Press Save to keep it.": "ታክሏል። ለማስቀመጥ አስቀምጥን ይጫኑ።",
-  "Internet calls": "የኢንተርኔት ጥሪዎች"
+  "Internet calls": "የኢንተርኔት ጥሪዎች",
+  "Read": "ተነቧል",
+  "Voice call": "የድምፅ ጥሪ",
+  "Call declined": "ጥሪው ተቀባይነት አላገኘም",
+  "Calls": "ጥሪዎች",
+  "Taking calls": "ጥሪዎችን ይቀበላል",
+  "Stop customers calling you for:": "ደንበኞች እንዳይደውሉልዎ ለ፡",
+  "1 hour": "1 ሰዓት",
+  "5 hours": "5 ሰዓታት",
+  "10 hours": "10 ሰዓታት",
+  "Until I turn them on": "እስካበራቸው ድረስ",
+  "Pause for these days": "ለእነዚህ ቀናት አቁም",
+  "Take calls again": "ጥሪዎችን እንደገና ተቀበል",
+  "Enter 1 to 365 days.": "ከ1 እስከ 365 ቀናት ያስገቡ።",
+  "Choose up to 365 days.": "እስከ 365 ቀናት ይምረጡ።",
+  "Only sellers can pause calls.": "ጥሪዎችን ማቆም የሚችሉት ሻጮች ብቻ ናቸው።",
+  "Not taking calls right now": "አሁን ጥሪ አይቀበልም",
+  "Paused · until you turn calls back on": "ቆሟል · ጥሪዎችን እስኪያበሩ ድረስ",
+  "Number of days": "የቀናት ብዛት",
+  "Pause calls": "ጥሪዎችን አቁም"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1559,6 +1578,9 @@
   "{0} is on another call. Try again later.": "{0} በሌላ ጥሪ ላይ ነው። ቆይተው ይሞክሩ።",
   "{0} called you on 5PLUS": "{0} በ5PLUS ደውሎልዎታል",
   "{0} is calling you on 5PLUS": "{0} በ5PLUS እየደወለልዎት ነው",
-  "Business categories ({0})": "የንግድ ዘርፎች ({0})"
+  "Business categories ({0})": "የንግድ ዘርፎች ({0})",
+  "Not taking calls until {0}": "እስከ {0} ጥሪ አይቀበልም",
+  "Paused until {0}": "እስከ {0} ቆሟል",
+  "{0} isn't taking calls right now. Send a message instead.": "{0} አሁን ጥሪ አይቀበልም። በምትኩ መልእክት ይላኩ።"
  }
 }

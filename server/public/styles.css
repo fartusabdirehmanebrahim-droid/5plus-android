@@ -1125,7 +1125,7 @@ img, video, iframe{max-width:100%}
 .hm-ic.salah, .pause-banner.salah .pb-ic { background: var(--green-soft); color: var(--green); }
 .hm-ic.sleep, .pause-banner.sleep .pb-ic { background: var(--usd-soft); color: var(--usd); }
 .pause-item { cursor: pointer; }
-.pause-item .pi-t { flex: 1; min-width: 0; }
+.drawer-item .pi-t { flex: 1; min-width: 0; }
 .pause-banner { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; border: 2px solid var(--green); background: var(--green-soft); }
 .pause-banner.sleep { border-color: var(--usd); background: var(--usd-soft); }
 .pause-banner .pb-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; background: var(--surface) !important; }
@@ -1184,3 +1184,24 @@ img, video, iframe{max-width:100%}
 .bc-new { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
 @media (max-width: 600px) { .bc-row { grid-template-columns: 1fr 1fr; } .bc-row > :nth-child(3) { grid-column: 1 / 2; } }
 .cat-tag { display: inline-block; margin: 2px 0; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--slsh-soft); color: var(--slsh); }
+
+/* Ticks on my messages: one grey tick = sent, two green ticks = read */
+.ticks { display: inline-flex; vertical-align: -2px; margin-left: 4px; color: rgba(255,255,255,.75); }
+.msg:not(.mine) .ticks { color: var(--ink-3); }
+.ticks.read { color: #7CF0B5; }
+/* A call record in the chat */
+.msg-call { align-self: flex-start; display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 10px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); max-width: 80%; }
+.msg-call.mine { align-self: flex-end; }
+.msg-call .mc-ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green); flex: none; }
+.msg-call.missed .mc-ic, .msg-call.declined .mc-ic { background: var(--danger-soft); color: var(--danger); }
+.msg-call.missed .mc-ic svg, .msg-call.declined .mc-ic svg { transform: rotate(135deg); }
+.msg-call .mc-t b { display: block; font-size: 14px; }
+.msg-call .mc-t small { color: var(--ink-3); font-size: 12px; }
+.calls-off-note { color: var(--danger); font-weight: 600; }
+/* Seller: pause calls */
+.hm-ic.calls-off { background: var(--danger-soft); color: var(--danger); }
+.calls-menu { display: flex; flex-direction: column; gap: 8px; padding: 4px 8px 12px 60px; }
+.cm-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.cm-opts .btn, .cm-days .btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.cm-days { display: flex; gap: 6px; }
+.cm-days .input { width: 84px; min-height: 36px; padding: 6px 10px; }

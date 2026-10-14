@@ -645,6 +645,17 @@ module.exports = function market(ctx) {
     send(res, 200, { products: rows.map(p => productRow(p, { sold: sold[p.id] || 0 })) });
   });
 
+  // A seller stops incoming calls for some hours, some days, or until they turn calls back on.
+  route("POST", "/api/me/calls-off", async (req, res) => {
+    const u = await needUser(req), b = await readJson(req);
+    if (u.account_type !== "merchant") fail("Only sellers can pause calls.");
+    let until = 0;
+    if (b.forever) until = -1;
+    else if (Number(b.hours) > 0) until = now() + Math.min(Number(b.hours), 24 * 365) * 3600e3;
+    else if (Number(b.days) > 0) { const d = Math.round(Number(b.days)); if (d > 365) fail("Choose up to 365 days."); until = now() + d * 864e5; }
+    await db.run("UPDATE users SET calls_off_until = ? WHERE id = ?", until, u.id);
+    send(res, 200, { calls_off_until: until });
+  });
   route("POST", "/api/me/pause", async (req, res) => {
     const u = await needUser(req), b = await readJson(req), mode = PAUSES.includes(b.mode) ? b.mode : "";
     await db.run("UPDATE users SET pause = ? WHERE id = ?", mode, u.id);
@@ -1232,9 +1243,25 @@ module.exports = function market(ctx) {
     return { id: k.id, conv_id: k.conv_id, state: k.state, caller: k.from === uid, from_name: k.from_name, to_name: k.to_name, topic: k.topic,
       offer: k.from !== uid ? k.offer : undefined, ice: k.from !== uid ? k.ice_from : k.ice_to, created_at: k.created_at };
   }
+  // The call is written in the chat, so both people can see if it was answered (and how long), declined or missed.
+  async function logCall(k, status) {
+    try {
+      const c = await db.get("SELECT * FROM conversations WHERE id = ?", k.conv_id); if (!c) return;
+      const sender = k.from === c.buyer_id ? c.buyer_id : c.seller_id, t = now();
+      const secs = status === "answered" && k.answered_at ? Math.max(1, Math.round((t - k.answered_at) / 1000)) : 0;
+      const att = JSON.stringify({ kind: "call", status, secs });
+      const info = await db.run("INSERT INTO messages (conv_id, sender_id, body, created_at, att) VALUES (?, ?, ?, ?, ?)", c.id, sender, "", t, att);
+      await db.run(`UPDATE conversations SET last_at = ?, ${sender === c.buyer_id ? "buyer_read_at" : "seller_read_at"} = ? WHERE id = ?`, t, t, c.id);
+      const m = { id: Number(info.lastInsertRowid), conv_id: c.id, sender_id: sender, body: "", created_at: t, att: attOut({ id: 0, att }), calllog: true, preview: msgPreview({ att }) };
+      const aud = await chatAudience(c, sender);
+      broadcast("chat", m, x => x.id === c.buyer_id || x.id === c.seller_id || aud.ids.includes(x.id));
+      if (aud.svc) broadcast("deskchat", { svc: aud.svc, conv_id: c.id, from_name: k.from_name, preview: m.preview }, x => aud.ids.includes(x.id));
+    } catch {}
+  }
   function endCall(k, reason, by) {
     if (!calls.has(k.id)) return;
     calls.delete(k.id); clearTimeout(k.timer);
+    logCall(k, k.state === "active" ? "answered" : reason === "declined" ? "declined" : "missed");
     const everyone = [k.from, ...(k.callee ? [k.callee] : k.to)];
     broadcast("call", { type: "end", id: k.id, reason }, x => everyone.includes(x.id) && x.id !== by);
     pushLater(k.callee ? [k.callee] : k.to, { kind: "cancel", tag: "call-" + k.id });
@@ -1248,6 +1275,7 @@ module.exports = function market(ctx) {
     if (busyNow(u.id)) fail("You are already in a call.");
     const to = sd.to.filter(id => id !== u.id); if (!to.length) fail("There is nobody to call in this chat.");
     if (to.length === 1 && busyNow(to[0])) fail(`${sd.to_name} is on another call. Try again later.`);
+    if (to.length === 1 && callsOffUntil((await db.get("SELECT calls_off_until FROM users WHERE id = ?", to[0]))?.calls_off_until)) fail(`${sd.to_name} isn't taking calls right now. Send a message instead.`);
     const k = { id: crypto.randomUUID(), conv_id: sd.c.id, from: u.id, from_name: sd.from_name, to, to_name: sd.to_name, topic: sd.topic, callee: null,
       state: "ringing", offer: { type: "offer", sdp: b.offer.sdp }, ice_from: [], ice_to: [], created_at: now() };
     k.timer = setTimeout(() => endCall(k, "missed"), RING_MS);
@@ -1433,8 +1461,11 @@ module.exports = function market(ctx) {
   /* ---------- chat: call, pictures, voice messages and files ---------- */
   const ATT_KIND = { image: ["image/jpeg", "image/png", "image/webp"], voice: ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/aac", "audio/wav"],
     file: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] };
-  const attOut = (m) => { if (!m.att) return null; try { const a = JSON.parse(m.att); return { kind: a.kind, name: a.name, size: a.size, dur: a.dur || 0, url: `/api/chatfile/${m.id}` }; } catch { return null; } };
-  const msgPreview = m => m.body || (m.att ? ({ image: "📷 Photo", voice: "🎤 Voice message", file: "📎 File" })[(() => { try { return JSON.parse(m.att).kind; } catch { return "file"; } })()] || "📎 File" : "");
+  const attOut = (m) => { if (!m.att) return null; try { const a = JSON.parse(m.att);
+    if (a.kind === "call") return { kind: "call", status: a.status, secs: a.secs || 0 }; // a call record, not a file
+    return { kind: a.kind, name: a.name, size: a.size, dur: a.dur || 0, url: `/api/chatfile/${m.id}` }; } catch { return null; } };
+  const callWords = a => a.status === "answered" ? `📞 Voice call · ${Math.floor(a.secs / 60)}:${String(a.secs % 60).padStart(2, "0")}` : a.status === "declined" ? "📞 Call declined" : "📞 Missed call";
+  const msgPreview = m => m.body || (m.att ? (() => { let a = {}; try { a = JSON.parse(m.att); } catch {} return a.kind === "call" ? callWords(a) : ({ image: "📷 Photo", voice: "🎤 Voice message", file: "📎 File" })[a.kind] || "📎 File"; })() : "");
   // The number the Call button dials: the person's phone; for a service desk (Saba…), the service's phone.
   async function callNumber(uid, service) {
     const x = await db.get("SELECT phone, account_type FROM users WHERE id = ?", uid); if (!x) return "";
@@ -1495,6 +1526,13 @@ module.exports = function market(ctx) {
     res.end(data);
   });
 
+  // Read receipts: when someone opens a chat, the other side's ticks turn green.
+  async function readPing(c, readerId, at) {
+    const aud = await chatAudience(c, readerId);
+    broadcast("chatread", { conv_id: c.id, at }, x => (x.id !== readerId && (x.id === c.buyer_id || x.id === c.seller_id)) || aud.ids.includes(x.id));
+  }
+  // Calls paused by a seller: 0 = taking calls, -1 = until they turn calls back on, otherwise until that time.
+  const callsOffUntil = v => { v = Number(v) || 0; return v === -1 || v > now() ? v : 0; };
   async function convRow(c, me) {
     const other = me === c.buyer_id ? c.seller_id : c.buyer_id;
     const o = await db.get("SELECT name FROM users WHERE id = ?", other);
@@ -1505,7 +1543,8 @@ module.exports = function market(ctx) {
     const img = JSON.parse(p?.images || "[]")[0], ticket = p?.service === "ticket";
     return { id: c.id, product_id: c.product_id, product_name: ticket ? "Ticket enquiry" : p?.name || "Product", image: img ? "/media/" + img : null, kind: ticket ? "ticket" : "product",
       with_name: ticket && me === c.buyer_id ? p.shop_name : o?.name || "Someone", i_am: me === c.buyer_id ? "buyer" : "seller", last: last && { ...last, body: msgPreview(last) }, unread, last_at: c.last_at,
-      with_phone: await callNumber(other, p?.service) };
+      with_phone: await callNumber(other, p?.service), other_read_at: (me === c.buyer_id ? c.seller_read_at : c.buyer_read_at) || 0,
+      with_calls_off: me === c.buyer_id ? callsOffUntil((await db.get("SELECT calls_off_until FROM users WHERE id = ?", other))?.calls_off_until) : 0 };
   }
   const convFor = async (id, u) => { const c = await db.get("SELECT * FROM conversations WHERE id = ?", id); if (!c || (c.buyer_id !== u.id && c.seller_id !== u.id)) fail("Chat not found.", 404); return c; };
   route("POST", "/api/suuq/chat/start", async (req, res) => {
@@ -1527,8 +1566,9 @@ module.exports = function market(ctx) {
     send(res, 200, { chats: (await Promise.all(rows.map(c => convRow(c, u.id)))).filter(c => c.last || c.i_am === "buyer") });
   });
   route("GET", "/api/suuq/chats/:id/messages", async (req, res, url, [id]) => {
-    const u = await needUser(req), c = await convFor(id, u);
-    await db.run(`UPDATE conversations SET ${u.id === c.buyer_id ? "buyer_read_at" : "seller_read_at"} = ? WHERE id = ?`, now(), c.id);
+    const u = await needUser(req), c = await convFor(id, u), at = now();
+    await db.run(`UPDATE conversations SET ${u.id === c.buyer_id ? "buyer_read_at" : "seller_read_at"} = ? WHERE id = ?`, at, c.id);
+    await readPing(c, u.id, at);
     const msgs = (await db.all("SELECT id, sender_id, body, att, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 300", c.id)).reverse();
     send(res, 200, { chat: await convRow(c, u.id), messages: msgs.map(m => ({ ...m, att: attOut(m), mine: m.sender_id === u.id })) });
   });
@@ -1565,10 +1605,10 @@ module.exports = function market(ctx) {
   });
   route("GET", "/api/admin/service-chats/:id/:cid", async (req, res, url, [svc, cid]) => {
     await needPageEditor(req, svc); const { d, c } = await deskConv(svc, cid);
-    await db.run("UPDATE conversations SET seller_read_at = ? WHERE id = ?", now(), c.id);
+    const at = now(); await db.run("UPDATE conversations SET seller_read_at = ? WHERE id = ?", at, c.id); await readPing(c, c.seller_id, at);
     const b = await db.get("SELECT name, phone FROM users WHERE id = ?", c.buyer_id);
     const msgs = (await db.all("SELECT id, sender_id, body, att, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 300", c.id)).reverse();
-    send(res, 200, { chat: { id: c.id, name: b?.name || "", phone: b?.phone || "" }, messages: msgs.map(m => ({ ...m, att: attOut(m), mine: m.sender_id === d.user.id })) });
+    send(res, 200, { chat: { id: c.id, name: b?.name || "", phone: b?.phone || "", other_read_at: c.buyer_read_at || 0 }, messages: msgs.map(m => ({ ...m, att: attOut(m), mine: m.sender_id === d.user.id })) });
   });
   route("POST", "/api/admin/service-chats/:id/:cid", async (req, res, url, [svc, cid]) => {
     await needPageEditor(req, svc); const { d, c } = await deskConv(svc, cid), b = await readJson(req, 15 * 1024 * 1024);

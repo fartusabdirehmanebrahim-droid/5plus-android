@@ -1363,7 +1363,26 @@
   "New category": "Nouvelle catégorie",
   "Saved. New merchants see this list.": "Enregistré. Les nouveaux marchands voient cette liste.",
   "Added. Press Save to keep it.": "Ajouté. Appuyez sur Enregistrer pour le garder.",
-  "Internet calls": "Appels internet"
+  "Internet calls": "Appels internet",
+  "Read": "Lu",
+  "Voice call": "Appel vocal",
+  "Call declined": "Appel refusé",
+  "Calls": "Appels",
+  "Taking calls": "Appels activés",
+  "Stop customers calling you for:": "Empêcher les clients de vous appeler pendant :",
+  "1 hour": "1 heure",
+  "5 hours": "5 heures",
+  "10 hours": "10 heures",
+  "Until I turn them on": "Jusqu'à ce que je les réactive",
+  "Pause for these days": "Suspendre ces jours",
+  "Take calls again": "Réactiver les appels",
+  "Enter 1 to 365 days.": "Entrez de 1 à 365 jours.",
+  "Choose up to 365 days.": "Choisissez jusqu'à 365 jours.",
+  "Only sellers can pause calls.": "Seuls les vendeurs peuvent suspendre les appels.",
+  "Not taking calls right now": "N'accepte pas d'appels pour le moment",
+  "Paused · until you turn calls back on": "En pause · jusqu'à ce que vous réactiviez les appels",
+  "Number of days": "Nombre de jours",
+  "Pause calls": "Suspendre les appels"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1559,6 +1578,9 @@
   "{0} is on another call. Try again later.": "{0} est sur un autre appel. Réessayez plus tard.",
   "{0} called you on 5PLUS": "{0} vous a appelé sur 5PLUS",
   "{0} is calling you on 5PLUS": "{0} vous appelle sur 5PLUS",
-  "Business categories ({0})": "Catégories d'activité ({0})"
+  "Business categories ({0})": "Catégories d'activité ({0})",
+  "Not taking calls until {0}": "N'accepte pas d'appels jusqu'à {0}",
+  "Paused until {0}": "En pause jusqu'à {0}",
+  "{0} isn't taking calls right now. Send a message instead.": "{0} n'accepte pas d'appels pour le moment. Envoyez plutôt un message."
  }
 }

@@ -109,7 +109,7 @@ const clearFails = async u => await db.run("UPDATE users SET failed = 0, locked_
 const tooMany = `Too many wrong tries. Try again in ${LOCK_MINUTES} minutes.`;
 
 function publicUser(u) {
-  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, pause: u.pause || "", has_face: !!u.face, created_at: u.created_at };
+  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, pause: u.pause || "", has_face: !!u.face, calls_off_until: (n => n === -1 || n > Date.now() ? n : 0)(Number(u.calls_off_until) || 0), created_at: u.created_at };
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.

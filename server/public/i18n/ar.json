@@ -1363,7 +1363,26 @@
   "New category": "فئة جديدة",
   "Saved. New merchants see this list.": "تم الحفظ. يرى التجار الجدد هذه القائمة.",
   "Added. Press Save to keep it.": "تمت الإضافة. اضغط حفظ للاحتفاظ بها.",
-  "Internet calls": "مكالمات الإنترنت"
+  "Internet calls": "مكالمات الإنترنت",
+  "Read": "مقروءة",
+  "Voice call": "مكالمة صوتية",
+  "Call declined": "رُفضت المكالمة",
+  "Calls": "المكالمات",
+  "Taking calls": "تستقبل المكالمات",
+  "Stop customers calling you for:": "أوقف اتصال العملاء بك لمدة:",
+  "1 hour": "ساعة واحدة",
+  "5 hours": "5 ساعات",
+  "10 hours": "10 ساعات",
+  "Until I turn them on": "حتى أشغّلها",
+  "Pause for these days": "أوقف لهذه الأيام",
+  "Take calls again": "استقبل المكالمات مجددًا",
+  "Enter 1 to 365 days.": "أدخل من 1 إلى 365 يومًا.",
+  "Choose up to 365 days.": "اختر حتى 365 يومًا.",
+  "Only sellers can pause calls.": "يمكن للبائعين فقط إيقاف المكالمات.",
+  "Not taking calls right now": "لا يستقبل المكالمات الآن",
+  "Paused · until you turn calls back on": "متوقفة · حتى تعيد تشغيل المكالمات",
+  "Number of days": "عدد الأيام",
+  "Pause calls": "إيقاف المكالمات"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",
@@ -1559,6 +1578,9 @@
   "{0} is on another call. Try again later.": "{0} في مكالمة أخرى. حاول لاحقًا.",
   "{0} called you on 5PLUS": "اتصل بك {0} على 5PLUS",
   "{0} is calling you on 5PLUS": "{0} يتصل بك على 5PLUS",
-  "Business categories ({0})": "فئات النشاط التجاري ({0})"
+  "Business categories ({0})": "فئات النشاط التجاري ({0})",
+  "Not taking calls until {0}": "لا يستقبل المكالمات حتى {0}",
+  "Paused until {0}": "متوقفة حتى {0}",
+  "{0} isn't taking calls right now. Send a message instead.": "{0} لا يستقبل المكالمات الآن. أرسل رسالة بدلًا من ذلك."
  }
 }

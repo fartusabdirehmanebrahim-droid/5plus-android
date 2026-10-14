@@ -303,6 +303,7 @@ async function init() {
   await addColumn("orders", "pay_discount", "REAL NOT NULL DEFAULT 0"); // Pay to shop: the buyer's own earning taken off the price
   await addColumn("orders", "buyer_ok", "INTEGER NOT NULL DEFAULT 0"); // Safe payment: the buyer said they received it (the admin releases)
   await addColumn("orders", "book_at", "TEXT NOT NULL DEFAULT ''");
+  await addColumn("users", "calls_off_until", "INTEGER NOT NULL DEFAULT 0"); // a seller paused calls until then (-1 = until turned back on)
   await addColumn("users", "face", "TEXT NOT NULL DEFAULT ''"); // private face photo (only admins see it)
   await addColumn("users", "pause", "TEXT NOT NULL DEFAULT ''"); // Salah time or Sleep time: no new orders until the seller turns it off
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")
