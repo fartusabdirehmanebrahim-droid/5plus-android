@@ -1376,6 +1376,8 @@
   "Send your papers, photos, invoices or letters to {0}: pictures, PDF or Word, one or many.": "أرسل أوراقك أو صورك أو فواتيرك أو رسائلك إلى {0}: صور أو PDF أو Word، ملف واحد أو أكثر.",
   "Sent to {0}": "أُرسلت إلى {0}",
   "Sent. {0} files were received.": "تم الإرسال. تم استلام {0} ملفات.",
-  "Sent. {0} file was received.": "تم الإرسال. تم استلام {0} ملف."
+  "Sent. {0} file was received.": "تم الإرسال. تم استلام {0} ملف.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "هاتفك يتصل لدفع {0}. عندما يؤكد Sarrif وصول المال، يسلّم البائع. يُحتفظ بالمال حتى تؤكد استلامك.",
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "هاتفك يتصل لدفع {0}. عندما يؤكد البائع وصول المال، يسلّم."
  }
 }

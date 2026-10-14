@@ -1376,6 +1376,8 @@
   "Send your papers, photos, invoices or letters to {0}: pictures, PDF or Word, one or many.": "Envoyez vos papiers, photos, factures ou lettres à {0} : images, PDF ou Word, un ou plusieurs.",
   "Sent to {0}": "Envoyés à {0}",
   "Sent. {0} files were received.": "Envoyé. {0} fichiers ont été reçus.",
-  "Sent. {0} file was received.": "Envoyé. {0} fichier a été reçu."
+  "Sent. {0} file was received.": "Envoyé. {0} fichier a été reçu.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "Votre téléphone compose pour payer {0}. Quand Sarrif confirme la réception, le vendeur livre. L'argent est conservé jusqu'à votre confirmation.",
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "Votre téléphone compose pour payer {0}. Quand le vendeur confirme la réception, il livre."
  }
 }

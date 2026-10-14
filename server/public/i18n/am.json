@@ -1376,6 +1376,8 @@
   "Send your papers, photos, invoices or letters to {0}: pictures, PDF or Word, one or many.": "ሰነዶችዎን፣ ፎቶዎችዎን፣ ደረሰኞችን ወይም ደብዳቤዎችን ወደ {0} ይላኩ፦ ምስሎች፣ PDF ወይም Word፣ አንድ ወይም ብዙ።",
   "Sent to {0}": "ወደ {0} ተልኳል",
   "Sent. {0} files were received.": "ተልኳል። {0} ፋይሎች ደርሰዋል።",
-  "Sent. {0} file was received.": "ተልኳል። {0} ፋይል ደርሷል።"
+  "Sent. {0} file was received.": "ተልኳል። {0} ፋይል ደርሷል።",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። Sarrif ገንዘቡ መድረሱን ሲያረጋግጥ ሻጩ ያደርሳል። እስኪያረጋግጡ ድረስ ገንዘቡ ይያዛል።",
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። ሻጩ ገንዘቡ መድረሱን ሲያረጋግጥ ያደርሳል።"
  }
 }

@@ -1375,6 +1375,8 @@
   "Send your papers, photos, invoices or letters to {0}: pictures, PDF or Word, one or many.": "U dir waraaqahaaga, sawirrada, qaansheegyada ama warqadaha {0}: sawirro, PDF ama Word, mid ama dhowr.",
   "Sent to {0}": "Loo diray {0}",
   "Sent. {0} files were received.": "Waa la diray. {0} fayl ayaa la helay.",
-  "Sent. {0} file was received.": "Waa la diray. {0} fayl ayaa la helay."
+  "Sent. {0} file was received.": "Waa la diray. {0} fayl ayaa la helay.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Marka Sarrif xaqiijiso lacagta, iibiyuhu wuu keenayaa. Lacagta waa la hayaa ilaa aad xaqiijiso inaad heshay.",
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Marka iibiyuhu xaqiijiyo lacagta, wuu keenayaa."
  }
 }

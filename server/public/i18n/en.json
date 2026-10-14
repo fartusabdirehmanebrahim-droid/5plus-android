@@ -1058,6 +1058,8 @@
   "Send your papers, photos, invoices or letters to {0}: pictures, PDF or Word, one or many.",
   "Sent to {0}",
   "Sent. {0} files were received.",
-  "Sent. {0} file was received."
+  "Sent. {0} file was received.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.",
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver."
  ]
 }

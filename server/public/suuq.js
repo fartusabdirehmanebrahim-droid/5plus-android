@@ -834,20 +834,19 @@ const SUUQ = (() => {
     const fee = payFeeOf(cur, total);
     return `<div class="paym" role="radiogroup" aria-label="How do you want to pay?"><b class="paym-h">How do you want to pay?</b>
       ${["wallet", "safe", "shop"].filter(m => opts[m].ok).map(m => `<button class="paym-opt" role="radio" data-paym="${m}" aria-checked="${box.method === m}"><span class="paym-ic ${m}">${PAY_IC[m]}</span><span class="paym-t"><b>${PAY_NAME[m]}</b><small>${sub[m]}</small></span><span class="paym-dot" aria-hidden="true"></span></button>`).join("")}
-      ${box.method !== "wallet" ? `${o.merchant && o.number ? `<div class="paym-via" role="group" aria-label="Number to pay"><button data-payvia="merchant" aria-pressed="${box.via === "merchant"}">Merchant number <span class="num">${cur === "SLSH" ? "*223*" : "*883*"}</span></button><button data-payvia="normal" aria-pressed="${box.via === "normal"}">Normal number <span class="num">${cur === "SLSH" ? "*220*" : "*880*"}</span></button></div>` : ""}
+      ${box.method !== "wallet" ? `${o.merchant && o.number ? `<div class="paym-via" role="group" aria-label="Number to pay"><button data-payvia="merchant" aria-pressed="${box.via === "merchant"}">Merchant number</button><button data-payvia="normal" aria-pressed="${box.via === "normal"}">Normal number</button></div>` : ""}
         <div class="summary"><div class="sum-row"><span>Price</span><b class="num">${money(total, cur)}</b></div><div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div>
           <div class="sum-row total"><span>You dial</span><b class="num">${money(total + fee, cur)}</b></div></div>
-        <p class="note" style="margin:0">${box.method === "safe" ? "Your phone dials the money processor straight away. Sarrif confirms the money arrived and holds it; the seller gets it when you confirm you received the item." : "Your phone dials the shop straight away. The seller confirms the money arrived, then delivers. The money goes to the seller directly, so it can't be refunded by Sarrif."}</p>` : ""}
+        ${box.method === "safe" ? `<p class="note" style="margin:0">Your phone dials the money processor straight away. Sarrif confirms the money arrived and holds it; the seller gets it when you confirm you received the item.</p>` : ""}` : ""}
     </div>`;
   }
   // The order didn't go through: show the error, then Try again with the merchant number or the normal number.
   function ussdButton(box, cur, total, act, payShop) {
     if (box.err) {
       const v = box.method === "safe" ? { merchant: !!settings.safePay?.merchant, number: !!settings.safePay?.number } : payShop || {};
-      const m = cur === "SLSH" ? "*223*" : "*883*", n = cur === "SLSH" ? "*220*" : "*880*";
       return `<div class="err" role="alert">${esc(box.err)}</div><div class="retry-row"><small>Try again with:</small>
-        ${v.merchant ? `<button class="btn btn-primary" data-sq="${act}" data-via="merchant">Merchant number <span class="num">${m}</span></button>` : ""}
-        ${v.number ? `<button class="btn btn-primary" data-sq="${act}" data-via="normal">Normal number <span class="num">${n}</span></button>` : ""}</div>`;
+        ${v.merchant ? `<button class="btn btn-primary" data-sq="${act}" data-via="merchant">Merchant number</button>` : ""}
+        ${v.number ? `<button class="btn btn-primary" data-sq="${act}" data-via="normal">Normal number</button>` : ""}</div>`;
     }
     return `<button class="btn btn-primary btn-block" data-sq="${act}">${SVC_TOPUP}Pay ${money(total + payFeeOf(cur, total), cur)} by USSD</button>`;
   }
@@ -857,7 +856,7 @@ const SUUQ = (() => {
   function vOrderSheet(p, os) {
     if (os.done && os.done.status === "awaiting_payment") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
       <h3 style="font-size:20px">Order placed · pay by USSD</h3>
-      <p class="note" style="margin:0">Your phone is dialling <b class="num">${esc(os.done.pay_ussd)}</b> (${esc(money(os.done.total + os.done.pay_fee, os.done.cur))}). ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it." : "When the seller confirms the money arrived, they deliver."}</p>
+      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it." : "When the seller confirms the money arrived, they deliver."}</p>
       <p class="note" style="margin:0">Ref <span class="num">${esc(os.done.ref)}</span></p></div>
       <button class="btn btn-ghost btn-block" data-sq="myorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closesheet">Keep shopping</button></div></div>`;
     if (os.done) return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
@@ -897,7 +896,7 @@ const SUUQ = (() => {
         <div class="orow"><span class="pill ${statusTone(o.status)}">${esc(orderLabel(o))}</span><b class="num">${o.needs_price ? "—" : money(o.total, o.cur)}</b></div>
         ${o.offer_desc ? `<small class="onote">${esc(o.offer_desc)}</small>` : ""}
         ${o.my_earn > 0 ? `<span class="earn">${o.status === "completed" ? `You earned ${esc(money(o.my_earn, o.cur))} · added to your earnings` : ["cancelled", "cancelled_by_seller", "declined", "payment_rejected"].includes(o.status) ? "" : `You earn ${esc(money(o.my_earn, o.cur))} when you confirm you received it`}</span>` : ""}
-        ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · dialled <span class="num">${esc(o.pay_ussd)}</span> (${esc(money(o.total + o.pay_fee, o.cur))})</small>` : ""}
+        ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · <span class="num">${esc(money(o.total + o.pay_fee, o.cur))}</span></small>` : ""}
         ${o.status === "awaiting_payment" ? `<small class="note">${o.pay_method === "safe" ? "Sarrif confirms the money arrived, then the seller delivers." : "The seller confirms the money arrived, then delivers."}</small>` : ""}
         ${o.status === "payment_rejected" ? `<small class="note" style="color:var(--danger)">${o.pay_method === "safe" ? "Sarrif didn't receive this payment. Contact support if you paid." : "The seller didn't receive this payment. Chat with them if you paid."}</small>` : ""}
         <div class="req-actions">
