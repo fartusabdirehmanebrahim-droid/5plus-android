@@ -418,7 +418,7 @@ const SUUQ = (() => {
   function ringFor(o) {
     if (!o || !o.buyer_name || seenOrder[o.id] === o.status) return; // only the merchant's copy, once per change
     seenOrder[o.id] = o.status;
-    const what = `<b>${esc(o.product_name)} × ${o.qty}</b> · ${esc(o.buyer_name)}${o.note ? `<br><span class="ring-note">“${esc(o.note)}”</span>` : ""}`;
+    const what = `<b>${esc(o.product_name)} × ${o.qty}</b> · ${esc(o.buyer_name)}${o.book_at ? `<br>📅 ${esc(o.book_at)}` : ""}${o.note ? `<br><span class="ring-note">“${esc(o.note)}”</span>` : ""}`;
     const act = a => api(`/api/suuq/orders/${o.id}/action`, { body: { action: a } });
     if (o.status === "requested") alarm.show({ key: o.id + o.status, secs: 25, tone: "req",
       title: o.kind === "book" ? "New booking" : o.from_order ? "New request (passed on to you)" : "New price request", body: what,
@@ -434,7 +434,7 @@ const SUUQ = (() => {
   function ringChat(m) {
     if (!m.new_chat || m.sender_id === S.user?.id) return;
     alarm.show({ key: "chat" + m.conv_id, secs: 25, tone: "req", title: "New chat",
-      body: `<b>${esc(m.from_name || "")}</b>${m.product_name ? ` · ${esc(m.product_name)}` : ""}<br><span class="ring-note">“${esc(m.body)}”</span>`,
+      body: `<b>${esc(m.from_name || "")}</b>${m.product_name ? ` · ${esc(m.product_name)}` : ""}<br><span class="ring-note">“${esc(m.preview || m.body)}”</span>`,
       actions: [{ label: "Accept", cls: "btn-primary", fn: async () => { S.service = "suuq"; S.drawer = false; await open("suuq"); await openChat(m.conv_id); } },
         { label: "Reject", cls: "btn-danger", fn: null }] });
   }
@@ -533,7 +533,7 @@ const SUUQ = (() => {
     const d = desk.data, pend = d.orders.filter(o => !["completed", "cancelled", "declined", "payment_rejected", "cancelled_by_seller"].includes(o.status));
     const card = o => `<div class="person"><div class="person-top"><div class="avatar">${esc((o.buyer_name || "?")[0].toUpperCase())}</div>
         <div class="t"><b>${esc(o.product_name)} × ${o.qty}</b><small>${esc(o.buyer_name)} · +252 ${esc(o.buyer_phone)} · ${new Date(o.created_at).toLocaleString()} · Ref ${esc(o.ref)}</small>
-          ${o.note ? `<small class="onote">“${esc(o.note)}”</small>` : ""}${o.offer_desc ? `<small class="onote">${esc(o.offer_desc)}</small>` : ""}
+          ${o.book_at ? `<small class="onote book-at">📅 ${esc(o.book_at)}</small>` : ""}${o.note ? `<small class="onote">“${esc(o.note)}”</small>` : ""}${o.offer_desc ? `<small class="onote">${esc(o.offer_desc)}</small>` : ""}
           ${o.total ? `<small>${esc(money(o.total, o.cur))}${o.pay_method && o.pay_method !== "wallet" ? ` · ${esc(PAY_NAME[o.pay_method])}` : ""}</small>` : ""}</div>
         <span class="pill ${statusTone(o.status)}">${esc(DESK_ST[o.status] || o.status)}</span></div>
       <div class="person-actions">
@@ -566,7 +566,7 @@ const SUUQ = (() => {
   function onDeskOrder(o) {
     if (desk.id === o.desk) loadDesk(o.desk).then(drawDesk);
     if (seenOrder["d" + o.id] === o.status) return; seenOrder["d" + o.id] = o.status;
-    const what = `<b>${esc(o.product_name)} × ${o.qty}</b> · ${esc(o.buyer_name)}${o.note ? `<br><span class="ring-note">“${esc(o.note)}”</span>` : ""}`;
+    const what = `<b>${esc(o.product_name)} × ${o.qty}</b> · ${esc(o.buyer_name)}${o.book_at ? `<br>📅 ${esc(o.book_at)}` : ""}${o.note ? `<br><span class="ring-note">“${esc(o.note)}”</span>` : ""}`;
     if (o.status === "requested") alarm.show({ key: "d" + o.id + o.status, secs: 25, tone: "staff", title: "New service request", body: what,
       actions: [{ label: "Accept", cls: "btn-primary", fn: () => deskAction(o.desk, o.id, "accept") }, { label: "Reject", cls: "btn-danger", fn: () => deskAction(o.desk, o.id, "decline") }] });
     else if (o.status === "paid") alarm.show({ key: "d" + o.id + o.status, secs: 10, tone: "staff", title: "Service order paid", body: `${what}<br>${esc(money(o.total, o.cur))} · money held`, actions: [{ label: "OK", cls: "btn-primary", fn: null }] });
@@ -785,7 +785,7 @@ const SUUQ = (() => {
   function vShop() {
     const visa = st.market === "visa", scholar = st.market === "scholarship";
     const cs = hasCountry(st.market) ? st.visaCountries || [] : [];
-    return `${visa ? visaFeature() : ""}${scholar ? `<div class="scholar-intro"><h2 style="font-size:20px">Scholarships</h2><p class="note" style="margin:0">Study abroad. Travel agencies post scholarships by country; choose one and ask them about it.</p></div>` : ""}<div class="sq-search"><input class="input" id="sq-q" placeholder="${visa ? "Search visas, countries or agencies" : scholar ? "Search scholarships, countries or agencies" : "Search products or shops"}" value="${esc(st.q)}" aria-label="Search"></div>
+    return `${visa ? visaFeature() : ""}<div class="sq-search"><input class="input" id="sq-q" placeholder="${visa ? "Search visas, countries or agencies" : scholar ? "Search scholarships, countries or agencies" : "Search products or shops"}" value="${esc(st.q)}" aria-label="Search"></div>
       ${cs.length ? `<div class="country-chips" role="group" aria-label="Countries"><button data-vcountry="" aria-pressed="${!st.visaCountry}">🌍 All countries</button>${cs.map(c => `<button data-vcountry="${esc(c.name)}" aria-pressed="${st.visaCountry === c.name}">${countryTag(c.name)} <span>${c.n}</span></button>`).join("")}</div>` : ""}
       ${st.products.length ? (visa ? `<div class="hlist">${st.products.map(visaCard).join("")}</div>` : `<div class="pgrid">${st.products.map(productCard).join("")}</div>`) : `<div class="empty">${st.q ? "Nothing matches your search." : visa ? "No visas yet. Sellers will post them here soon." : scholar ? "No scholarships yet. Travel agencies will post them here soon." : "No products yet. Sellers will post here soon."}</div>`}`;
   }
@@ -806,7 +806,7 @@ const SUUQ = (() => {
       ${p.description ? `<p style="margin:0;white-space:pre-wrap">${esc(p.description)}</p>` : ""}
       ${mine ? `<div class="earn-box"><div><b>Share your product</b><small>Your link has no affiliate code, so when someone buys through it you keep the whole price.</small></div><button class="btn btn-ghost" data-share="${esc(p.id)}">Copy link</button></div>`
         : p.first_sender && earnText(p) ? `<div class="earn-box"><div><b>Share this product</b><small>You opened it from someone's link. They shared it first, so they earn when you or people you send it to buy it.</small></div><button class="btn btn-ghost" data-share="${esc(p.id)}">Copy link</button></div>`
-        : earnFor(p) ? `<div class="earn-box"><div><b>${esc(earnFor(p))}</b><small>Share your link. When someone buys and the order is completed, you get ${p.comm_type === "percent" ? p.comm_value + "% of the price" : money(p.comm_value, p.cur) + " per item"}.</small><small>You also earn it when you buy it yourself.</small></div><button class="btn btn-ghost" data-share="${esc(p.id)}">Copy my link</button></div>` : ""}
+        : earnFor(p) ? `<div class="earn-box"><div><b>${esc(earnFor(p))}</b><details class="earn-more"><summary>How it works</summary><small>Share your link. When someone buys and the order is completed, you get ${p.comm_type === "percent" ? p.comm_value + "% of the price" : money(p.comm_value, p.cur) + " per item"}.</small><small>You also earn it when you buy it yourself.</small></details></div><button class="btn btn-ghost" data-share="${esc(p.id)}">Copy my link</button></div>` : ""}
       ${mine ? `<div class="instr">${p.approval === "pending" ? "Waiting for admin approval. Customers can't see it yet. " : p.approval === "rejected" ? `Not approved: ${esc(p.review_note)}. ` : ""}This is your product. Edit it from My shop → Products.</div>` : `
         <div class="row-actions" style="gap:8px">
           <button class="btn btn-primary" data-order style="flex:1">${asksPrice(p) ? "Ask for price" : p.mode === "buy" ? "Buy now" : "Book now"}</button>
@@ -891,7 +891,9 @@ const SUUQ = (() => {
     return `<div class="sheet"><div class="sheet-card">
       <h3 style="font-size:19px">${p.mode === "buy" ? "Buy" : "Book"} ${esc(p.name)}</h3>
       <div class="qty"><span>${UNIT_NAME[p.unit] ? UNIT_NAME[p.unit][1] : "Quantity"}</span><button class="icon-btn" data-qty="-1" aria-label="Less">−</button><b class="num">${os.qty}</b><button class="icon-btn" data-qty="1" aria-label="More">+</button></div>
-      <div class="field"><label for="sq-note">${p.unit === "night" ? "Check-in date and number of guests" : String(p.service).startsWith("svc:") ? "Where and when, and what you need" : p.mode === "buy" ? "Delivery address or note" : "Date, time or note for the seller"}</label><input class="input" id="sq-note" maxlength="300" value="${esc(os.note || "")}"></div>
+      ${p.mode === "book" ? `<div class="grid2 book-when"><div class="field"><label for="sq-bdate">${p.unit === "night" ? "Check-in date" : "Date"}</label><input class="input" type="date" id="sq-bdate" min="${new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10)}" value="${esc(os.bdate || "")}"></div>
+        <div class="field"><label for="sq-btime">Time</label><input class="input" type="time" id="sq-btime" value="${esc(os.btime || "")}"></div></div>` : ""}
+      <div class="field"><label for="sq-note">${p.unit === "night" ? "Check-in date and number of guests" : String(p.service).startsWith("svc:") ? "Where and when, and what you need" : p.mode === "buy" ? "Delivery address or note" : "Where, and what you need (optional)"}</label><input class="input" id="sq-note" maxlength="300" value="${esc(os.note || "")}"></div>
       <div class="summary"><div class="sum-row total"><span>Total</span><b class="num">${money(total, p.cur)}</b></div>
         ${p.mode === "buy" && wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, p.cur)}</b></div>` : ""}</div>
       ${p.mode === "buy" ? payChooser(os, p.cur, total, p.pay_shop, shopI) : ""}
@@ -907,7 +909,7 @@ const SUUQ = (() => {
       ${o.image ? `<img src="${esc(o.image)}" alt="">` : `<span class="noimg">▶</span>`}
       <div class="t"><b>${esc(o.product_name)} × ${o.qty}</b><small>${esc(o.shop_name)} · ${new Date(o.created_at).toLocaleDateString()} · Ref ${esc(o.ref)}</small>
         <div class="orow"><span class="pill ${statusTone(o.status)}">${esc(orderLabel(o))}</span><b class="num">${o.needs_price ? "—" : money(o.total, o.cur)}</b></div>
-        ${o.offer_desc ? `<small class="onote">${esc(o.offer_desc)}</small>` : ""}
+        ${o.book_at ? `<small class="onote book-at">📅 ${esc(o.book_at)}</small>` : ""}${o.offer_desc ? `<small class="onote">${esc(o.offer_desc)}</small>` : ""}
         ${o.my_earn > 0 ? `<span class="earn">${o.status === "completed" ? `You earned ${esc(money(o.my_earn, o.cur))} · added to your earnings` : ["cancelled", "cancelled_by_seller", "declined", "payment_rejected"].includes(o.status) ? "" : `You earn ${esc(money(o.my_earn, o.cur))} when you confirm you received it`}</span>` : ""}
         ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · <span class="num">${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))}</span>${o.pay_discount ? ` · your earnings ${esc(money(o.pay_discount, o.cur))} taken off` : ""}</small>` : ""}
         ${o.status === "awaiting_payment" ? `<small class="note">${o.pay_method === "safe" ? "Sarrif confirms the money arrived, then the seller delivers." : "The seller confirms the money arrived, then delivers."}</small>` : ""}
@@ -975,6 +977,94 @@ const SUUQ = (() => {
   }
   const PLANE_S = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-2px;margin-inline-end:4px"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>';
   const PLANE = '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>';
+  /* ---------- chat kit: pictures, voice messages, files, call (customers and service admins) ---------- */
+  const CI = {
+    clip: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.6 8.6a2 2 0 0 1-2.8-2.8L15 7.5"/></svg>',
+    cam: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="12" cy="12" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>',
+    mic: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/></svg>',
+    stop: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+    send: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>',
+    call: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>',
+    doc: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+  };
+  const fmtDur = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  function msgHtml(m) {
+    const a = m.att, t = new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const att = !a ? "" : a.kind === "image" ? `<button class="msg-img" data-chatimg="${esc(a.url)}" aria-label="Open picture"><img src="${esc(a.url)}" alt="" loading="lazy"></button>`
+      : a.kind === "voice" ? `<audio class="msg-voice" controls preload="none" src="${esc(a.url)}"></audio>`
+      : `<a class="msg-file" href="${esc(a.url)}" target="_blank" rel="noopener" download="${esc(a.name)}">${CI.doc}<span>${esc(a.name)}</span></a>`;
+    return `<div class="msg ${m.mine ? "mine" : ""} ${a ? "has-att" : ""}">${att}${m.body ? `<span>${esc(m.body)}</span>` : ""}<small>${t}</small></div>`;
+  }
+  // The message box: text, a picture or file, or a voice message (tap the mic, tap again to send).
+  const composerHtml = (id = "composer") => `<form class="composer chat-comp" id="${id}">
+    <label class="icon-btn comp-btn" aria-label="Send a picture or file">${CI.clip}<input type="file" data-chatfile accept="image/jpeg,image/png,image/webp,.pdf,.doc,.docx,application/pdf" hidden></label>
+    <input class="input" data-chatin placeholder="Write a message" maxlength="1000" autocomplete="off" aria-label="Message">
+    <button type="button" class="icon-btn comp-btn" data-chatmic aria-label="Record a voice message">${CI.mic}</button>
+    <button class="btn btn-primary comp-send" type="submit" aria-label="Send">${CI.send}</button>
+    <div class="rec-bar" hidden><span class="rec-dot"></span><b data-recclock>0:00</b><span class="note">Recording…</span><button type="button" class="btn btn-ghost" data-reccancel>Cancel</button><button type="button" class="btn btn-primary" data-recstop>${CI.stop} Send</button></div>
+    <small class="err" data-chaterr></small></form>`;
+  const readAsUrl = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
+  async function shrinkImage(f) { // big phone photos: max 1600 px, JPEG
+    const url = await readAsUrl(f);
+    try { const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height)); if (k === 1 && f.size < 1.5e6) return url;
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL("image/jpeg", 0.85); } catch { return url; }
+  }
+  let rec = null;
+  function bindComposer(form, sendFn) {
+    if (!form) return;
+    const inp = form.querySelector("[data-chatin]"), err = form.querySelector("[data-chaterr]"), bar = form.querySelector(".rec-bar");
+    const go = async payload => { err.textContent = ""; try { await sendFn(payload); } catch (e) { err.textContent = e.message; } };
+    form.onsubmit = async e => { e.preventDefault(); const body = inp.value.trim(); if (!body) return; inp.value = ""; await go({ body }); const n = document.querySelector("[data-chatin]"); if (n) n.focus(); };
+    const fileIn = form.querySelector("[data-chatfile]");
+    fileIn.onchange = async () => {
+      const f = fileIn.files[0]; fileIn.value = ""; if (!f) return;
+      if (f.size > 10 * 1024 * 1024) { err.textContent = "Files must be 10 MB or smaller."; return; }
+      const isImg = /^image\//.test(f.type);
+      if (!isImg && !/\.(pdf|docx?)$/i.test(f.name)) { err.textContent = "Send a picture, PDF or Word file."; return; }
+      err.textContent = "Sending…";
+      const data = isImg ? await shrinkImage(f) : await readAsUrl(f);
+      await go({ body: inp.value.trim(), att: { kind: isImg ? "image" : "file", name: f.name, data } }); inp.value = "";
+    };
+    const mic = form.querySelector("[data-chatmic]");
+    const stopRec = send => { if (!rec) return; rec.send = send; try { rec.mr.stop(); } catch {} };
+    mic.onclick = async () => {
+      if (rec) return stopRec(true);
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { err.textContent = "Voice messages don't work on this phone."; return; }
+      let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { err.textContent = "Allow the microphone to send voice messages."; return; }
+      const type = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"].find(t => MediaRecorder.isTypeSupported?.(t)) || "";
+      const mr = new MediaRecorder(stream, type ? { mimeType: type } : {}), chunks = [], t0 = Date.now();
+      rec = { mr, send: true }; bar.hidden = false; form.classList.add("recording");
+      const clock = form.querySelector("[data-recclock]"), tick = setInterval(() => { clock.textContent = fmtDur((Date.now() - t0) / 1000); if (Date.now() - t0 > 300000) stopRec(true); }, 250);
+      mr.ondataavailable = e => e.data.size && chunks.push(e.data);
+      mr.onstop = async () => {
+        clearInterval(tick); stream.getTracks().forEach(t => t.stop()); bar.hidden = true; form.classList.remove("recording");
+        const send = rec?.send; rec = null; if (!send || !chunks.length) return;
+        const blob = new Blob(chunks, { type: (mr.mimeType || "audio/webm").split(";")[0] }), dur = (Date.now() - t0) / 1000;
+        if (dur < 1) { err.textContent = "Hold on a little longer to record."; return; }
+        err.textContent = "Sending…"; await go({ att: { kind: "voice", name: "voice", data: await readAsUrl(blob), dur } });
+      };
+      mr.start();
+    };
+    form.querySelector("[data-recstop]").onclick = () => stopRec(true);
+    form.querySelector("[data-reccancel]").onclick = () => stopRec(false);
+  }
+  function bindMsgs(box) {
+    if (!box) return;
+    box.querySelectorAll("[data-chatimg]").forEach(b => b.onclick = () => zoom.open([b.dataset.chatimg], 0, "Picture"));
+    box.scrollTop = box.scrollHeight;
+  }
+  const callBtn = phone => phone ? `<a class="btn btn-ghost chat-call" href="tel:${esc(phone)}" aria-label="Call">${CI.call}Call</a>` : "";
+  // A small banner when a message arrives while you are somewhere else in the app.
+  function msgBanner(m, open) {
+    document.getElementById("msg-banner")?.remove();
+    const d = document.createElement("button"); d.id = "msg-banner"; d.className = "msg-banner";
+    d.innerHTML = `<b>${esc(m.from_name || "New message")}</b><span>${esc(m.preview || m.body || "")}</span>`;
+    d.onclick = () => { d.remove(); open(); }; document.body.appendChild(d);
+    setTimeout(() => d.remove(), 6000);
+  }
+
   function vChats() {
     if (!st.chats.length) return `<div class="empty">No chats yet. Open a product and tap “Chat with seller”.</div>`;
     return `<div class="olist">${st.chats.map(c => `<button class="ccard" data-openchat="${esc(c.id)}">
@@ -985,9 +1075,9 @@ const SUUQ = (() => {
   function vThread() {
     const c = st.chat;
     return `<div class="view thread-view">
-      <div class="svc-bar">${back("closechat")}<div style="min-width:0"><b>${esc(c.with_name)}</b><small class="note" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.product_name)} · only you two can see this chat</small></div></div>
-      <div class="msgs" id="msgs">${st.messages.length ? st.messages.map(m => `<div class="msg ${m.mine ? "mine" : ""}"><span>${esc(m.body)}</span><small>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small></div>`).join("") : `<div class="empty">Say hello and ask about ${esc(c.product_name)}.</div>`}</div>
-      <form class="composer" id="composer"><input class="input" id="msg-in" placeholder="Write a message" maxlength="1000" autocomplete="off" aria-label="Message"><button class="btn btn-primary" type="submit">Send</button></form>
+      <div class="svc-bar">${back("closechat")}<div style="min-width:0;flex:1"><b>${esc(c.with_name)}</b><small class="note" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.product_name)} · only you two can see this chat</small></div>${callBtn(c.with_phone)}</div>
+      <div class="msgs" id="msgs">${st.messages.length ? st.messages.map(msgHtml).join("") : `<div class="empty">Say hello and ask about ${esc(c.product_name)}.</div>`}</div>
+      ${composerHtml()}
     </div>`;
   }
 
@@ -1146,10 +1236,10 @@ const SUUQ = (() => {
     const e = st.edit;
     return `<div class="leg">
       <b style="font-family:var(--display);font-size:17px">${e.id ? (e.service === "visa" ? "Edit visa" : e.service === "scholarship" ? "Edit scholarship" : "Edit product") : (e.service === "visa" ? "New visa" : e.service === "scholarship" ? "New scholarship" : "New product")}</b>
-      ${(() => { const opts = [["suuq", "Suuq"], ...(visaOpen() ? [["visa", "Visa"]] : []), ...(scholarOk() || e.service === "scholarship" ? [["scholarship", "Scholarship"]] : [])];
+      ${(() => { const opts = [["suuq", "Suuq"], ...(visaOpen() ? [["visa", "Visa"]] : []), ...(scholarOk() || e.service === "scholarship" ? [["scholarship", "Scholarship"]] : []), ...((settings.services || []).some(x => x.id === "technician") || e.service === "technician" ? [["technician", "Technician"]] : [])];
         return opts.length > 1 ? `<div class="field"><label>List it in</label><div class="cur-toggle" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([k, l], i) => `<button class="${i % 2 ? "SLSH" : "USD"}" data-pesvc="${k}" aria-pressed="${(e.service || "suuq") === k}">${l}</button>`).join("")}</div></div>` : ""; })()}
       ${hasCountry(e.service) ? `<div class="field"><label for="pe-country">${e.service === "scholarship" ? "Country of the scholarship" : "Country of the visa"}</label><select class="input" id="pe-country"><option value="">Choose a country…</option>${(st.countries || []).filter(c => c !== "Somaliland").map(c => `<option ${c === e.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>` : ""}
-      <div class="field"><label for="pe-name">Short name</label><input class="input" id="pe-name" maxlength="60" value="${esc(e.name)}" placeholder="${e.service === "visa" ? "Tourist visa, 30 days" : e.service === "scholarship" ? "Bachelor's degree, full scholarship" : "Samsung A15 128GB"}"></div>
+      <div class="field"><label for="pe-name">Short name</label><input class="input" id="pe-name" maxlength="60" value="${esc(e.name)}" placeholder="${e.service === "visa" ? "Tourist visa, 30 days" : e.service === "scholarship" ? "Bachelor's degree, full scholarship" : e.service === "technician" ? "Plumbing repair, one visit" : "Samsung A15 128GB"}"></div>
       <div class="grid2" style="grid-template-columns:1fr 110px"><div class="field"><label for="pe-price">Price</label><input class="input" id="pe-price" inputmode="decimal" value="${esc(e.price)}"></div>
         <div class="field"><label for="pe-cur">Currency</label><select class="input" id="pe-cur">${CURS.map(c => `<option ${c === e.cur ? "selected" : ""}>${c}</option>`).join("")}</select></div></div>
       <div class="field"><label>Show the price to customers?</label><div class="cur-toggle" style="grid-template-columns:1fr 1fr"><button class="USD" data-pehide="0" aria-pressed="${!e.price_hidden}">Show price</button><button class="SLSH" data-pehide="1" aria-pressed="${!!e.price_hidden}">Hide price</button></div>
@@ -1176,7 +1266,7 @@ const SUUQ = (() => {
     const card = o => `<div class="ocard">
       ${o.image ? `<img src="${esc(o.image)}" alt="">` : `<span class="noimg">▶</span>`}
       <div class="t"><b>${esc(o.product_name)} × ${o.qty}</b><small>${esc(o.buyer_name)} · +252 ${esc(o.buyer_phone)} · ${new Date(o.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</small>
-        ${o.note ? `<small class="onote">“${esc(o.note)}”</small>` : ""}
+        ${o.book_at ? `<small class="onote book-at">📅 ${esc(o.book_at)}</small>` : ""}${o.note ? `<small class="onote">“${esc(o.note)}”</small>` : ""}
         <div class="orow"><span class="pill ${statusTone(o.status)}">${esc(o.status === "accepted" ? (o.kind === "buy" ? "Accepted · send the agreed price" : "Booking accepted") : o.needs_price ? "Price requested" : o.status === "declined" && o.forwarded ? "Rejected · sent to another merchant" : statusLabel[o.status] || o.status)}</span><b class="num">${o.needs_price ? "—" : money(o.total, o.cur)}</b></div>
         ${o.status === "requested" ? `<div class="req-actions"><button class="btn btn-primary" data-oact="accept" data-oid="${o.id}">Accept</button><button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button></div>
           <small class="note">Accept, then agree the price with the buyer in chat. If you reject, the request goes to another merchant who sells the same thing.</small>` : ""}
@@ -1247,14 +1337,16 @@ const SUUQ = (() => {
     if (trav) trav.onchange = async () => { try { st.shop = (await api("/api/suuq/shop/travel", { body: { on: trav.checked } })).shop; render(); } catch (e) { trav.checked = !trav.checked; alertNote(trav.parentElement, e.message); } };
     const sq = one("sq-q"); if (sq) { let t; sq.oninput = () => { st.q = sq.value; clearTimeout(t); t = setTimeout(async () => { await loadProducts(); render(); const i = document.getElementById("sq-q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 300); }; }
     q("[data-order]").forEach(b => b.onclick = () => { st.orderSheet = { qty: 1, pin: "", note: "" }; render(); });
+    const bd = one("sq-bdate"), bt = one("sq-btime");
+    if (bd) bd.onchange = bd.oninput = () => { st.orderSheet.bdate = bd.value; }; if (bt) bt.onchange = bt.oninput = () => { st.orderSheet.btime = bt.value; };
     q("[data-qty]").forEach(b => b.onclick = () => { const os = st.orderSheet; os.note = (one("sq-note") || {}).value || os.note; os.qty = Math.min(100, Math.max(1, os.qty + Number(b.dataset.qty))); os.tpAmt = undefined; render(); });
     const note = one("sq-note"); if (note) note.oninput = () => st.orderSheet.note = note.value;
     if (st.orderSheet || st.paySheet) bindTopupInline(st.paySheet || st.orderSheet);
     q("[data-paym]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.method = b.dataset.paym; box.err = ""; render(); });
     q("[data-payvia]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.via = b.dataset.payvia; render(); });
     pinOn("sq-pin", v => { st.orderSheet.pin = v; st.orderSheet.err = ""; }, v => { const b = root.querySelector('[data-sq="pay"]'); if (b) b.disabled = v.length !== 4; }, () => { if ((st.orderSheet.pin || "").length === 4) placeOrder(); });
-    const form = one("composer"); if (form) form.onsubmit = e => { e.preventDefault(); sendMsg(); };
-    const box = one("msgs"); if (box) box.scrollTop = box.scrollHeight;
+    bindComposer(one("composer"), sendMsg);
+    bindMsgs(one("msgs"));
     // product editor
     q("[data-pemode]").forEach(b => b.onclick = () => { keepEdit(); st.edit.mode = b.dataset.pemode; render(); });
     q("[data-pesvc]").forEach(b => b.onclick = () => { keepEdit(); st.edit.service = b.dataset.pesvc; render(); });
@@ -1355,7 +1447,7 @@ const SUUQ = (() => {
       if (st.fromHub && !st.shopView) { st.fromHub = false; S.service = null; render(); return; } // back to the search results
       await loadProducts(); render(); return;
     }
-    if (a === "closechat") { st.chat = null; if (st.fromTicket) { st.fromTicket = false; S.service = "ticket"; render(); return; } await loadChats(); render(); return; }
+    if (a === "closechat") { st.chat = null; if (st.fromTicket) { st.fromTicket = false; S.service = "ticket"; render(); return; } if (st.fromSvcChat) { S.service = st.fromSvcChat; st.fromSvcChat = null; render(); return; } await loadChats(); render(); return; }
     if (a === "closesheet") { st.orderSheet = null; render(); return; }
     if (a === "myorders") { st.product = null; st.orderSheet = null; st.tab = "orders"; await loadOrders(); render(); return; }
     if (a === "book" || a === "pay") { if (b) b.disabled = true; return placeOrder(); }
@@ -1365,7 +1457,7 @@ const SUUQ = (() => {
       if (b) b.disabled = true;
       return a === "payussd" ? placeOrder() : payQuotedUssd();
     }
-    if (a === "newprod" || a === "newvisa" || a === "newscholar") { st.flash = ""; st.edit = { id: null, service: a === "newvisa" ? "visa" : a === "newscholar" ? "scholarship" : "suuq", price_hidden: false, price_label: priceWords()[0], name: "", price: "", cur: "USD", mode: "buy", images: [], video: "", description: "", comm_type: "percent", comm_value: 5 }; render(); return; }
+    if (a === "newprod" || a === "newvisa" || a === "newscholar" || a === "newtech") { st.flash = ""; st.edit = { id: null, service: a === "newvisa" ? "visa" : a === "newscholar" ? "scholarship" : a === "newtech" ? "technician" : "suuq", price_hidden: false, price_label: priceWords()[0], name: "", price: "", cur: "USD", mode: "buy", images: [], video: "", description: "", comm_type: "percent", comm_value: 5 }; render(); return; }
     if (a === "closepay") { st.paySheet = null; render(); return; }
     if (a === "gowallet") { st.paySheet = null; S.service = "wallet"; st.topup = { cur: "USD", amount: "" }; await open("wallet"); return; }
     if (a === "canceledit") { st.edit = null; render(); return; }
@@ -1412,9 +1504,13 @@ const SUUQ = (() => {
       try { await api("/api/auth/check-pin", { body: { pin: os.pin } }); }
       catch (e) { os.err = e.message; os.pin = ""; return render(); }
     }
+    if (p.mode === "book") {
+      os.bdate = (document.getElementById("sq-bdate") || {}).value || os.bdate || ""; os.btime = (document.getElementById("sq-btime") || {}).value || os.btime || "";
+      if (!os.bdate || !os.btime) { os.err = "Choose the date and time you want it."; return render(); }
+    }
     try {
       const ussd = p.mode === "buy" && !asksPrice(p) && os.method && os.method !== "wallet";
-      const r = await api("/api/suuq/orders", { body: { product_id: p.id, qty: os.qty, note: os.note, ref: refFor(p.id), ...(ussd ? { method: os.method, via: os.via } : {}) } });
+      const r = await api("/api/suuq/orders", { body: { product_id: p.id, qty: os.qty, note: os.note, ref: refFor(p.id), ...(p.mode === "book" ? { book_at: `${os.bdate} ${os.btime}` } : {}), ...(ussd ? { method: os.method, via: os.via } : {}) } });
       os.done = r.order; if (r.balances && st.wallet) st.wallet.balances = r.balances;
       if (r.order.pay_ussd) dialNow(r.order.pay_ussd);
       try { localStorage.removeItem("sarrif.ref." + p.id); } catch {}
@@ -1440,22 +1536,24 @@ const SUUQ = (() => {
   }
   async function openChat(id) {
     try { const r = await api(`/api/suuq/chats/${id}/messages`); st.chat = r.chat; st.messages = r.messages; st.product = null; } catch {}
-    render(); const i = document.getElementById("msg-in"); if (i) i.focus();
+    render(); const i = document.querySelector("#composer [data-chatin]"); if (i) i.focus();
   }
-  async function sendMsg() {
-    const i = document.getElementById("msg-in"), body = i.value.trim(); if (!body) return;
-    i.value = "";
-    try { const r = await api(`/api/suuq/chats/${st.chat.id}/messages`, { body: { body } }); if (!st.messages.some(m => m.id === r.message.id)) st.messages.push(r.message); render(); }
-    catch (e) { i.value = body; }
-    const n = document.getElementById("msg-in"); if (n) n.focus();
+  async function sendMsg(payload) {
+    const r = await api(`/api/suuq/chats/${st.chat.id}/messages`, { body: payload });
+    if (!st.messages.some(m => m.id === r.message.id)) st.messages.push(r.message);
+    const typed = (document.querySelector("#composer [data-chatin]") || {}).value; render();
+    const i = document.querySelector("#composer [data-chatin]"); if (i) i.value = typed || "";
   }
   function onChat(m) {
     ringChat(m);
     if (st.chat && m.conv_id === st.chat.id) {
       if (!st.messages.some(x => x.id === m.id)) st.messages.push({ ...m, mine: m.sender_id === S.user.id });
       if (inMarket() && !m.mine) api(`/api/suuq/chats/${st.chat.id}/messages`).catch(() => {});
-      if (inMarket()) { const typed = (document.getElementById("msg-in") || {}).value; render(); const i = document.getElementById("msg-in"); if (i) { i.value = typed || ""; i.focus(); } }
-    } else { loadChats().then(() => { if (inMarket() && !st.orderSheet && !st.paySheet && !st.edit) render(); }); }
+      if (inMarket() && !rec) { const typed = (document.querySelector("#composer [data-chatin]") || {}).value; render(); const i = document.querySelector("#composer [data-chatin]"); if (i) { i.value = typed || ""; i.focus(); } }
+    } else {
+      loadChats().then(() => { if (inMarket() && !st.orderSheet && !st.paySheet && !st.edit && !rec) render(); });
+      if (m.sender_id !== S.user?.id && !m.new_chat && S.user?.role === "customer") msgBanner(m, () => openChatById(m.conv_id));
+    }
   }
   function onOrder(d) { ringFor(d); if (document.getElementById("pf-full_name")) keepPf(); Promise.all([loadOrders(), loadShop()]).then(() => { if (inMarket() && !st.orderSheet && !st.paySheet && !st.edit && !st.chat) render(); }); }
   function onWallet(d) { if (document.getElementById("pf-full_name")) keepPf(); if (st.wallet) st.wallet.balances = d.balances; else st.wallet = { balances: d.balances, tx: [] }; if ((S.service === "wallet" || S.service === "affiliate") ) loadWallet().then(render); else if (inMarket() && !st.orderSheet && !st.paySheet && !st.edit && !st.chat) render(); else if (!S.service) render(); else if (document.getElementById("tpi-send")) { for (const x of [st.orderSheet, st.paySheet]) if (x) x.tpAmt = undefined; render(); } }
@@ -1489,6 +1587,15 @@ const SUUQ = (() => {
       await reload();
     });
     el.querySelectorAll("[data-prodhide]").forEach(b => b.onclick = async () => { try { await api(`/api/suuq/admin/products/${b.dataset.prodhide}/hide`, { body: { hidden: b.dataset.to === "1" } }); } catch {} await reload(); });
+  }
+  // A service market with its own admin (Technician): approve the services sellers list.
+  async function marketReviewPanel(el, m, word) {
+    if (!el) return;
+    let list; try { list = (await api(`/api/market/${m}/admin/products`)).products; } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+    const n = pendingCount(list);
+    el.innerHTML = `<div class="panel-head"><div><h3>Services from sellers${n ? ` <span class="pill warn">${n} to approve</span>` : ""}</h3><p>Sellers list their own services here (like Suuq). Approve them so customers can buy or book them.</p></div></div>
+      <div class="people">${list.length ? list.map(p => reviewCard(p, word)).join("") : `<div class="empty">No services from sellers yet.</div>`}</div>`;
+    bindReview(el, () => marketReviewPanel(el, m, word));
   }
   // A product was sent for approval, or approved/rejected: the admin screens reload their lists.
   function onReview() { st.admin = null; st.visaAdmin = null; st.scholarAdmin = null; }
@@ -1754,10 +1861,22 @@ const SUUQ = (() => {
   const earnLabel = (type, value, cur = "USD") => Number(value) > 0 ? `Earn ${type === "percent" ? value + "%" : money(value, cur)} by sharing` : "";
   // From a push notification: the customer's orders, or the chats list.
   async function openFavProduct(pid) { st.fromFavs = true; st.tab = "shop"; st.shopView = null; st.chat = null; S.service = "suuq"; await Promise.all([openProduct(pid), loadWallet()]); render(); }
+  // Technician: add your own service (a product in the Technician market). Opens the product editor in My shop.
+  async function newTechProduct() {
+    S.service = "suuq"; st.fromSvc = "technician"; st.tab = "sell"; st.sell = "products"; st.product = null; st.chat = null; st.shopView = null;
+    await open("suuq"); await loadShop();
+    if (st.shop && st.shop.active) await action("newtech"); else render();
+  }
+  async function openChatById(id) { st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; S.drawer = false; await open("suuq"); await openChat(id); }
+  // Chat with a service (Saba…): Back returns to the service page.
+  async function openSvcChat(svcId) {
+    try { const r = await api(`/api/services/${encodeURIComponent(svcId)}/chat`, { body: {} }); st.fromSvcChat = svcId; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(r.chat.id); st.chat = { ...st.chat, with_name: r.chat.with_name, product_name: r.chat.product_name }; render(); }
+    catch (e) { alert(e.message); }
+  }
   async function openMyOrders() { S.service = "suuq"; S.drawer = false; st.tab = "orders"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; heldList = null; }, state: st };
 })();

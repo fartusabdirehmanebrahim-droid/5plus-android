@@ -394,6 +394,7 @@ function openService(v) {
   if (v === "technician") S.tech = { view: null, q: "" };
   if (v === "ibedel") { loadMine(); SUUQ.loadWallet().then(() => { if (S.service === "ibedel") render(); }); }
   if (v === "ticket") S.ticket = { list: null, q: "", open: null };
+  if (v === "technician") S.techMk = undefined;
   if (v === "myshop") { S.service = "suuq"; SUUQ.state.tab = "sell"; return SUUQ.open("suuq"); }
   if (["suuq", "visa", "scholarship", "wallet", "affiliate"].includes(v)) return SUUQ.open(v);
   if (v === "hub") SUUQ.loadWallet().then(render);
@@ -567,6 +568,11 @@ function vTechnician(h) {
   const L = S.svcItems || (S.svcItems = {});
   if (!(h.id in L)) { L[h.id] = null; api(`/api/services/${encodeURIComponent(h.id)}/items`).then(r => { L[h.id] = r.items; if (S.service === h.id) render(); }).catch(() => { L[h.id] = []; }); }
   const list = L[h.id] || [], T = S.tech || (S.tech = { view: null, q: "" }), I = SUUQ.TECH_ICONS, U = SUUQ.UNIT_NAME;
+  // Services that sellers list themselves (like Suuq): Buy, or Book with a date and time.
+  if (S.techMk === undefined) { S.techMk = null; api("/api/suuq/products?service=technician").then(r => { S.techMk = r.products; if (S.service === h.id) render(); }).catch(() => { S.techMk = []; }); }
+  const mk = S.techMk || [];
+  const mkBlock = items => `<div class="ts-sec"><h3 class="ts-h">From sellers</h3><button class="link-btn" data-technew>+ Add your service</button></div>
+    ${items.length ? `<div class="pgrid">${items.map(SUUQ.productCard).join("")}</div>` : `<div class="empty">No services from sellers yet. Tap “Add your service” to list yours.</div>`}`;
   const card = x => `<div class="hcard-w"><button class="hcard" data-svcitem="${esc(x.id)}" data-svcid="${esc(h.id)}">
       <span class="hcard-img">${x.images[0] ? `<img src="${esc(x.images[0])}" alt="" loading="lazy">` : ""}</span>
       <span class="hcard-t"><b data-no-i18n>${esc(x.name)}</b><span class="cat-chip">${esc(x.category)}</span>
@@ -586,12 +592,14 @@ function vTechnician(h) {
       <button class="link-btn" data-tview="" style="align-self:flex-start">‹ All categories</button>
       <h3 class="ts-h">${esc(title)}</h3>
       ${shown.length ? `<div class="hlist">${shown.map(card).join("")}</div>` : `<div class="empty">No technicians here yet.</div>`}
+      ${q ? mkBlock(mk.filter(p => [p.name, p.description, p.shop_name].some(v => String(v || "").toLowerCase().includes(q)))) : T.view.type === "all" ? mkBlock(mk) : ""}
       ${ask}</div>`;
   }
   const photoOf = cat => (list.find(x => x.category === cat && x.images[0]) || {}).images?.[0];
   return `<div class="view ts">${head}
     <div class="ts-sec"><h3 class="ts-h">Categories</h3><button class="link-btn" data-tview="all">See all</button></div>
     <div class="ts-cats">${SUUQ.TECH_CHIPS.map(([n, ic, grp]) => `<button class="ts-cat" data-tview="${grp ? "group" : "cat"}" data-tkey="${esc(grp || n)}"><span class="ts-cat-ic">${SUUQ.techPhoto(n) ? `<img src="${SUUQ.techPhoto(n)}" alt="" loading="lazy">` : I[ic]}</span><b>${esc(n)}</b></button>`).join("")}</div>
+    ${mkBlock(mk)}
     ${SUUQ.TECH_GROUPS.map(g => `<div class="ts-sec"><h3 class="ts-h">${esc(g.name)}</h3><button class="link-btn" data-tview="group" data-tkey="${esc(g.name)}">See all</button></div>
       <div class="ts-row">${g.cats.map(([n, ic]) => { const ph = SUUQ.techPhoto(n) || photoOf(n), c = list.filter(x => x.category === n).length; return `<button class="ts-card" data-tview="cat" data-tkey="${esc(n)}">
         ${ph ? `<img src="${esc(ph)}" alt="" loading="lazy">` : `<span class="ts-card-ic">${I[ic]}</span>`}<span class="ts-card-l">${esc(n)}${c ? ` <small>· ${c}</small>` : ""}</span></button>`; }).join("")}</div>`).join("")}
@@ -674,14 +682,31 @@ function vVideos(h) {
   return `<div class="view yt-view">
     <div class="yt-channel"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><span class="yt-avatar big">${avatar}</span><div class="yt-text"><b>${esc(h.name)}</b><small>${esc(h.sub || "")}</small></div></div>
     ${svcItems(h)}
-    <button class="btn ${(S.svcItems?.[h.id] || []).length ? "btn-ghost" : "btn-primary"} btn-block svc-req" data-svcreq="${esc(h.id)}">${(S.svcItems?.[h.id] || []).length ? "Something else? Ask " + esc(h.name) : "Request " + esc(h.name)}</button>
     ${phone || wa || h.tiktok ? `<div class="yt-contact">${callBtn("")}${waBtn("", "")}${h.tiktok ? `<a class="btn tt-btn" href="${esc(h.tiktok)}" target="_blank" rel="noopener">${SVC_ICONS.tiktok}TikTok</a>` : ""}</div>` : ""}
     <nav class="yt-tabs" role="tablist">
-      <button role="tab" data-yttab="videos" aria-selected="${S.ytTab !== "track" && S.ytTab !== "docs"}">${SVC_ICONS.play}Videos</button>
+      <button role="tab" data-yttab="videos" aria-selected="${!["track", "docs", "earn"].includes(S.ytTab)}">${SVC_ICONS.play}Videos</button>
       <button role="tab" data-yttab="track" aria-selected="${S.ytTab === "track"}">${SVC_ICONS.track}Tracking</button>
-      <button role="tab" data-yttab="docs" aria-selected="${S.ytTab === "docs"}">${DOC_ICON}Documents</button></nav>
-    ${S.ytTab === "track" ? vTracking(h) : S.ytTab === "docs" ? docsCard(h) : `${(h.gallery || []).length ? galleryStrip(h.gallery) : ""}
+      <button role="tab" data-yttab="docs" aria-selected="${S.ytTab === "docs"}">${DOC_ICON}Documents</button>
+      <button role="tab" data-ytchat="${esc(h.id)}" aria-selected="false">${SUUQ.CHAT.CI.send}Chat</button>
+      <button role="tab" data-yttab="earn" aria-selected="${S.ytTab === "earn"}">${EARN_ICON}Earn</button></nav>
+    ${S.ytTab === "track" ? vTracking(h) : S.ytTab === "docs" ? docsCard(h) : S.ytTab === "earn" ? vSvcEarn(h) : `${(h.gallery || []).length ? galleryStrip(h.gallery) : ""}
     <div class="yt-feed">${h.videos.length ? h.videos.map(card).join("") : `<div class="empty">No videos yet.</div>`}</div>`}
+  </div>`;
+}
+// Earn: what you earned for documents you sent to this service (each person sees only their own).
+const EARN_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-.9-1.7-1.5-3-1.5-1.7 0-3 .9-3 2.2 0 2.9 6 1.5 6 4.4 0 1.3-1.3 2.4-3 2.4-1.4 0-2.6-.6-3.2-1.6M12 6v2M12 16.5v1.5"/></svg>';
+function vSvcEarn(h) {
+  const E = S.svcEarn && S.svcEarn.svc === h.id ? S.svcEarn : (S.svcEarn = { svc: h.id, data: null });
+  if (E.data === null) { E.data = undefined; api(`/api/services/${encodeURIComponent(h.id)}/earnings`).then(r => { E.data = r; if (S.service === h.id && S.ytTab === "earn") render(); }).catch(() => { E.data = { docs: [], totals: {}, balances: {} }; render(); }); }
+  const d = E.data; if (!d) return `<div class="empty">Loading…</div>`;
+  const tot = Object.entries(d.totals || {}).map(([c, v]) => fmt(v, c)).join(" · ");
+  return `<div class="svc-earn">
+    <div class="earn-hero"><small class="label">You earned from ${esc(h.name)}</small><b class="num">${tot || fmt(0, "USD")}</b>
+      <span>In My earnings now: <b class="num">${CURS.map(c => fmt(d.balances?.[c] || 0, c)).join(" · ")}</b></span></div>
+    <p class="note" style="margin:0">Send your documents in the Documents tab. When ${esc(h.name)} accepts them, they add your earning here and in My earnings.</p>
+    ${(d.docs || []).length ? `<div class="doc-mine">${d.docs.map(x => `<div class="doc-sent"><span>${x.files.length} file${x.files.length > 1 ? "s" : ""} · ${new Date(x.created_at).toLocaleDateString()}</span>
+      ${x.earn_amount > 0 ? `<b class="num earn-plus">+ ${esc(fmt(x.earn_amount, x.earn_cur))}</b>` : `<span class="pill">${x.status === "done" ? "Seen" : "Waiting"}</span>`}</div>`).join("")}</div>`
+      : `<div class="empty">No documents yet.</div>`}
   </div>`;
 }
 /* ---------- Tracking: customers look up the tracking number the service gave them ---------- */
@@ -695,7 +720,7 @@ function trackCard(t) {
     ${t.location ? `<p class="trk-loc">${SVC_ICONS.pin}<span>Now at: <b data-no-i18n>${esc(t.location)}</b></span></p>` : ""}
     ${cancelled ? "" : `<ol class="trk-steps">${TRACK_STEPS.map((x, i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}"><span></span><small>${esc(x)}</small></li>`).join("")}</ol>`}
     ${t.note ? `<p class="note" style="margin:0" data-no-i18n>${esc(t.note)}</p>` : ""}
-    <details class="trk-hist"><summary>Updates (${t.history.length})</summary><ul>${t.history.slice().reverse().map(u => `<li><b>${esc(u.status)}</b>${u.location ? ` · <span data-no-i18n>${esc(u.location)}</span>` : ""}<small>${when(u.at)}</small>${u.note ? `<p data-no-i18n>${esc(u.note)}</p>` : ""}</li>`).join("")}</ul></details>
+    <details class="trk-hist" open><summary>Updates (${t.history.length})</summary><ul>${t.history.slice().reverse().map(u => `<li><b>${esc(u.status)}</b>${u.location ? ` · <span data-no-i18n>${esc(u.location)}</span>` : ""}<small>${when(u.at)}</small>${u.note ? `<p data-no-i18n>${esc(u.note)}</p>` : ""}</li>`).join("")}</ul></details>
     <small class="trk-upd">Last update: ${when(t.updated_at)}</small></article>`;
 }
 function vTracking(h) {
@@ -712,7 +737,9 @@ function vTracking(h) {
   </div>`;
 }
 function bindTracking() {
-  appEl.querySelectorAll("[data-yttab]").forEach(b => b.onclick = () => { S.ytTab = b.dataset.yttab; if (S.trk) S.trk.mine = null; if (S.docs) S.docs.mine = null; render(); });
+  { const t = appEl.querySelector('.yt-tabs [aria-selected="true"]'), nav = t && t.parentElement; if (nav) nav.scrollLeft = Math.max(0, t.offsetLeft - nav.offsetLeft - 16); }
+  appEl.querySelectorAll("[data-yttab]").forEach(b => b.onclick = () => { S.ytTab = b.dataset.yttab; if (S.trk) S.trk.mine = null; if (S.docs) S.docs.mine = null; if (S.svcEarn) S.svcEarn.data = null; render(); });
+  appEl.querySelectorAll("[data-ytchat]").forEach(b => b.onclick = () => SUUQ.openSvcChat(b.dataset.ytchat));
   bindDocs();
   const go = document.getElementById("trk-go"), inp = document.getElementById("trk-code"); if (!go) return;
   const T = S.trk;
@@ -1006,6 +1033,10 @@ function bind() {
   appEl.querySelectorAll("[data-call]").forEach(b => b.onclick = () => dialUssd(b.dataset.call));
   appEl.querySelectorAll("[data-svcreq]").forEach(b => b.onclick = () => SUUQ.openServiceRequest(b.dataset.svcreq));
   appEl.querySelectorAll("[data-svcitem]").forEach(b => b.onclick = () => SUUQ.openSvcItem(b.dataset.svcitem, b.dataset.svcid));
+  if (S.service === "technician") {
+    appEl.querySelectorAll("[data-prod]").forEach(b => b.onclick = () => SUUQ.openSvcItem(b.dataset.prod, "technician"));
+    appEl.querySelectorAll("[data-technew]").forEach(b => b.onclick = () => SUUQ.newTechProduct());
+  }
   appEl.querySelectorAll("[data-tview]").forEach(b => b.onclick = () => { const T = S.tech || (S.tech = { q: "" }); const v = b.dataset.tview; T.q = "";
     T.view = !v ? null : v === "all" ? { type: "all" } : { type: v, key: b.dataset.tkey }; render(); scrollTo(0, 0); });
   const tq = document.getElementById("ts-q"); if (tq) { tq.oninput = () => { S.tech.q = tq.value; clearTimeout(tq._t); tq._t = setTimeout(() => { render(); const i = document.getElementById("ts-q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); }; }
@@ -1117,6 +1148,7 @@ window.__pushOpen = goto => {
     if (goto === "sellerorders") SUUQ.goSellerOrders();
     else if (goto === "orders") SUUQ.openMyOrders();
     else if (goto === "chats") SUUQ.openChats();
+    else if (String(goto).startsWith("chat:")) SUUQ.openChatById(String(goto).slice(5));
   }
 };
 async function loggedIn(user) {
@@ -1170,6 +1202,7 @@ function connectEvents() {
   es.addEventListener("chat", e => { if (S.user?.role === "customer") SUUQ.onChat(JSON.parse(e.data)); });
   es.addEventListener("order", e => { if (S.user?.role === "customer") SUUQ.onOrder(JSON.parse(e.data)); });
   es.addEventListener("earnings", () => { if (S.user?.role === "customer") SUUQ.onEarnings(); });
+  es.addEventListener("deskchat", e => { if (S.user && S.user.role !== "customer") { const d = JSON.parse(e.data || "{}"); if (document.getElementById("svc-admin-chats")?.dataset.svc === d.svc) { const typing = document.querySelector("#desk-composer [data-chatin]")?.value; if (!typing) loadDeskChats(true); } try { SUUQ.alarm.preview(0); } catch {} } });
   es.addEventListener("servicedoc", e => { if (S.user && S.user.role !== "customer") { try { SUUQ.alarm.preview(0); } catch {} if (document.getElementById("svc-admin-docs")?.dataset.svc === JSON.parse(e.data || "{}").service) { tkDocsTab = "new"; loadSvcDocs(); } } });
   es.addEventListener("svcorder", e => { if (S.user && S.user.role !== "customer") SUUQ.onDeskOrder(JSON.parse(e.data)); });
   es.addEventListener("safepay", e => {
@@ -1656,16 +1689,45 @@ async function loadSvcDocs() {
   const fileEl = f => f.type.startsWith("image/")
     ? `<a class="doc-thumb" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`
     : `<a class="doc-chip" href="${esc(f.url)}${f.type === "application/pdf" ? "" : "?download=1"}" target="_blank" rel="noopener" download="${esc(f.name)}">${DOC_ICON}<span><b>${esc(f.name)}</b><small>${docKind(f.name)} · ${kb(f.size)}</small></span></a>`;
-  el.innerHTML = `<div class="panel-head"><div><h3>Documents from customers${r.new ? ` <span class="pill warn">${r.new} new</span>` : ""}</h3><p>Pictures, PDF and Word files customers send from the Documents tab. Tap a file to open it.</p></div></div>
+  el.innerHTML = `<div class="panel-head"><div><h3>Documents from customers${r.new ? ` <span class="pill warn">${r.new} new</span>` : ""}</h3><p>Pictures, PDF and Word files customers send from the Documents tab. Tap a file to open it. Give each person a fixed earning for their documents; it goes to their My earnings and they see it in the Earn tab.</p></div></div>
     <div class="agent-tabs" role="group"><button data-tkdt="new" aria-pressed="${tkDocsTab === "new"}">New</button><button data-tkdt="done" aria-pressed="${tkDocsTab === "done"}">Done</button></div>
     <div class="people">${r.docs.length ? r.docs.map(d => `<div class="person doc-set"><div class="person-top"><div class="avatar">${esc((d.name || "?")[0].toUpperCase())}</div>
       <div class="t"><b>${esc(d.name)}</b><small><a href="tel:+252${esc(d.phone)}">+252 ${esc(d.phone)}</a> · ${new Date(d.created_at).toLocaleString()} · ${d.files.length} file${d.files.length > 1 ? "s" : ""}</small></div></div>
       ${d.note ? `<p class="onote" style="margin:0">“${esc(d.note)}”</p>` : ""}
       <div class="doc-files">${d.files.map(fileEl).join("")}</div>
+      ${d.earn_amount > 0 ? `<p class="note" style="margin:0">Earning given: <b class="num">${esc(fmt(d.earn_amount, d.earn_cur))}</b></p>`
+        : `<div class="earn-give"><label class="mini"><span class="label">Earning for ${esc(d.name)}</span><div class="suffix"><select data-ecur="${esc(d.id)}">${CURS.map(c => `<option ${(r.earn_default?.cur || "USD") === c ? "selected" : ""}>${c}</option>`).join("")}</select><input data-eamt="${esc(d.id)}" inputmode="decimal" value="${r.earn_default?.amount ? esc(r.earn_default.amount) : ""}" placeholder="0"></div></label><button class="btn btn-ghost" data-egive="${esc(d.id)}">Give earning</button></div>`}
       <div class="person-actions"><button class="btn ${d.status === "new" ? "btn-primary" : "btn-ghost"}" data-tkdone="${esc(d.id)}" data-to="${d.status === "new" ? "done" : "new"}">${d.status === "new" ? "Mark done" : "Move back to new"}</button></div></div>`).join("")
       : `<div class="empty">${tkDocsTab === "new" ? "No new documents." : "Nothing here yet."}</div>`}</div>`;
   el.querySelectorAll("[data-tkdt]").forEach(b => b.onclick = () => { tkDocsTab = b.dataset.tkdt; loadSvcDocs(); });
+  el.querySelectorAll("[data-egive]").forEach(b => b.onclick = async () => {
+    const id = b.dataset.egive, amount = el.querySelector(`[data-eamt="${id}"]`).value.replace(/[^\d.]/g, ""), cur = el.querySelector(`[data-ecur="${id}"]`).value;
+    b.disabled = true;
+    try { await api(`/api/admin/service-docs/${encodeURIComponent(svc)}/${id}/earn`, { body: { amount: Number(amount), cur } }); loadSvcDocs(); }
+    catch (e) { b.disabled = false; alert(e.message); }
+  });
   el.querySelectorAll("[data-tkdone]").forEach(b => b.onclick = async () => { b.disabled = true; try { await api(`/api/admin/service-docs/${encodeURIComponent(svc)}/${b.dataset.tkdone}`, { body: { status: b.dataset.to } }); } catch {} loadSvcDocs(); });
+}
+// Service admin: chats with customers (the Chat tab on the service page). Reply with text, pictures, files or voice.
+let deskChat = { list: null, open: null, msgs: [] };
+async function loadDeskChats(keepOpen) {
+  const el = document.getElementById("svc-admin-chats"); if (!el) return;
+  const svc = el.dataset.svc, C = SUUQ.CHAT;
+  try { deskChat.list = (await api(`/api/admin/service-chats/${encodeURIComponent(svc)}`)).chats; } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (keepOpen && deskChat.open) { try { const r = await api(`/api/admin/service-chats/${encodeURIComponent(svc)}/${deskChat.open.id}`); deskChat.open = r.chat; deskChat.msgs = r.messages; } catch {} }
+  const o = deskChat.open;
+  el.innerHTML = `<div class="panel-head"><div><h3>Customer chats${deskChat.list.some(c => c.unread) ? ` <span class="pill warn">${deskChat.list.reduce((a, c) => a + c.unread, 0)} new</span>` : ""}</h3><p>Customers chat from the Chat tab on the service page. Only admins of this service see these chats.</p></div></div>
+    ${o ? `<div class="desk-thread"><div class="svc-bar"><button class="btn btn-ghost" data-dcback>‹ All chats</button><div style="flex:1;min-width:0"><b>${esc(o.name)}</b><small class="note" style="display:block">+252 ${esc(o.phone)}</small></div>${C.callBtn("+252" + o.phone)}</div>
+      <div class="msgs" id="desk-msgs">${deskChat.msgs.map(C.msgHtml).join("") || `<div class="empty">No messages yet.</div>`}</div>${C.composerHtml("desk-composer")}</div>`
+    : deskChat.list.length ? `<div class="olist">${deskChat.list.map(c => `<button class="ccard" data-dcopen="${esc(c.id)}"><span class="noimg">${esc((c.name || "?")[0].toUpperCase())}</span>
+        <span class="t"><b>${esc(c.name)}</b><small>+252 ${esc(c.phone)}</small><small class="last">${c.last.mine ? "You: " : ""}${esc(c.last.body)}</small></span>${c.unread ? `<span class="badge">${c.unread}</span>` : ""}</button>`).join("")}</div>`
+    : `<div class="empty">No chats yet.</div>`}`;
+  el.querySelectorAll("[data-dcopen]").forEach(b => b.onclick = async () => { const r = await api(`/api/admin/service-chats/${encodeURIComponent(svc)}/${b.dataset.dcopen}`); deskChat.open = r.chat; deskChat.msgs = r.messages; loadDeskChats(); });
+  const back = el.querySelector("[data-dcback]"); if (back) back.onclick = () => { deskChat.open = null; loadDeskChats(); };
+  if (o) {
+    C.bindMsgs(document.getElementById("desk-msgs"));
+    C.bindComposer(document.getElementById("desk-composer"), async payload => { await api(`/api/admin/service-chats/${encodeURIComponent(svc)}/${o.id}`, { body: payload }); await loadDeskChats(true); });
+  }
 }
 // Ticket admin: choose the admin's own travel agency. It gets half of all new ticket requests (every second one).
 async function loadTicketAgency() {
@@ -1794,8 +1856,9 @@ function renderSvcDash(fromLoad) {
       <div class="row-actions"><label class="btn btn-ghost">Add photos<input type="file" id="sp-gal" accept="image/jpeg,image/png,image/webp" multiple hidden></label><span class="status-msg" id="st-gal"></span></div>
     </div>` : ""}
     ${svcPage ? trkAdminPanel(id, name) : ""}
+    ${id === "technician" ? `<div class="panel" id="mk-review"><div class="empty">Loading…</div></div>` : ""}
     ${id === "ticket" ? `<div class="panel" id="tk-admin-agency"><div class="empty">Loading…</div></div>` : ""}
-    ${svcPage && !["suuq", "visa", "scholarship", "ticket", "ibedel"].includes(id) && (svcPage.videos || []).length ? `<div class="panel" id="svc-admin-docs" data-svc="${esc(id)}"><div class="empty">Loading…</div></div>` : ""}
+    ${svcPage && !["suuq", "visa", "scholarship", "ticket", "ibedel"].includes(id) && (svcPage.videos || []).length ? `<div class="panel" id="svc-admin-docs" data-svc="${esc(id)}"><div class="empty">Loading…</div></div><div class="panel" id="svc-admin-chats" data-svc="${esc(id)}"><div class="empty">Loading…</div></div>` : ""}
     ${svcPage && !["suuq", "visa", "scholarship", "ticket", "ibedel"].includes(id) ? SUUQ.itemsPanel(id, name) : ""}
     ${svcPage && !["suuq", "visa", "scholarship", "ticket", "ibedel"].includes(id) ? (SUUQ.deskName(name), SUUQ.deskPanel(id, name)) : ""}
     <div class="panel">
@@ -1811,7 +1874,8 @@ function renderSvcDash(fromLoad) {
   if (id === "suuq" || id === "visa" || id === "scholarship") { const extra = el.querySelector("div[hidden]"); if (extra) { const head = extra.querySelector(".admin-head"); if (head) head.remove(); const art = extra.querySelector(".sup-card"); if (art) art.remove(); extra.hidden = false; } if (id === "suuq") SUUQ.bindAdminTabs(el); else if (id === "visa") SUUQ.bindVisaTabs(el); else SUUQ.bindScholarTabs(el); }
   bindPeople($("#sg-list"), loadSvcAgents);
   if (id === "ticket") loadTicketAgency();
-  loadSvcDocs();
+  loadSvcDocs(); loadDeskChats();
+  if (id === "technician") SUUQ.marketReviewPanel(document.getElementById("mk-review"), "technician", "service");
   if (svcPage) bindTrkAdmin(id);
   const galIn = $("#sp-gal");
   if (galIn) galIn.onchange = async () => {

@@ -399,3 +399,9 @@ CREATE TABLE IF NOT EXISTS public.favorites (
 ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS pay_discount DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS buyer_ok INTEGER NOT NULL DEFAULT 0;
+
+-- Booking date and time, chat attachments (picture, voice, file), and earnings for Saba documents.
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS book_at TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS att TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.service_docs ADD COLUMN IF NOT EXISTS earn_amount DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE public.service_docs ADD COLUMN IF NOT EXISTS earn_cur TEXT NOT NULL DEFAULT '';

@@ -302,6 +302,10 @@ async function init() {
   await addColumn("orders", "reserved", "INTEGER NOT NULL DEFAULT 0"); // a room (or other limited item) is held for this order
   await addColumn("orders", "pay_discount", "REAL NOT NULL DEFAULT 0"); // Pay to shop: the buyer's own earning taken off the price
   await addColumn("orders", "buyer_ok", "INTEGER NOT NULL DEFAULT 0"); // Safe payment: the buyer said they received it (the admin releases)
+  await addColumn("orders", "book_at", "TEXT NOT NULL DEFAULT ''"); // Book: the date and time the customer chose ("2026-10-20 14:00")
+  await addColumn("messages", "att", "TEXT NOT NULL DEFAULT ''"); // chat attachment: picture, voice message or file (JSON)
+  await addColumn("service_docs", "earn_amount", "REAL NOT NULL DEFAULT 0"); // the earning the admin gave for these documents
+  await addColumn("service_docs", "earn_cur", "TEXT NOT NULL DEFAULT ''");
   await addColumn("orders", "from_order", "TEXT NOT NULL DEFAULT ''");
   await addColumn("orders", "forwarded_to", "TEXT NOT NULL DEFAULT ''");
   // Every shop has a shop number people can search for: 1001, 1002 … (more digits once 9999 is used).

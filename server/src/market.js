@@ -40,8 +40,8 @@ module.exports = function market(ctx) {
   const needUser = async req => { const u = await loadUser(req); if (!u) fail("Please log in again.", 401); return u; };
   const needSuuqAdmin = async req => { const u = await needRole(req, "admin", "super"); if (!isSuper(u) && u.service !== "suuq") fail("You don't have access to this.", 403); return u; };
   // Suuq and Visa are both marketplaces: merchants list products (Suuq) or visas (Visa) from the same shop.
-  const MARKETS = ["suuq", "visa", "scholarship"];
-  const MNAME = { suuq: "Suuq", visa: "Visa", scholarship: "Scholarship", ticket: "Ticket" };
+  const MARKETS = ["suuq", "visa", "scholarship", "technician"];
+  const MNAME = { suuq: "Suuq", visa: "Visa", scholarship: "Scholarship", ticket: "Ticket", technician: "Technician" };
   // Visas and scholarships are for one country each.
   const hasCountry = m => m === "visa" || m === "scholarship";
   // Only travel agencies the Scholarship admin allowed may post scholarships.
@@ -565,7 +565,7 @@ module.exports = function market(ctx) {
     let video = String(b.video ?? existing?.video ?? "").trim();
     if (video && !/^https?:\/\/\S+$/i.test(video)) fail("The video link must start with http:// or https://");
     const service = String(b.service ?? existing?.service ?? "suuq");
-    if (!MARKETS.includes(service)) fail("Choose Suuq, Visa or Scholarship.");
+    if (!MARKETS.includes(service)) fail("Choose Suuq, Visa, Scholarship or Technician.");
     if (service !== existing?.service && !await marketOpen(service)) fail(`${MNAME[service]} is not open right now.`);
     const price_hidden = b.price_hidden === undefined ? !!existing?.price_hidden : !!b.price_hidden;
     const price_label = price_hidden ? String(b.price_label ?? existing?.price_label ?? "") : "";
@@ -682,7 +682,7 @@ module.exports = function market(ctx) {
       created_at: o.created_at, updated_at: o.updated_at, completed_at: o.completed_at, service: o.p_service || "suuq",
       pay_method: o.pay_method || "wallet", pay_fee: o.pay_fee || 0, pay_ussd: o.pay_ussd || "",
       my_earn: !forSeller && o.affiliate_id === o.buyer_id ? o.commission : 0,
-      pay_discount: o.pay_discount || 0, buyer_ok: !!o.buyer_ok,
+      pay_discount: o.pay_discount || 0, buyer_ok: !!o.buyer_ok, book_at: o.book_at || "",
       pay_vias: o.pay_method === "shop" ? (n => ({ merchant: !!n.merchant, number: !!n.number }))(shopPayNums(o.shop_profile)) : undefined };
     // A hidden-price request: the seller sends the price, then the buyer pays it from the wallet.
     if (o.kind === "buy" && (o.status === "requested" || o.status === "accepted")) r.needs_price = true;
@@ -776,7 +776,7 @@ module.exports = function market(ctx) {
       const svc = String(o.p_service || "").startsWith("svc:") ? o.p_service.slice(4) : null, ref = `${o.product_name} × ${o.qty}`;
       const staff = svc ? (await db.all("SELECT id FROM users WHERE (role = 'admin' AND service = ?) OR role = 'super'", svc)).map(x => x.id) : [o.seller_id];
       const st = o.status, who = o.buyer_name || "A customer";
-      if (st === "requested") pushLater(staff, { kind: "ring", title: o.kind === "book" ? "New booking" : "New request", body: `${who} · ${ref}${o.note ? " · “" + o.note + "”" : ""}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
+      if (st === "requested") pushLater(staff, { kind: "ring", title: o.kind === "book" ? "New booking" : "New request", body: `${who} · ${ref}${o.book_at ? " · " + o.book_at : ""}${o.note ? " · “" + o.note + "”" : ""}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
       else if (st === "paid") pushLater(staff, { kind: "paid", title: "Order paid", body: `${who} paid ${o.total} ${o.cur} · ${ref}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
       else if (st === "awaiting_payment" && o.pay_method === "shop") pushLater(staff, { kind: "info", title: "Check the money", body: `${who} says they paid ${o.total} ${o.cur} to your number · ${ref}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
       else if (st === "accepted") pushLater([o.buyer_id], { kind: "info", title: "Request accepted", body: `${ref}: agree the price in chat.`, goto: "orders", tag: o.id });
@@ -820,6 +820,15 @@ module.exports = function market(ctx) {
     const plan = p.mode === "buy" && !ask && method !== "wallet" ? await payPlan(method, b.via, p.cur, round(p.cur, total - discount), p.shop_profile) : null;
     const id = crypto.randomUUID(), ref = "SQ" + crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 7);
     const note = ((chosen ? `Customer chose ${chosen}. ` : "") + String(b.note || "").trim()).slice(0, 300);
+    // Book: the customer picks the date and time they want the service.
+    let bookAt = "";
+    if (p.mode === "book") {
+      const m = String(b.book_at || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
+      if (!m) fail("Choose the date and time you want it.");
+      const when = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime();
+      if (!(when > now() - 36e5) || when > now() + 366 * 864e5) fail("Choose a date and time from today on.");
+      bookAt = `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}`;
+    }
     const limited = Number(p.stock) >= 0;
     await tx(async () => {
       // Limited items (hotel rooms…): one is held for this order until it ends.
@@ -835,6 +844,7 @@ module.exports = function market(ctx) {
                   p.mode === "buy" && !ask ? (plan ? "awaiting_payment" : "paid") : "requested", note, now(), now(), plan ? method : "wallet", plan ? plan.fee : 0, plan ? plan.ussd : "");
       if (limited) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
       if (discount) await db.run("UPDATE orders SET pay_discount = ? WHERE id = ?", discount, id);
+      if (bookAt) await db.run("UPDATE orders SET book_at = ? WHERE id = ?", bookAt, id);
     });
     if (plan?.ussd && method === "safe") broadcast("safepay", { new: true, name: u.name, product: p.name, amount: total + plan.fee, cur: p.cur }, x => isSuper(x));
     await pushOrder(id);
@@ -1215,16 +1225,82 @@ module.exports = function market(ctx) {
   });
 
   /* ---------- private chat (only the buyer and the seller of a product) ---------- */
+  /* ---------- chat: call, pictures, voice messages and files ---------- */
+  const ATT_KIND = { image: ["image/jpeg", "image/png", "image/webp"], voice: ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/aac", "audio/wav"],
+    file: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] };
+  const attOut = (m) => { if (!m.att) return null; try { const a = JSON.parse(m.att); return { kind: a.kind, name: a.name, size: a.size, dur: a.dur || 0, url: `/api/chatfile/${m.id}` }; } catch { return null; } };
+  const msgPreview = m => m.body || (m.att ? ({ image: "📷 Photo", voice: "🎤 Voice message", file: "📎 File" })[(() => { try { return JSON.parse(m.att).kind; } catch { return "file"; } })()] || "📎 File" : "");
+  // The number the Call button dials: the person's phone; for a service desk (Saba…), the service's phone.
+  async function callNumber(uid, service) {
+    const x = await db.get("SELECT phone, account_type FROM users WHERE id = ?", uid); if (!x) return "";
+    if (x.account_type === "service") { const id = String(x.phone).replace(/^svc-/, ""); const sv = (await getSettings()).services.find(v => v.id === id); return String(sv?.phone || "").replace(/[^\d+]/g, ""); }
+    return /^\d{6,15}$/.test(x.phone) ? "+252" + x.phone.replace(/^0/, "") : "";
+  }
+  // Who hears about a chat message: the other person, or, for a service desk, that service's admins.
+  async function chatAudience(c, senderId) {
+    const other = senderId === c.buyer_id ? c.seller_id : c.buyer_id;
+    const x = await db.get("SELECT phone, account_type FROM users WHERE id = ?", other);
+    if (x?.account_type === "service") { const svc = String(x.phone).replace(/^svc-/, ""); return { svc, ids: (await db.all("SELECT id FROM users WHERE (role = 'admin' AND service = ?) OR role = 'super'", svc)).map(r => r.id) }; }
+    return { svc: null, ids: [other] };
+  }
+  // A message with an optional attachment. Returns the message as the sender sees it.
+  async function postMessage(c, senderId, senderName, b) {
+    const body = String(b.body || "").trim().slice(0, 1000);
+    let att = "";
+    if (b.att && b.att.data) {
+      const kind = ["image", "voice", "file"].includes(b.att.kind) ? b.att.kind : "file";
+      const mm = String(b.att.data).match(/^data:([^;,]+)(?:;[^,]*)?;base64,([A-Za-z0-9+/=]+)$/); if (!mm) fail("The file could not be read.");
+      const type = mm[1].split(";")[0].toLowerCase();
+      if (!ATT_KIND[kind].includes(type)) fail(kind === "image" ? "Send a JPG, PNG or WebP picture." : kind === "voice" ? "This voice message can't be sent." : "Send a picture, PDF or Word file.");
+      const buf = Buffer.from(mm[2], "base64"); if (!buf.length) fail("The file is empty."); if (buf.length > 10 * 1024 * 1024) fail("Files must be 10 MB or smaller.");
+      const name = String(b.att.name || kind).replace(/[\\/\r\n"]/g, "_").slice(0, 120);
+      const file = `chat-${crypto.randomUUID()}`; await db.files.put(file, buf);
+      att = JSON.stringify({ kind, name, type, size: buf.length, file, dur: Math.min(600, Math.max(0, Math.round(Number(b.att.dur) || 0))) });
+    }
+    if (!body && !att) fail("Write a message first.");
+    const t = now();
+    const info = await db.run("INSERT INTO messages (conv_id, sender_id, body, created_at, att) VALUES (?, ?, ?, ?, ?)", c.id, senderId, body, t, att);
+    await db.run(`UPDATE conversations SET last_at = ?, ${senderId === c.buyer_id ? "buyer_read_at" : "seller_read_at"} = ? WHERE id = ?`, t, t, c.id);
+    const m = { id: Number(info.lastInsertRowid), conv_id: c.id, sender_id: senderId, body, created_at: t, att: null };
+    m.att = attOut({ id: m.id, att });
+    const preview = msgPreview({ body, att });
+    // The buyer's first message: the merchant's phone rings so they can answer quickly.
+    if (senderId === c.buyer_id && (await db.get("SELECT COUNT(*) AS n FROM messages WHERE conv_id = ? AND sender_id = ?", c.id, senderId)).n === 1)
+      Object.assign(m, { new_chat: true, product_name: (await db.get("SELECT name FROM products WHERE id = ?", c.product_id))?.name || "" });
+    Object.assign(m, { from_name: senderName, preview });
+    const aud = await chatAudience(c, senderId);
+    broadcast("chat", m, x => x.id === c.buyer_id || x.id === c.seller_id || aud.ids.includes(x.id));
+    if (aud.svc) broadcast("deskchat", { svc: aud.svc, conv_id: c.id, from_name: senderName, preview }, x => aud.ids.includes(x.id));
+    pushLater(aud.ids, { kind: m.new_chat ? "ring" : "info", title: m.new_chat ? "New chat" : (senderName || "New message"), body: `${m.new_chat ? senderName + ": " : ""}${preview}`.slice(0, 160),
+      goto: aud.svc ? "desk" : "chat:" + c.id, tag: "chat-" + c.id });
+    return { ...m, mine: true };
+  }
+  // A chat file: only the two people in the chat (or the service's admins for a service desk) can open it.
+  route("GET", "/api/chatfile/:id", async (req, res, url, [id]) => {
+    const u = await needUser(req), m = await db.get("SELECT * FROM messages WHERE id = ?", Number(id));
+    if (!m || !m.att) fail("File not found.", 404);
+    const c = await db.get("SELECT * FROM conversations WHERE id = ?", m.conv_id);
+    let ok = c && (c.buyer_id === u.id || c.seller_id === u.id);
+    if (!ok && c) { const aud = await chatAudience(c, c.buyer_id); ok = !!aud.svc && aud.ids.includes(u.id); }
+    if (!ok) fail("File not found.", 404);
+    const a = JSON.parse(m.att), data = await db.files.get(a.file); if (!data) fail("File not found.", 404);
+    const inline = a.kind !== "file" || a.type === "application/pdf";
+    res.writeHead(200, { "Content-Type": a.type, "Content-Length": data.length, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff",
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${String(a.name).replace(/[^\x20-\x7e]/g, "_")}"` });
+    res.end(data);
+  });
+
   async function convRow(c, me) {
     const other = me === c.buyer_id ? c.seller_id : c.buyer_id;
     const o = await db.get("SELECT name FROM users WHERE id = ?", other);
-    const last = await db.get("SELECT body, sender_id, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 1", c.id);
+    const last = await db.get("SELECT body, att, sender_id, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 1", c.id);
     const readAt = me === c.buyer_id ? c.buyer_read_at : c.seller_read_at;
     const unread = (await db.get("SELECT COUNT(*) AS n FROM messages WHERE conv_id = ? AND sender_id != ? AND created_at > ?", c.id, me, readAt)).n;
     const p = await db.get("SELECT p.name, p.images, p.service, s.name AS shop_name FROM products p JOIN shops s ON s.id = p.shop_id WHERE p.id = ?", c.product_id);
     const img = JSON.parse(p?.images || "[]")[0], ticket = p?.service === "ticket";
     return { id: c.id, product_id: c.product_id, product_name: ticket ? "Ticket enquiry" : p?.name || "Product", image: img ? "/media/" + img : null, kind: ticket ? "ticket" : "product",
-      with_name: ticket && me === c.buyer_id ? p.shop_name : o?.name || "Someone", i_am: me === c.buyer_id ? "buyer" : "seller", last, unread, last_at: c.last_at };
+      with_name: ticket && me === c.buyer_id ? p.shop_name : o?.name || "Someone", i_am: me === c.buyer_id ? "buyer" : "seller", last: last && { ...last, body: msgPreview(last) }, unread, last_at: c.last_at,
+      with_phone: await callNumber(other, p?.service) };
   }
   const convFor = async (id, u) => { const c = await db.get("SELECT * FROM conversations WHERE id = ?", id); if (!c || (c.buyer_id !== u.id && c.seller_id !== u.id)) fail("Chat not found.", 404); return c; };
   route("POST", "/api/suuq/chat/start", async (req, res) => {
@@ -1248,25 +1324,51 @@ module.exports = function market(ctx) {
   route("GET", "/api/suuq/chats/:id/messages", async (req, res, url, [id]) => {
     const u = await needUser(req), c = await convFor(id, u);
     await db.run(`UPDATE conversations SET ${u.id === c.buyer_id ? "buyer_read_at" : "seller_read_at"} = ? WHERE id = ?`, now(), c.id);
-    const msgs = (await db.all("SELECT id, sender_id, body, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 300", c.id)).reverse();
-    send(res, 200, { chat: await convRow(c, u.id), messages: msgs.map(m => ({ ...m, mine: m.sender_id === u.id })) });
+    const msgs = (await db.all("SELECT id, sender_id, body, att, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 300", c.id)).reverse();
+    send(res, 200, { chat: await convRow(c, u.id), messages: msgs.map(m => ({ ...m, att: attOut(m), mine: m.sender_id === u.id })) });
   });
   route("POST", "/api/suuq/chats/:id/messages", async (req, res, url, [id]) => {
-    const u = await needUser(req), c = await convFor(id, u), b = await readJson(req);
+    const u = await needUser(req), c = await convFor(id, u), b = await readJson(req, 15 * 1024 * 1024);
     rateLimit(req, 60, 60000, "chat");
-    const body = String(b.body || "").trim().slice(0, 1000);
-    if (!body) fail("Write a message first.");
-    const t = now();
-    const info = await db.run("INSERT INTO messages (conv_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)", c.id, u.id, body, t);
-    await db.run(`UPDATE conversations SET last_at = ?, ${u.id === c.buyer_id ? "buyer_read_at" : "seller_read_at"} = ? WHERE id = ?`, t, t, c.id);
-    const m = { id: Number(info.lastInsertRowid), conv_id: c.id, sender_id: u.id, body, created_at: t };
-    // The buyer's first message: the merchant's phone rings so they can answer quickly.
-    if (u.id === c.buyer_id && (await db.get("SELECT COUNT(*) AS n FROM messages WHERE conv_id = ? AND sender_id = ?", c.id, u.id)).n === 1)
-      Object.assign(m, { new_chat: true, from_name: u.name, product_name: (await db.get("SELECT name FROM products WHERE id = ?", c.product_id))?.name || "" });
-    broadcast("chat", m, x => x.id === c.buyer_id || x.id === c.seller_id);
-    if (m.new_chat) pushLater([c.seller_id], { kind: "ring", title: "New chat", body: `${u.name}: ${body.slice(0, 120)}`, goto: "chats", tag: "chat-" + c.id });
-    else pushLater([u.id === c.buyer_id ? c.seller_id : c.buyer_id], { kind: "info", title: u.name || "New message", body: body.slice(0, 160), goto: "chats", tag: "chat-" + c.id });
-    send(res, 200, { message: { ...m, mine: true } });
+    send(res, 200, { message: await postMessage(c, u.id, u.name, b) });
+  });
+
+  /* ---------- chat with a service (Saba Multi Services and other services run by their admins) ---------- */
+  // The customer chats with the service; the service's admins answer from the service dashboard.
+  route("POST", "/api/services/:id/chat", async (req, res, url, [svc]) => {
+    const u = await needRole(req, "customer"), d = await serviceDesk(svc);
+    let c = await db.get("SELECT * FROM conversations WHERE product_id = ? AND buyer_id = ?", d.product.id, u.id);
+    if (!c) {
+      const cid = crypto.randomUUID();
+      await db.run("INSERT INTO conversations (id, product_id, buyer_id, seller_id, last_at) VALUES (?, ?, ?, ?, ?)", cid, d.product.id, u.id, d.user.id, now());
+      c = await db.get("SELECT * FROM conversations WHERE id = ?", cid);
+    }
+    const row = await convRow(c, u.id); row.with_name = d.sv.name; row.product_name = d.sv.name;
+    send(res, 200, { chat: row });
+  });
+  const deskConv = async (svc, cid) => { const d = await serviceDesk(svc); const c = await db.get("SELECT * FROM conversations WHERE id = ? AND seller_id = ?", cid, d.user.id); if (!c) fail("Chat not found.", 404); return { d, c }; };
+  route("GET", "/api/admin/service-chats/:id", async (req, res, url, [svc]) => {
+    await needPageEditor(req, svc); const d = await serviceDesk(svc);
+    const rows = await db.all("SELECT c.*, u.name AS bname, u.phone AS bphone FROM conversations c JOIN users u ON u.id = c.buyer_id WHERE c.seller_id = ? ORDER BY c.last_at DESC LIMIT 200", d.user.id);
+    const out = [];
+    for (const c of rows) {
+      const last = await db.get("SELECT body, att, sender_id, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 1", c.id); if (!last) continue;
+      const unread = (await db.get("SELECT COUNT(*) AS n FROM messages WHERE conv_id = ? AND sender_id != ? AND created_at > ?", c.id, d.user.id, c.seller_read_at)).n;
+      out.push({ id: c.id, name: c.bname, phone: c.bphone, last: { ...last, body: msgPreview(last), mine: last.sender_id === d.user.id }, unread: Number(unread) || 0, last_at: c.last_at });
+    }
+    send(res, 200, { chats: out });
+  });
+  route("GET", "/api/admin/service-chats/:id/:cid", async (req, res, url, [svc, cid]) => {
+    await needPageEditor(req, svc); const { d, c } = await deskConv(svc, cid);
+    await db.run("UPDATE conversations SET seller_read_at = ? WHERE id = ?", now(), c.id);
+    const b = await db.get("SELECT name, phone FROM users WHERE id = ?", c.buyer_id);
+    const msgs = (await db.all("SELECT id, sender_id, body, att, created_at FROM messages WHERE conv_id = ? ORDER BY id DESC LIMIT 300", c.id)).reverse();
+    send(res, 200, { chat: { id: c.id, name: b?.name || "", phone: b?.phone || "" }, messages: msgs.map(m => ({ ...m, att: attOut(m), mine: m.sender_id === d.user.id })) });
+  });
+  route("POST", "/api/admin/service-chats/:id/:cid", async (req, res, url, [svc, cid]) => {
+    await needPageEditor(req, svc); const { d, c } = await deskConv(svc, cid), b = await readJson(req, 15 * 1024 * 1024);
+    rateLimit(req, 120, 60000, "deskchat");
+    send(res, 200, { message: await postMessage(c, d.user.id, d.sv.name, b) });
   });
 
   /* ---------- Documents for a service's admins (Saba Multi Services and other video-page services) ---------- */
@@ -1275,7 +1377,7 @@ module.exports = function market(ctx) {
   const DOC_TYPES = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", pdf: "application/pdf",
     doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
   const isDocAdmin = (u, svc) => u && (isSuper(u) || (u.role === "admin" && u.service === svc));
-  const docOut = (d, extra = {}) => ({ id: d.id, note: d.note, status: d.status, created_at: d.created_at,
+  const docOut = (d, extra = {}) => ({ id: d.id, note: d.note, status: d.status, created_at: d.created_at, earn_amount: Number(d.earn_amount) || 0, earn_cur: d.earn_cur || "",
     files: JSON.parse(d.files || "[]").map((f, n) => ({ name: f.name, type: f.type, size: f.size, url: `/api/docs/${d.id}/file/${n}` })), ...extra });
   route("POST", "/api/services/:id/docs", async (req, res, url, [svc]) => {
     const u = await needRole(req, "customer"), b = await readJson(req, 40 * 1024 * 1024);
@@ -1324,7 +1426,33 @@ module.exports = function market(ctx) {
     const st = url.searchParams.get("status") === "done" ? "done" : "new";
     const rows = await db.all(`SELECT d.*, u.name, u.phone FROM service_docs d JOIN users u ON u.id = d.user_id WHERE d.service = ? AND d.status = ? ORDER BY d.created_at DESC LIMIT 200`, svc, st);
     const count = (await db.get("SELECT COUNT(*) AS n FROM service_docs WHERE service = ? AND status = 'new'", svc)).n;
-    send(res, 200, { docs: rows.map(d => docOut(d, { name: d.name, phone: d.phone })), new: Number(count) || 0 });
+    const sv = (await getSettings()).services.find(x => x.id === svc);
+    send(res, 200, { docs: rows.map(d => docOut(d, { name: d.name, phone: d.phone })), new: Number(count) || 0, earn_default: sv?.doc_earn || { amount: 0, cur: "USD" } });
+  });
+  // Earnings for documents: the admin gives the person who sent a set of documents a fixed earning (once per set).
+  // It goes to their "My earnings". The amount used becomes the default for the next set.
+  route("POST", "/api/admin/service-docs/:id/:doc/earn", async (req, res, url, [svc, id]) => {
+    await needPageEditor(req, svc);
+    const b = await readJson(req), amount = round(String(b.cur), Number(b.amount)), cur = String(b.cur);
+    if (!CURS.includes(cur)) fail("Choose USD or SLSH.");
+    if (!(amount > 0) || amount > 1e7) fail("Enter an earning above 0.");
+    const name = (await getSettings()).services.find(x => x.id === svc)?.name || "Service";
+    await tx(async () => {
+      const d = await db.get("SELECT * FROM service_docs WHERE id = ? AND service = ?", id, svc); if (!d) fail("Not found.", 404);
+      if (Number(d.earn_amount) > 0) fail("This person already got an earning for these documents.");
+      await db.run("UPDATE service_docs SET earn_amount = ?, earn_cur = ? WHERE id = ?", amount, cur, id);
+      await addEarning(d.user_id, cur, amount, "documents", "DOC-" + id.slice(0, 8), `${name} · documents`);
+    });
+    const s2 = await getSettings(), i = s2.services.findIndex(x => x.id === svc);
+    if (i >= 0) { const services = s2.services.slice(); services[i] = { ...services[i], doc_earn: { amount, cur } }; await saveSettings({ services }); }
+    send(res, 200, { ok: true });
+  });
+  // The customer's own earnings from a service's documents (each person sees only their own).
+  route("GET", "/api/services/:id/earnings", async (req, res, url, [svc]) => {
+    const u = await needRole(req, "customer");
+    const docs = await db.all("SELECT * FROM service_docs WHERE user_id = ? AND service = ? ORDER BY created_at DESC LIMIT 100", u.id, svc);
+    const totals = {}; for (const d of docs) if (d.earn_amount > 0) totals[d.earn_cur] = round(d.earn_cur, (totals[d.earn_cur] || 0) + d.earn_amount);
+    send(res, 200, { docs: docs.map(d => docOut(d)), totals, balances: await earnBalances(u.id), withdraw_at: withdrawAt(u) });
   });
   route("POST", "/api/admin/service-docs/:id/:doc", async (req, res, url, [svc, id]) => {
     await needPageEditor(req, svc);
@@ -1596,6 +1724,13 @@ module.exports = function market(ctx) {
     const pending = (await db.get("SELECT COUNT(*) AS n FROM products WHERE deleted = 0 AND approval = 'pending' AND service = ?", p.service)).n;
     broadcast("review", { service: p.service, pending, product: { id: p.id, name: p.name } }, u => u.role === "super" || (u.role === "admin" && u.service === p.service));
   }
+  // Products sellers list in a service market that has its own admin (Technician): to approve or reject.
+  route("GET", "/api/market/:m/admin/products", async (req, res, url, [m]) => {
+    if (!MARKETS.includes(m)) fail("Not found.", 404);
+    await needMarketAdmin(req, m);
+    const rows = await db.all(`${PROD_SELECT} WHERE p.deleted = 0 AND p.service = ? ORDER BY CASE p.approval WHEN 'pending' THEN 0 ELSE 1 END, p.updated_at DESC LIMIT 300`, m);
+    send(res, 200, { products: rows.map(p => productRow(p)) });
+  });
   route("POST", "/api/suuq/admin/products/:id/review", async (req, res, url, [id]) => {
     const pr = await db.get("SELECT p.id, p.name, p.service, s.owner_id FROM products p JOIN shops s ON s.id = p.shop_id WHERE p.id = ? AND p.deleted = 0", id);
     if (!pr) fail("Product not found.", 404);
