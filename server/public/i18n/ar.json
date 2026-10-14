@@ -1389,7 +1389,11 @@
   "Enter your PIN to place the order": "أدخل رمزك لتقديم الطلب",
   "Enter your PIN to place the order.": "أدخل رمزك لتقديم الطلب.",
   "Press Top up to pay this amount by phone.": "اضغط شحن لدفع هذا المبلغ بالهاتف.",
-  "You pay": "ستدفع"
+  "You pay": "ستدفع",
+  "or pay by phone": "أو ادفع بالهاتف",
+  "Pay by phone": "ادفع بالهاتف",
+  "Subscription payments": "مدفوعات الاشتراك",
+  "Top-up isn't set up yet. Contact support to add money.": "الشحن غير مُعد بعد. تواصل مع الدعم لإضافة المال."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",

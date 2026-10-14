@@ -1388,7 +1388,11 @@
   "Enter your PIN to place the order": "Geli PIN-kaaga si aad u dalbato",
   "Enter your PIN to place the order.": "Geli PIN-kaaga si aad u dalbato.",
   "Press Top up to pay this amount by phone.": "Riix Ku shubo si aad lacagtan taleefanka ugu bixiso.",
-  "You pay": "Waxaad bixinaysaa"
+  "You pay": "Waxaad bixinaysaa",
+  "or pay by phone": "ama ku bixi taleefan",
+  "Pay by phone": "Ku bixi taleefan",
+  "Subscription payments": "Lacag-bixinta rukunka",
+  "Top-up isn't set up yet. Contact support to add money.": "Ku shubashadu weli lama diyaarin. La xidhiidh taageerada si aad lacag ugu darto."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

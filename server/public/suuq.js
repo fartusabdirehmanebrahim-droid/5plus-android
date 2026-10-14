@@ -634,7 +634,7 @@ const SUUQ = (() => {
   function vTopupForm() {
     const t = st.topup || (st.topup = { cur: "USD", amount: "" });
     const code = topupCode(t.cur, t.amount), ready = topupReady();
-    if (!ready) return `<div class="leg"><b style="font-family:var(--display)">Top up</b><p class="note" style="margin:0">Top-up by USSD isn't set up yet. Contact support to add money.</p></div>`;
+    if (!ready) return `<div class="leg"><b style="font-family:var(--display)">Top up</b><p class="note" style="margin:0">Top-up isn't set up yet. Contact support to add money.</p></div>`;
     return `<div class="leg"><b style="font-family:var(--display)">Top up</b>
       <div class="cur-toggle" style="grid-template-columns:1fr 1fr">${CURS.map(c => `<button class="${c}" data-tpcur="${c}" aria-pressed="${t.cur === c}">${c === "USD" ? "USD · Dollar" : "SLSH · Shilling"}</button>`).join("")}</div>
       <div class="amount-box"><span>${t.cur === "USD" ? "$" : "SLSH"}</span><input id="tp-amount" inputmode="decimal" placeholder="0" value="${esc(t.amount)}" aria-label="Top-up amount"></div>
@@ -860,7 +860,7 @@ const SUUQ = (() => {
         ${v.merchant ? `<button class="btn btn-primary" data-sq="${act}" data-via="merchant">Merchant number</button>` : ""}
         ${v.number ? `<button class="btn btn-primary" data-sq="${act}" data-via="normal">Normal number</button>` : ""}</div>`;
     }
-    return `<button class="btn btn-primary btn-block" data-sq="${act}">${SVC_TOPUP}Pay ${money(total + payFeeOf(cur, total), cur)} by USSD</button>`;
+    return `<button class="btn btn-primary btn-block" data-sq="${act}">${SVC_TOPUP}Pay ${money(total + payFeeOf(cur, total), cur)}</button>`;
   }
   const dialNow = code => { if (code) dialUssd(code); };
 
@@ -869,7 +869,7 @@ const SUUQ = (() => {
   const orderPin = os => `<div class="field"><label for="sq-pin">Enter your PIN to place the order</label>${pinInput("sq-pin", os.pin)}</div>`;
   function vOrderSheet(p, os) {
     if (os.done && os.done.status === "awaiting_payment") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
-      <h3 style="font-size:20px">Order placed · pay by USSD</h3>
+      <h3 style="font-size:20px">Order placed</h3>
       <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it." : "When the seller confirms the money arrived, they deliver."}</p>
       <p class="note" style="margin:0">Ref <span class="num">${esc(os.done.ref)}</span></p></div>
       <button class="btn btn-ghost btn-block" data-sq="myorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closesheet">Keep shopping</button></div></div>`;
@@ -1367,21 +1367,21 @@ const SUUQ = (() => {
       <div class="sum-row"><span>Your wallet</span><b class="num">${money(st.wallet?.balances?.USD || 0, "USD")} · ${money(st.wallet?.balances?.SLSH || 0, "SLSH")}</b></div>
       <span class="err" id="shop-err"></span>
       <button class="btn btn-primary btn-block" data-sq="openshop">Pay from wallet</button>
-      ${topupReady() ? `<div class="or-sep"><span>or pay by USSD</span></div>
-      <a class="btn btn-ghost btn-block" id="sub-ussd" href="#">Pay by USSD</a>
+      ${topupReady() ? `<div class="or-sep"><span>or pay by phone</span></div>
+      <a class="btn btn-ghost btn-block" id="sub-ussd" href="#">Pay by phone</a>
       <span class="note" id="sub-status">Your phone dials the code with the plan price. When support confirms the payment, your shop is renewed.</span>` : ""}</div>
       ${pendingSub()}
     <div class="leg"><b style="font-family:var(--display);font-size:16px">Registration details</b>${detailRows(s.profile || {})}</div>`;
   }
   function pendingSub() {
     const list = (st.wallet?.topups || []).filter(t => t.purpose === "subscription").slice(0, 5);
-    return list.length ? `<div class="leg"><b style="font-family:var(--display);font-size:15px">Subscription payments by USSD</b>${topupList(list)}</div>` : "";
+    return list.length ? `<div class="leg"><b style="font-family:var(--display);font-size:15px">Subscription payments</b>${topupList(list)}</div>` : "";
   }
   function selectedPlan() { const id = (document.querySelector('input[name="plan"]:checked') || {}).value; return paidPlans().find(p => p.id === id) || paidPlans()[0]; }
   function syncSubLink() {
     const a = document.getElementById("sub-ussd"), p = selectedPlan(); if (!a || !p) return;
     const code = topupCode(p.cur, p.price);
-    if (code) { a.href = telHref(code); a.textContent = `Pay by USSD · ${code}`; }
+    if (code) { a.href = telHref(code); a.textContent = "Pay by phone"; }
   }
   function detailRows(p) {
     const rows = [["Full name", p.full_name], ["Birth date", p.birth_date], ["Country", p.country], ["City", p.city], ["Type", p.kind === "company" ? "Company" : p.kind === "shop" ? "Shop" : ""],
@@ -1397,8 +1397,8 @@ const SUUQ = (() => {
       <div class="field"><label>Plan</label>${planList(defaultPlan())}</div>
       <span class="err" id="shop-err"></span>
       <button class="btn btn-primary btn-block" data-sq="openshop">Pay from wallet and renew</button>
-      ${topupReady() ? `<div class="or-sep"><span>or pay by USSD</span></div>
-      <a class="btn btn-ghost btn-block" id="sub-ussd" href="#">Pay by USSD</a>
+      ${topupReady() ? `<div class="or-sep"><span>or pay by phone</span></div>
+      <a class="btn btn-ghost btn-block" id="sub-ussd" href="#">Pay by phone</a>
       <span class="note" id="sub-status">Your phone dials the code with the plan price. When support confirms the payment, your shop is renewed.</span>` : ""}</div>
       ${pendingSub()}
     <div class="leg"><b style="font-family:var(--display);font-size:16px">Registration details</b>${detailRows(p) || `<p class="note" style="margin:0">No details yet.</p>`}
