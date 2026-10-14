@@ -670,7 +670,6 @@ const SUUQ = (() => {
     return `<div class="view">
       <div class="svc-bar">${back("hub")}<b>Affiliate program</b></div>
       <div class="aff-hero"><span class="label" style="color:inherit;opacity:.85">Share products · earn money</span>
-        <p style="margin:0">Everyone earns, even buyers: you earn on what you buy yourself, and when someone buys through your link. When the order is completed, the earning is added to your earnings below. Withdraw it to your wallet when it reaches the amount you chose.</p>
         <div class="aff-code"><span>Your code</span><b class="num">${esc(code || "—")}</b></div></div>
       <div class="kpis" style="grid-template-columns:1fr 1fr"><div class="kpi"><span class="label">Earned</span><b class="num" style="font-size:16px">${sum(a?.earned)}</b></div><div class="kpi warn"><span class="label">On the way</span><b class="num" style="font-size:16px">${sum(a?.pending)}</b></div></div>
       ${vEarnings(a)}
@@ -1650,8 +1649,10 @@ const SUUQ = (() => {
     if (a === "openshop") {
       const plan = (document.querySelector('input[name="plan"]:checked') || {}).value;
       if (document.getElementById("pf-full_name")) keepPf();
+      const pl = (st.plans || []).find(x => x.id === plan);
+      const pin = await askPin("Pay from your wallet", pl ? `${pl.name} · ${money(pl.price, pl.cur)}` : ""); if (!pin) return;
       b.disabled = true;
-      try { const r = await api("/api/suuq/shop", { body: { plan_id: plan } }); st.shop = r.shop; st.pf = null; st.sell = "products"; await Promise.all([loadShop(), loadWallet()]); render(); }
+      try { const r = await api("/api/suuq/shop", { body: { plan_id: plan, pin } }); st.shop = r.shop; st.pf = null; st.sell = "products"; await Promise.all([loadShop(), loadWallet()]); render(); }
       catch (e) { b.disabled = false; const el = document.getElementById("shop-err"); el.textContent = e.message; el.scrollIntoView({ block: "center", behavior: "smooth" }); }
     }
     if (a === "becomemerchant") {
@@ -1693,7 +1694,7 @@ const SUUQ = (() => {
     }
     try {
       const ussd = p.mode === "buy" && !asksPrice(p) && os.method && os.method !== "wallet";
-      const r = await api("/api/suuq/orders", { body: { product_id: p.id, qty: os.qty, note: os.note, ref: refFor(p.id), ...(p.mode === "book" ? { book_at: `${os.bdate} ${os.btime}` } : {}), ...(ussd ? { method: os.method, via: os.via } : {}) } });
+      const r = await api("/api/suuq/orders", { body: { pin: os.pin, product_id: p.id, qty: os.qty, note: os.note, ref: refFor(p.id), ...(p.mode === "book" ? { book_at: `${os.bdate} ${os.btime}` } : {}), ...(ussd ? { method: os.method, via: os.via } : {}) } });
       os.done = r.order; if (r.balances && st.wallet) st.wallet.balances = r.balances;
       if (r.order.pay_ussd) dialNow(r.order.pay_ussd);
       try { localStorage.removeItem("sarrif.ref." + p.id); } catch {}
@@ -1710,7 +1711,7 @@ const SUUQ = (() => {
   }
   async function payQuoted() {
     const ps = st.paySheet; if (!ps || (ps.pin || "").length !== 4) return;
-    try { await api("/api/auth/check-pin", { body: { pin: ps.pin } }); await api(`/api/suuq/orders/${ps.id}/action`, { body: { action: "pay" } }); }
+    try { await api("/api/auth/check-pin", { body: { pin: ps.pin } }); await api(`/api/suuq/orders/${ps.id}/action`, { body: { action: "pay", pin: ps.pin } }); }
     catch (e) { ps.err = e.message; ps.pin = ""; return render(); }
     st.paySheet = null; await Promise.all([loadOrders(), loadWallet()]); render();
   }

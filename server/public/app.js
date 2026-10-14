@@ -31,6 +31,25 @@ async function api(path, opts = {}) {
   if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
   return data;
 }
+// Asks for the 4-digit PIN before money moves (the server checks it). Resolves with the PIN, or null if cancelled.
+function askPin(title, detail) {
+  return new Promise(resolve => {
+    const back = document.activeElement, box = document.createElement("div");
+    box.className = "pin-ask";
+    box.innerHTML = `<div class="pin-card" role="dialog" aria-modal="true" aria-labelledby="pa-t"><b id="pa-t">${esc(title)}</b>${detail ? `<p class="note" style="margin:0">${esc(detail)}</p>` : ""}
+      <label for="pa-pin" class="label">Enter your 4-digit PIN</label>
+      <input id="pa-pin" class="input pa-pin num" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+      <div class="row-actions"><button class="btn btn-ghost" data-pa="no">Cancel</button><button class="btn btn-primary" data-pa="ok" disabled>Confirm</button></div></div>`;
+    document.body.appendChild(box);
+    const inp = box.querySelector("#pa-pin"), ok = box.querySelector('[data-pa="ok"]');
+    const done = v => { box.remove(); try { back && back.focus(); } catch {} resolve(v); };
+    inp.oninput = () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 4); ok.disabled = inp.value.length !== 4; };
+    inp.onkeydown = e => { if (e.key === "Enter" && inp.value.length === 4) done(inp.value); if (e.key === "Escape") done(null); };
+    ok.onclick = () => done(inp.value); box.querySelector('[data-pa="no"]').onclick = () => done(null);
+    box.onclick = e => { if (e.target === box) done(null); };
+    setTimeout(() => inp.focus(), 30);
+  });
+}
 async function copyText(text, btn) {
   try { await navigator.clipboard.writeText(text); if (btn) { const o = btn.textContent; btn.textContent = "Copied"; setTimeout(() => btn.textContent = o, 1200); } }
   catch { if (btn) btn.textContent = text; }
@@ -774,7 +793,6 @@ function vSvcEarn(h) {
   return `<div class="svc-earn">
     <div class="earn-hero"><small class="label">You earned from ${esc(h.name)}</small><b class="num">${tot || fmt(0, "USD")}</b>
       <span>In My earnings now: <b class="num">${CURS.map(c => fmt(d.balances?.[c] || 0, c)).join(" · ")}</b></span></div>
-    <p class="note" style="margin:0">Send your documents in the Documents tab. When ${esc(h.name)} accepts them, they add your earning here and in My earnings.</p>
     ${(d.docs || []).length ? `<div class="doc-mine">${d.docs.map(x => `<div class="doc-sent"><span>${x.files.length} file${x.files.length > 1 ? "s" : ""} · ${new Date(x.created_at).toLocaleDateString()}</span>
       ${x.earn_amount > 0 ? `<b class="num earn-plus">+ ${esc(fmt(x.earn_amount, x.earn_cur))}</b>` : `<span class="pill">${x.status === "done" ? "Seen" : "Waiting"}</span>`}</div>`).join("")}</div>`
       : `<div class="empty">No documents yet.</div>`}
@@ -973,9 +991,11 @@ function bindEarnPay() {
   document.querySelectorAll("[data-epto]").forEach(b => b.onclick = () => { S.earnPay.to = b.dataset.epto; S.earnPay.err = ""; render(); });
   const go = document.getElementById("ep-send"); if (!go) return;
   go.onclick = async () => {
-    const P = S.earnPay; go.disabled = true;
+    const P = S.earnPay;
+    const pin = await askPin("Send your earnings", go.textContent.trim()); if (!pin) return;
+    go.disabled = true;
     try {
-      const r = await api("/api/earnings/payout", { body: { cur: P.cur, to: P.to } });
+      const r = await api("/api/earnings/payout", { body: { cur: P.cur, to: P.to, pin } });
       if (SUUQ.state.wallet) SUUQ.state.wallet.earnings = r.earnings;
       S.mine.unshift(r.request); S.last = r.request; S.sheet = "done"; S.earnPay = null; render();
     } catch (e) { P.err = e.message; render(); }
@@ -1258,11 +1278,9 @@ async function logout() {
 }
 async function loadMine() { try { S.mine = (await api("/api/requests/mine")).requests; if (S.tab === "history" && !S.sheet) render(); } catch {} }
 async function submitTx() {
-  // The server re-checks the PIN before every transfer.
-  try { await api("/api/auth/check-pin", { body: { pin: S.sheetPin } }); }
-  catch (e) { S.err = e.message; S.sheetPin = ""; return render(); }
+  // The server checks the PIN with every transfer.
   try {
-    const q = S.q, r = await api("/api/requests", { body: { cur: q.cur, from: q.from, to: q.to, amount: q.amount, proof: needsProof(q.from) ? q.proof : undefined,
+    const q = S.q, r = await api("/api/requests", { body: { pin: S.sheetPin, cur: q.cur, from: q.from, to: q.to, amount: q.amount, proof: needsProof(q.from) ? q.proof : undefined,
       recipient: toOther() ? { name: q.toName, phone: q.toPhone } : undefined } });
     S.q.proof = null; S.last = r.request; S.sheet = "done"; S.sheetPin = ""; S.mine.unshift(r.request); render();
     // Every wallet except Premier pays the agent by USSD: dial the code (USD or SLSH) automatically one second after

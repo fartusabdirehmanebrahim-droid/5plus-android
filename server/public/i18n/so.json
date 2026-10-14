@@ -1381,7 +1381,10 @@
   "Not taking calls right now": "Hadda wicitaan ma qaato",
   "Paused · until you turn calls back on": "La joojiyay · ilaa aad dib u furto wicitaanada",
   "Number of days": "Tirada maalmaha",
-  "Pause calls": "Jooji wicitaanada"
+  "Pause calls": "Jooji wicitaanada",
+  "Enter your 4-digit PIN": "Geli PIN-kaaga 4-ta god",
+  "Confirm": "Xaqiiji",
+  "Send your earnings": "Dir dakhligaaga"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

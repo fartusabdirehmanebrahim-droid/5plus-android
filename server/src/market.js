@@ -1,7 +1,7 @@
 // Wallets, the Suuq marketplace, private buyer-seller chat and the affiliate program.
 // Loaded by server.js, which passes in its helpers.
 module.exports = function market(ctx) {
-  const { readFace, storeFace, hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
+  const { needPin, readFace, storeFace, hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
     crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit } = ctx;
 
   /* ---------- money helpers ---------- */
@@ -421,6 +421,7 @@ module.exports = function market(ctx) {
     if (!shop) fail("Register as a merchant first.");
     const name = shop.name, profile = null;
     if (shop?.suspended) fail("Your shop is suspended. Contact support.");
+    await needPin(u, b.pin);
     await tx(async () => {
       if (await balance(u.id, plan.cur) < plan.price) fail(`Your wallet needs at least ${plan.cur === "USD" ? "$" + plan.price : plan.price + " SLSH"} for this plan. Top up your wallet or pay by USSD.`);
       await buyPlan(u.id, shop, plan);
@@ -875,6 +876,7 @@ module.exports = function market(ctx) {
       bookAt = `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}`;
     }
     const limited = Number(p.stock) >= 0;
+    if (p.mode === "buy" && !ask && !plan) await needPin(u, b.pin); // paid from the wallet
     await tx(async () => {
       // Limited items (hotel rooms…): one is held for this order until it ends.
       if (limited) {
@@ -1055,6 +1057,7 @@ module.exports = function market(ctx) {
   }
   route("POST", "/api/suuq/orders/:id/action", async (req, res, url, [id]) => {
     const u = await needRole(req, "customer"), b = await readJson(req);
+    if (b.action === "pay" && (!b.method || b.method === "wallet")) await needPin(u, b.pin); // paying a sent price from the wallet
     const fwd = await orderAction(id, u, b);
     send(res, 200, { ok: true, forwarded: !!fwd });
   });
@@ -1872,6 +1875,7 @@ module.exports = function market(ctx) {
   route("POST", "/api/earnings/withdraw", async (req, res) => {
     const u = await needUser(req), b = await readJson(req), cur = String(b.cur);
     if (!CURS.includes(cur)) fail("Choose USD or SLSH.");
+    await needPin(u, b.pin);
     const limit = withdrawAt(u)[cur];
     await tx(async () => {
       const bal = await earnBalance(u.id, cur);

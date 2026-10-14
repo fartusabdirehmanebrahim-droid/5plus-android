@@ -1382,7 +1382,10 @@
   "Not taking calls right now": "አሁን ጥሪ አይቀበልም",
   "Paused · until you turn calls back on": "ቆሟል · ጥሪዎችን እስኪያበሩ ድረስ",
   "Number of days": "የቀናት ብዛት",
-  "Pause calls": "ጥሪዎችን አቁም"
+  "Pause calls": "ጥሪዎችን አቁም",
+  "Enter your 4-digit PIN": "ባለ 4 አሃዝ ፒንዎን ያስገቡ",
+  "Confirm": "አረጋግጥ",
+  "Send your earnings": "ገቢዎን ይላኩ"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

@@ -23,7 +23,10 @@ if (SECRET.length < 32 || SECRET.startsWith("change-me")) {
   process.exit(1);
 }
 const COOKIE = "sarrif_session";
-const SESSION_SECONDS = 12 * 3600;
+const SESSION_SECONDS = 12 * 3600; // admins and agents
+// Customers and sellers stay logged in on their phone (the login is renewed each time the app opens);
+// every payment or transfer asks for their PIN again on the server.
+const CUSTOMER_SESSION_SECONDS = 400 * 86400;
 const SECURE = process.env.COOKIE_SECURE === "true";
 const MAX_FAILS = 5, LOCK_MINUTES = 15;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -63,7 +66,8 @@ setInterval(() => { for (const [k, v] of hits) if (v.reset < now()) hits.delete(
 
 /* ---------- sessions ---------- */
 function startSession(res, u) {
-  res.setHeader("Set-Cookie", cookieHeader(COOKIE, signToken({ uid: u.id, tv: u.token_version }, SECRET, SESSION_SECONDS), { maxAge: SESSION_SECONDS, secure: SECURE }));
+  const secs = u.role === "customer" ? CUSTOMER_SESSION_SECONDS : SESSION_SECONDS;
+  res.setHeader("Set-Cookie", cookieHeader(COOKIE, signToken({ uid: u.id, tv: u.token_version }, SECRET, secs), { maxAge: secs, secure: SECURE }));
 }
 function endSession(res) { res.setHeader("Set-Cookie", cookieHeader(COOKIE, "", { maxAge: 0, secure: SECURE })); }
 async function loadUser(req) {
@@ -250,6 +254,13 @@ route("POST", "/api/auth/admin-password", async (req, res) => {
   send(res, 200, { user: publicUser(u) });
 });
 
+// Money moves only with the PIN: checked here on the server, not just in the app. A wrong PIN is 403 (not 401),
+// so the person stays logged in.
+async function needPin(u, pin) {
+  if (isLocked(u)) fail(tooMany, 429);
+  if (!checkSecret(String(pin || ""), u.pin_hash)) fail(await recordFail(u) ? tooMany : "Wrong PIN. Try again.", 403);
+  await clearFails(u);
+}
 // Re-checks the PIN before a transfer without changing the session.
 route("POST", "/api/auth/check-pin", async (req, res) => {
   const u = await needRole(req, "customer"); rateLimit(req, 60);
@@ -263,6 +274,7 @@ route("POST", "/api/auth/logout", async (req, res) => { endSession(res); send(re
 route("GET", "/api/me", async (req, res) => {
   const u = await loadUser(req);
   const staff = u && u.role !== "customer";
+  if (u && !staff) startSession(res, u); // renew: customers and sellers stay logged in
   send(res, 200, { user: u ? publicUser(u) : null, services: staff ? (await getSettings()).services.map(({ id, name, art, ready, visible, photo }) => ({ id, name, art, ready, visible, photo: photo ? "/media/" + photo : null })) : undefined });
 });
 
@@ -283,6 +295,7 @@ route("GET", "/api/settings", async (req, res) => send(res, 200, publicSettings(
 route("POST", "/api/requests", async (req, res) => {
   const u = await needRole(req, "customer"), b = await readJson(req, 4 * 1024 * 1024), s = await getSettings();
   if (!s.services.some(x => x.id === "ibedel" && x.visible)) fail("iBedel is not available right now.");
+  await needPin(u, b.pin);
   const cur = String(b.cur), from = String(b.from), to = String(b.to), amount = Number(b.amount);
   if (!CURS.includes(cur)) fail("Choose USD or SLSH.");
   // Sending to another person: only their name and phone number are needed. Otherwise the money goes to the
@@ -329,6 +342,7 @@ route("POST", "/api/requests", async (req, res) => {
 // customer: Sarrif pays), minus the iBedel charge.
 route("POST", "/api/earnings/payout", async (req, res) => {
   const u = await needRole(req, "customer"), b = await readJson(req), s = await getSettings();
+  await needPin(u, b.pin);
   if (!s.services.some(x => x.id === "ibedel" && x.visible)) fail("iBedel is not available right now.");
   const cur = String(b.cur), to = String(b.to);
   if (!CURS.includes(cur)) fail("Choose USD or SLSH.");
@@ -708,7 +722,7 @@ route("DELETE", "/api/admin/expenses/:id", async (req, res, url, [id]) => {
 });
 
 /* ---------- wallets, Suuq, chat, affiliates ---------- */
-require("./market")({ readFace, storeFace, hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
+require("./market")({ needPin, readFace, storeFace, hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
   crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit });
 
 /* ---------- static files ---------- */

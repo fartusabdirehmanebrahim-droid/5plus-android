@@ -1382,7 +1382,10 @@
   "Not taking calls right now": "N'accepte pas d'appels pour le moment",
   "Paused · until you turn calls back on": "En pause · jusqu'à ce que vous réactiviez les appels",
   "Number of days": "Nombre de jours",
-  "Pause calls": "Suspendre les appels"
+  "Pause calls": "Suspendre les appels",
+  "Enter your 4-digit PIN": "Entrez votre code à 4 chiffres",
+  "Confirm": "Confirmer",
+  "Send your earnings": "Envoyer vos gains"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
