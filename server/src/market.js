@@ -1,7 +1,7 @@
 // Wallets, the Suuq marketplace, private buyer-seller chat and the affiliate program.
 // Loaded by server.js, which passes in its helpers.
 module.exports = function market(ctx) {
-  const { hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
+  const { readFace, storeFace, hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
     crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit } = ctx;
 
   /* ---------- money helpers ---------- */
@@ -152,8 +152,9 @@ module.exports = function market(ctx) {
   route("GET", "/api/super/wallet", async (req, res, url) => {
     await needRole(req, "super");
     const phone = cleanPhone(url.searchParams.get("phone"));
-    const u = await db.get("SELECT id, name, phone, role, service FROM users WHERE phone = ?", phone);
+    const u = await db.get("SELECT id, name, phone, role, service, face FROM users WHERE phone = ?", phone);
     if (!u) fail("No account uses this phone number.", 404);
+    u.has_face = !!u.face; delete u.face;
     const rows = await db.all("SELECT * FROM wallet_tx WHERE user_id = ? ORDER BY id DESC LIMIT 50", u.id);
     send(res, 200, { user: u, balances: await balances(u.id), tx: rows.map(txRow) });
   });
@@ -331,7 +332,8 @@ module.exports = function market(ctx) {
 
   // Seller registration form. Somaliland and neighbours first, then every other country.
   const COUNTRIES = ["Somaliland", "Somalia", "Djibouti", "Ethiopia", "Kenya", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Côte d'Ivoire", "Croatia", "Cuba", "Cyprus", "Czechia", "Democratic Republic of the Congo", "Denmark", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "São Tomé and Príncipe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Türkiye", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"];
-  function readProfile(b) {
+  // need: a new merchant must choose a business category (older shops may not have one yet).
+  function readProfile(b, cats, need) {
     const t = (k, n = 80) => String(b[k] || "").trim().slice(0, n), num = k => String(b[k] || "").replace(/\D/g, "");
     const p = { full_name: t("full_name"), birth_date: t("birth_date", 10), country: t("country", 60), city: t("city", 60), kind: t("kind", 10),
       business_name: t("business_name", 60), address: t("address", 160), phone: num("phone"), zaad_merchant: num("zaad_merchant"), edahab_merchant: num("edahab_merchant"), shop_phone: num("shop_phone") };
@@ -346,6 +348,10 @@ module.exports = function market(ctx) {
     if (!["shop", "company"].includes(p.kind)) fail("Choose Shop or Company.");
     if (p.business_name.length < 2) fail(`Enter the name of your ${p.kind === "company" ? "company" : "shop"}.`);
     if (p.address.length < 4) fail("Enter your address.");
+    const cat = (cats || []).find(c => c.name === t("category", 60));
+    if (cat) { p.category = cat.name; p.section = cat.section;
+      if ((cat.subs || []).length) { if (!cat.subs.includes(t("category_sub", 60))) fail(`Choose the kind of ${cat.name.toLowerCase()}.`); p.category_sub = t("category_sub", 60); } }
+    else if (need || t("category")) fail("Choose your business category.");
     if (p.phone.length < 7 || p.phone.length > 15) fail("Enter a valid phone number.");
     for (const [k, label] of [["zaad_merchant", "ZAAD merchant number"], ["edahab_merchant", "eDahab merchant number"], ["shop_phone", "shop phone number"]])
       if (p[k] && (p[k].length < 4 || p[k].length > 15)) fail(`Check the ${label}.`);
@@ -353,29 +359,31 @@ module.exports = function market(ctx) {
     return p;
   }
 
-  route("GET", "/api/suuq/plans", async (req, res) => send(res, 200, { plans: (await getSettings()).suuq.plans, countries: COUNTRIES }));
+  route("GET", "/api/suuq/plans", async (req, res) => { const s = await getSettings(); send(res, 200, { plans: s.suuq.plans, countries: COUNTRIES, categories: s.bizCats }); });
   // Merchant sign-up from the first screen: the seller registration form plus a PIN. The phone is the login.
   route("POST", "/api/auth/signup-merchant", async (req, res) => {
     rateLimit(req);
-    const b = await readJson(req), p = readProfile(b.profile || {}), pin = String(b.pin || "");
+    const b = await readJson(req, 1024 * 1024), p = readProfile(b.profile || {}, (await getSettings()).bizCats, true), pin = String(b.pin || "");
     const phone = cleanPhone(p.phone);
     if (phone.length < 7 || phone.length > 12) fail("Enter a valid phone number.");
     if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
     if (await db.get("SELECT 1 FROM users WHERE phone = ?", phone)) fail("This phone number already has an account. Log in, then choose “Become a merchant” in Account.");
     p.phone = phone;
+    const face = b.face ? readFace(b.face) : null;
     const u = await tx(async () => {
       const info = await db.run("INSERT INTO users (name, phone, role, account_type, pin_hash, wallets, created_at, ref_code) VALUES (?, ?, 'customer', 'merchant', ?, '{}', ?, ?)", p.full_name, phone, hashSecret(pin), now(), await newRefCode());
       await db.run("INSERT INTO shops (owner_id, name, profile, sub_until, plan, shop_no, created_at) VALUES (?, ?, ?, ?, 'free', ?, ?)", info.lastInsertRowid, p.business_name, JSON.stringify(p), await freeUntil(), await nextShopNo(), now());
       return await db.get("SELECT * FROM users WHERE id = ?", info.lastInsertRowid);
     });
+    if (face) await storeFace(u.id, face);
     startSession(res, u);
-    send(res, 200, { user: publicUser(u) });
+    send(res, 200, { user: publicUser(face ? await db.get("SELECT * FROM users WHERE id = ?", u.id) : u) });
   });
   // An existing customer becomes a merchant by filling in the same form.
   route("POST", "/api/suuq/become-merchant", async (req, res) => {
     const u = await needRole(req, "customer"), b = await readJson(req);
     if (await shopOf(u.id)) fail("You are already a merchant.");
-    const p = readProfile(b);
+    const p = readProfile(b, (await getSettings()).bizCats, true);
     await tx(async () => {
       await db.run("INSERT INTO shops (owner_id, name, profile, sub_until, plan, shop_no, created_at) VALUES (?, ?, ?, ?, 'free', ?, ?)", u.id, p.business_name, JSON.stringify(p), await freeUntil(), await nextShopNo(), now());
       await db.run("UPDATE users SET account_type = 'merchant' WHERE id = ?", u.id);
@@ -386,7 +394,7 @@ module.exports = function market(ctx) {
   route("PUT", "/api/suuq/shop/profile", async (req, res) => {
     const u = await needRole(req, "customer"), s = await shopOf(u.id), b = await readJson(req);
     if (!s) fail("Open your shop first.");
-    const p = readProfile(b);
+    const p = readProfile(b, (await getSettings()).bizCats, false);
     await db.run("UPDATE shops SET profile = ?, name = ? WHERE id = ?", JSON.stringify(p), p.business_name, s.id);
     send(res, 200, { shop: await publicShop(await shopOf(u.id)) });
   });
@@ -1158,6 +1166,151 @@ module.exports = function market(ctx) {
     send(res, 200, { ok: true });
   });
 
+  /* ---------- Business categories (super admin) ---------- */
+  route("GET", "/api/super/biz-categories", async (req, res) => { await needRole(req, "super"); send(res, 200, { categories: (await getSettings()).bizCats }); });
+  route("PUT", "/api/super/biz-categories", async (req, res) => {
+    await needRole(req, "super"); const b = await readJson(req, 64 * 1024), sv = (await getSettings()).services.map(x => x.id);
+    if (!Array.isArray(b.categories) || b.categories.length > 200) fail("Check the categories list.");
+    const seen = new Set(), out = [];
+    for (const c of b.categories) {
+      const name = String(c?.name || "").trim().slice(0, 40); if (!name) continue;
+      if (name.length < 2) fail("Each category needs a name.");
+      if (seen.has(name.toLowerCase())) fail(`“${name}” is in the list twice.`); seen.add(name.toLowerCase());
+      if (!sv.includes(c.section)) fail(`Choose a section for “${name}”.`);
+      const subs = [...new Set((Array.isArray(c.subs) ? c.subs : String(c.subs || "").split(",")).map(x => String(x).trim().slice(0, 40)).filter(Boolean))].slice(0, 10);
+      out.push({ name, section: c.section, subs });
+    }
+    if (!out.length) fail("Keep at least one category.");
+    const ns = await saveSettings({ bizCats: out });
+    send(res, 200, { categories: ns.bizCats });
+  });
+
+  /* ---------- Internet calls (like WhatsApp): voice goes phone to phone (WebRTC) ---------- */
+  // The server only introduces the two phones: it rings the other person (live, and by a Firebase push when 5PLUS is
+  // closed), passes the connection details between them, and ends the call. The voice itself never passes through it.
+  // A chat with a service (Saba…) rings that service's admins; the first to answer takes the call.
+  const calls = new Map(); // id → call
+  const RING_MS = 45_000;
+  async function callTurn() {
+    const env = process.env.TURN_URLS ? { urls: process.env.TURN_URLS, username: process.env.TURN_USER || "", credential: process.env.TURN_PASS || "" } : null;
+    if (env) return env;
+    const r = await db.get("SELECT value FROM settings WHERE key = 'callturn'"); try { return r ? JSON.parse(r.value) : null; } catch { return null; }
+  }
+  async function iceServers() {
+    const list = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }], t = await callTurn();
+    if (t && t.urls) list.push({ urls: String(t.urls).split(/[\s,]+/).filter(Boolean), username: t.username || "", credential: t.credential || "" });
+    return list;
+  }
+  // Who is calling whom from this chat. A service admin calls the customer from the service's desk.
+  async function callSides(u, convId) {
+    const c = await db.get("SELECT * FROM conversations WHERE id = ?", convId); if (!c) fail("Chat not found.", 404);
+    const p = await db.get("SELECT name FROM products WHERE id = ?", c.product_id);
+    if (c.buyer_id === u.id || c.seller_id === u.id) {
+      const other = u.id === c.buyer_id ? c.seller_id : c.buyer_id, x = await db.get("SELECT name, phone, account_type FROM users WHERE id = ?", other);
+      if (x?.account_type === "service") {
+        const svc = String(x.phone).replace(/^svc-/, ""), sv = (await getSettings()).services.find(v => v.id === svc);
+        let ids = (await db.all("SELECT id FROM users WHERE role = 'admin' AND service = ? AND suspended = 0", svc)).map(r => r.id);
+        if (!ids.length) ids = (await db.all("SELECT id FROM users WHERE role = 'super'")).map(r => r.id);
+        return { c, from_name: u.name, to: ids, to_name: sv?.name || x.name, topic: p?.name || "" };
+      }
+      return { c, from_name: u.name, to: [other], to_name: x?.name || "", topic: p?.name || "" };
+    }
+    // A service admin answering from the desk.
+    if (u.role === "admin" || u.role === "super") {
+      const s = await db.get("SELECT phone, account_type FROM users WHERE id = ?", c.seller_id);
+      const svc = s?.account_type === "service" ? String(s.phone).replace(/^svc-/, "") : null;
+      if (svc && (isSuper(u) || u.service === svc)) {
+        const sv = (await getSettings()).services.find(v => v.id === svc), b = await db.get("SELECT name FROM users WHERE id = ?", c.buyer_id);
+        return { c, from_name: sv?.name || u.name, to: [c.buyer_id], to_name: b?.name || "", topic: p?.name || "" };
+      }
+    }
+    fail("Chat not found.", 404);
+  }
+  const inCall = (k, uid) => k.from === uid || k.callee === uid || (!k.callee && k.to.includes(uid));
+  const busyNow = uid => [...calls.values()].some(k => k.state === "active" && (k.from === uid || k.callee === uid));
+  function callOut(k, uid) {
+    return { id: k.id, conv_id: k.conv_id, state: k.state, caller: k.from === uid, from_name: k.from_name, to_name: k.to_name, topic: k.topic,
+      offer: k.from !== uid ? k.offer : undefined, ice: k.from !== uid ? k.ice_from : k.ice_to, created_at: k.created_at };
+  }
+  function endCall(k, reason, by) {
+    if (!calls.has(k.id)) return;
+    calls.delete(k.id); clearTimeout(k.timer);
+    const everyone = [k.from, ...(k.callee ? [k.callee] : k.to)];
+    broadcast("call", { type: "end", id: k.id, reason }, x => everyone.includes(x.id) && x.id !== by);
+    pushLater(k.callee ? [k.callee] : k.to, { kind: "cancel", tag: "call-" + k.id });
+    if (reason === "missed") pushLater(k.to, { kind: "info", title: "Missed call", body: `${k.from_name} called you on 5PLUS`, goto: "chat:" + k.conv_id, tag: "missed-" + k.id });
+  }
+  route("GET", "/api/call/config", async (req, res) => { await needUser(req); send(res, 200, { iceServers: await iceServers() }); });
+  route("POST", "/api/call/start", async (req, res) => {
+    const u = await needUser(req), b = await readJson(req, 64 * 1024);
+    const sd = await callSides(u, String(b.conv_id || ""));
+    if (!b.offer || b.offer.type !== "offer" || typeof b.offer.sdp !== "string" || b.offer.sdp.length > 20000) fail("The call could not start. Try again.");
+    if (busyNow(u.id)) fail("You are already in a call.");
+    const to = sd.to.filter(id => id !== u.id); if (!to.length) fail("There is nobody to call in this chat.");
+    if (to.length === 1 && busyNow(to[0])) fail(`${sd.to_name} is on another call. Try again later.`);
+    const k = { id: crypto.randomUUID(), conv_id: sd.c.id, from: u.id, from_name: sd.from_name, to, to_name: sd.to_name, topic: sd.topic, callee: null,
+      state: "ringing", offer: { type: "offer", sdp: b.offer.sdp }, ice_from: [], ice_to: [], created_at: now() };
+    k.timer = setTimeout(() => endCall(k, "missed"), RING_MS);
+    calls.set(k.id, k);
+    broadcast("call", { type: "ring", id: k.id, conv_id: k.conv_id, from_name: k.from_name, topic: k.topic }, x => to.includes(x.id));
+    pushLater(to, { kind: "call", title: "Incoming call", body: `${k.from_name} is calling you on 5PLUS${k.topic ? " · " + k.topic : ""}`, goto: "call:" + k.id, tag: "call-" + k.id });
+    send(res, 200, { call: callOut(k, u.id), iceServers: await iceServers() });
+  });
+  route("GET", "/api/call/:id", async (req, res, url, [id]) => {
+    const u = await needUser(req), k = calls.get(id);
+    if (!k || !inCall(k, u.id)) return send(res, 200, { call: null });
+    send(res, 200, { call: callOut(k, u.id), iceServers: await iceServers() });
+  });
+  route("POST", "/api/call/:id/answer", async (req, res, url, [id]) => {
+    const u = await needUser(req), b = await readJson(req, 64 * 1024), k = calls.get(id);
+    if (!k || !inCall(k, u.id) || k.from === u.id) fail("This call has ended.", 404);
+    if (k.state !== "ringing") fail("This call was answered on another phone.");
+    if (!b.answer || b.answer.type !== "answer" || typeof b.answer.sdp !== "string" || b.answer.sdp.length > 20000) fail("The call could not connect.");
+    clearTimeout(k.timer); k.state = "active"; k.callee = u.id; k.answered_at = now();
+    broadcast("call", { type: "answer", id: k.id, answer: { type: "answer", sdp: b.answer.sdp } }, x => x.id === k.from);
+    broadcast("call", { type: "end", id: k.id, reason: "taken" }, x => k.to.includes(x.id) && x.id !== u.id);
+    pushLater(k.to, { kind: "cancel", tag: "call-" + k.id });
+    send(res, 200, { ok: true });
+  });
+  // Connection details (ICE candidates) found by one phone, passed to the other.
+  route("POST", "/api/call/:id/ice", async (req, res, url, [id]) => {
+    const u = await needUser(req), b = await readJson(req, 16 * 1024), k = calls.get(id);
+    if (!k || !inCall(k, u.id)) return send(res, 200, { ok: false });
+    const cand = b.candidate && typeof b.candidate.candidate === "string" && b.candidate.candidate.length < 1000 ? { candidate: b.candidate.candidate, sdpMid: b.candidate.sdpMid ?? null, sdpMLineIndex: b.candidate.sdpMLineIndex ?? null } : null;
+    if (!cand) return send(res, 200, { ok: false });
+    if (k.from === u.id) {
+      if (k.ice_from.length < 60) k.ice_from.push(cand);
+      if (k.callee) broadcast("call", { type: "ice", id: k.id, candidate: cand }, x => x.id === k.callee);
+    } else {
+      if (k.ice_to.length < 60) k.ice_to.push(cand);
+      broadcast("call", { type: "ice", id: k.id, candidate: cand }, x => x.id === k.from);
+    }
+    send(res, 200, { ok: true });
+  });
+  route("POST", "/api/call/:id/end", async (req, res, url, [id]) => {
+    const u = await needUser(req), b = await readJson(req), k = calls.get(id);
+    if (k && inCall(k, u.id)) {
+      // One admin of a service declining doesn't stop the others' phones ringing.
+      if (b.reason === "declined" && k.state === "ringing" && k.from !== u.id && k.to.length > 1) {
+        k.to = k.to.filter(x => x !== u.id); pushLater([u.id], { kind: "cancel", tag: "call-" + k.id });
+      } else endCall(k, k.from === u.id && k.state === "ringing" ? "cancelled" : b.reason === "declined" ? "declined" : "ended", u.id);
+    }
+    send(res, 200, { ok: true });
+  });
+  // TURN server (optional): lets calls connect when both phones are behind strict mobile networks.
+  route("GET", "/api/super/call-settings", async (req, res) => {
+    await needRole(req, "super"); const t = await callTurn();
+    send(res, 200, { urls: t?.urls || "", username: t?.username || "", has_credential: !!t?.credential, fromEnv: !!process.env.TURN_URLS });
+  });
+  route("PUT", "/api/super/call-settings", async (req, res) => {
+    await needRole(req, "super"); const b = await readJson(req);
+    const urls = String(b.urls || "").trim().slice(0, 500), username = String(b.username || "").trim().slice(0, 200);
+    const old = await callTurn(), credential = b.credential ? String(b.credential).slice(0, 200) : old?.credential || "";
+    if (urls && !String(urls).split(/[\s,]+/).filter(Boolean).every(x => /^turns?:[^\s]+$/.test(x))) fail("TURN addresses start with turn: or turns:");
+    await db.run("INSERT INTO settings (key, value) VALUES ('callturn', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", JSON.stringify(urls ? { urls, username, credential } : {}));
+    send(res, 200, { urls, username, has_credential: !!(urls && credential) });
+  });
+
   /* ---------- safe payments (super admin) ---------- */
   // The super admin sees every safe payment; the admin of a part (Suuq, Technician…) sees the ones paid to them.
   const safeScope = u => isSuper(u) ? { sql: "1 = 1", args: [] } : { sql: "o.safe_svc = ?", args: [u.service] };
@@ -1166,11 +1319,11 @@ module.exports = function market(ctx) {
   // Each safe payment, spelled out for the admin: the buyer, the seller's price, and who earns what.
   async function safeRow(o) {
     const aff = o.affiliate_id ? await db.get("SELECT name, phone FROM users WHERE id = ?", o.affiliate_id) : null;
-    const seller = await db.get("SELECT name, phone FROM users WHERE id = ?", o.seller_id);
+    const seller = await db.get("SELECT name, phone, face FROM users WHERE id = ?", o.seller_id), buyer = await db.get("SELECT face FROM users WHERE id = ?", o.buyer_id);
     const svcs = (await getSettings()).services, sec = svcs.find(x => x.id === o.safe_svc);
     const earner = !o.affiliate_id || !(o.commission > 0) ? "none" : o.affiliate_id === o.buyer_id ? "buyer" : "linker";
     return { ...orderRow(o, true), buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, seller_name: seller?.name || "", seller_phone: seller?.phone || "",
-      earner, earner_name: earner === "none" ? "" : earner === "buyer" ? o.buyer_name : aff?.name || "", earner_phone: earner === "linker" ? aff?.phone || "" : "",
+      buyer_id: o.buyer_id, seller_id: o.seller_id, buyer_face: !!buyer?.face, seller_face: !!seller?.face, earner, earner_name: earner === "none" ? "" : earner === "buyer" ? o.buyer_name : aff?.name || "", earner_phone: earner === "linker" ? aff?.phone || "" : "",
       paid_amount: round(o.cur, o.total - (o.pay_discount || 0) + (o.pay_fee || 0)), paid_to: o.safe_svc ? `${sec?.name || o.safe_svc} admin` : "Main money processor", section: o.safe_svc || "" };
   }
   route("GET", "/api/super/safepay", async (req, res, url) => {
@@ -1713,7 +1866,7 @@ module.exports = function market(ctx) {
   route("GET", "/api/scholar/admin/overview", async (req, res) => {
     await needMarketAdmin(req, "scholarship");
     const products = await db.all(`${PROD_SELECT} WHERE p.deleted = 0 AND p.service = 'scholarship' ORDER BY CASE p.approval WHEN 'pending' THEN 0 ELSE 1 END, p.updated_at DESC LIMIT 300`);
-    const shops = await db.all(`SELECT s.*, u.name AS owner_name, u.phone AS owner_phone,
+    const shops = await db.all(`SELECT s.*, u.name AS owner_name, u.phone AS owner_phone, u.face AS owner_face,
         EXISTS (SELECT 1 FROM products p WHERE p.shop_id = s.id AND p.service = 'visa' AND p.deleted = 0) AS has_visa
       FROM shops s JOIN users u ON u.id = s.owner_id ORDER BY s.name`);
     const agencies = shops.map(s => ({ s, pf: JSON.parse(s.profile || "{}") })).filter(({ s, pf }) => pf.travel || s.has_visa || pf.scholar)
@@ -1732,7 +1885,7 @@ module.exports = function market(ctx) {
   });
   route("GET", "/api/suuq/admin/overview", async (req, res) => {
     await needSuuqAdmin(req);
-    const shops = await db.all(`SELECT s.*, u.name AS owner_name, u.phone AS owner_phone,
+    const shops = await db.all(`SELECT s.*, u.name AS owner_name, u.phone AS owner_phone, u.face AS owner_face,
         (SELECT COUNT(*) FROM products p WHERE p.shop_id = s.id AND p.deleted = 0 AND p.service != 'ticket') AS products,
         (SELECT COUNT(*) FROM orders o WHERE o.shop_id = s.id AND o.status = 'completed') AS sales
       FROM shops s JOIN users u ON u.id = s.owner_id ORDER BY s.created_at DESC`);
@@ -1740,7 +1893,7 @@ module.exports = function market(ctx) {
     const orders = await db.all("SELECT status, cur, COUNT(*) AS n, SUM(total) AS total FROM orders GROUP BY status, cur");
     const subs = await db.all("SELECT cur, SUM(amount) AS total FROM wallet_tx WHERE user_id IS NULL AND kind = 'subscription_income' GROUP BY cur");
     send(res, 200, { plans: (await getSettings()).suuq.plans,
-      shops: await Promise.all(shops.map(async s => ({ ...await publicShop(s), owner_name: s.owner_name, owner_phone: s.owner_phone, products: s.products, sales: s.sales }))),
+      shops: await Promise.all(shops.map(async s => ({ ...await publicShop(s), owner_name: s.owner_name, owner_phone: s.owner_phone, owner_id: s.owner_id, owner_face: !!s.owner_face, products: s.products, sales: s.sales }))),
       products: products.map(p => productRow(p)), orders, subs });
   });
   route("PUT", "/api/suuq/admin/plans", async (req, res) => {

@@ -109,7 +109,7 @@ const clearFails = async u => await db.run("UPDATE users SET failed = 0, locked_
 const tooMany = `Too many wrong tries. Try again in ${LOCK_MINUTES} minutes.`;
 
 function publicUser(u) {
-  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, pause: u.pause || "", created_at: u.created_at };
+  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, pause: u.pause || "", has_face: !!u.face, created_at: u.created_at };
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
@@ -167,9 +167,46 @@ function buildUssd(s, wallet, cur, amount) {
 const routes = [];
 const route = (method, pattern, handler) => routes.push({ method, re: new RegExp("^" + pattern.replace(/:\w+/g, "([^/]+)") + "$"), handler });
 
+/* ---------- Face photo: private, only the administration of 5PLUS can see it ---------- */
+// It is kept apart from product photos (never under /media) and is served only to admins and the super admin.
+function readFace(dataUrl) {
+  const m = String(dataUrl || "").match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) fail("Take a photo of your face (JPG, PNG or WebP).");
+  const buf = Buffer.from(m[2], "base64"), t = m[1];
+  const real = t === "jpeg" ? buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff
+    : t === "png" ? buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    : buf.subarray(0, 4).toString("latin1") === "RIFF" && buf.subarray(8, 12).toString("latin1") === "WEBP";
+  if (!real) fail("That file is not a photo. Take a photo of your face.");
+  if (buf.length < 2000) fail("The face photo is too small. Take it again.");
+  if (buf.length > 3 * 1024 * 1024) fail("The face photo must be smaller than 3 MB.");
+  return { file: `face-${crypto.randomUUID()}.${t === "jpeg" ? "jpg" : t}`, buf };
+}
+async function storeFace(userId, face) {
+  const old = await db.get("SELECT face FROM users WHERE id = ?", userId);
+  await db.files.put(face.file, face.buf);
+  await db.run("UPDATE users SET face = ? WHERE id = ?", face.file, userId);
+  if (old?.face) { try { await db.files.del(old.face); } catch {} }
+}
+// The person adds or changes their own face photo (Account).
+route("POST", "/api/me/face", async (req, res) => {
+  const u = await loadUser(req); if (!u) fail("Please log in again.", 401);
+  const b = await readJson(req, 1024 * 1024); await storeFace(u.id, readFace(b.image));
+  send(res, 200, { user: publicUser(await db.get("SELECT * FROM users WHERE id = ?", u.id)) });
+});
+// Only admins and the super admin see a face photo.
+route("GET", "/api/admin/face/:id", async (req, res, url, [id]) => {
+  await needRole(req, "admin", "super");
+  const u = await db.get("SELECT face FROM users WHERE id = ?", Number(id) || 0);
+  const data = u?.face ? await db.files.get(u.face) : null;
+  if (!data) { res.writeHead(404); return res.end(); }
+  const ext = path.extname(u.face).slice(1);
+  res.writeHead(200, { "Content-Type": ext === "jpg" ? "image/jpeg" : "image/" + ext, "Content-Length": data.length, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
+  res.end(data);
+});
+
 route("POST", "/api/auth/signup", async (req, res) => {
   rateLimit(req);
-  const b = await readJson(req);
+  const b = await readJson(req, 1024 * 1024);
   const name = String(b.name || "").trim().slice(0, 80), phone = cleanPhone(b.phone), pin = String(b.pin || "");
   const wallets = {};
   for (const w of WALLETS) { const n = cleanNum(b.wallets?.[w]); if (n) wallets[w] = n; }
@@ -179,7 +216,9 @@ route("POST", "/api/auth/signup", async (req, res) => {
   if (Object.values(wallets).some(n => n.length < 7 || n.length > 12)) fail("Check your wallet numbers.");
   if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
   if (await db.get("SELECT 1 FROM users WHERE phone = ?", phone)) fail("This number already has an account. Log in instead.");
+  const face = b.face ? readFace(b.face) : null;
   const info = await db.run("INSERT INTO users (name, phone, role, pin_hash, wallets, created_at, ref_code) VALUES (?, ?, 'customer', ?, ?, ?, ?)", name, phone, hashSecret(pin), JSON.stringify(wallets), now(), await newRefCode());
+  if (face) await storeFace(info.lastInsertRowid, face);
   const u = await db.get("SELECT * FROM users WHERE id = ?", info.lastInsertRowid);
   startSession(res, u);
   send(res, 200, { user: publicUser(u) });
@@ -669,7 +708,7 @@ route("DELETE", "/api/admin/expenses/:id", async (req, res, url, [id]) => {
 });
 
 /* ---------- wallets, Suuq, chat, affiliates ---------- */
-require("./market")({ hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
+require("./market")({ readFace, storeFace, hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
   crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit });
 
 /* ---------- static files ---------- */
@@ -690,7 +729,7 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "same-origin",
   "X-Frame-Options": "DENY",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
 };
 if (SECURE) SECURITY_HEADERS["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
 

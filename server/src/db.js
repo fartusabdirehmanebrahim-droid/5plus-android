@@ -303,6 +303,7 @@ async function init() {
   await addColumn("orders", "pay_discount", "REAL NOT NULL DEFAULT 0"); // Pay to shop: the buyer's own earning taken off the price
   await addColumn("orders", "buyer_ok", "INTEGER NOT NULL DEFAULT 0"); // Safe payment: the buyer said they received it (the admin releases)
   await addColumn("orders", "book_at", "TEXT NOT NULL DEFAULT ''");
+  await addColumn("users", "face", "TEXT NOT NULL DEFAULT ''"); // private face photo (only admins see it)
   await addColumn("users", "pause", "TEXT NOT NULL DEFAULT ''"); // Salah time or Sleep time: no new orders until the seller turns it off
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")
   await addColumn("messages", "att", "TEXT NOT NULL DEFAULT ''"); // chat attachment: picture, voice message or file (JSON)
@@ -358,7 +359,48 @@ const DEFAULT_SERVICES = [
   { id: "restaurant", name: "Restaurant", sub: "Menu, dinners and sweets", art: "restaurant", visible: true, ready: false, builtIn: true },
 ];
 
+// Business categories a merchant chooses when registering. The super admin edits the list and puts each one under a
+// section (Suuq, Technician, Hotels…). "subs": a second choice (Clothes → Men’s or Women’s).
+const DEFAULT_BIZ_CATS = [
+  {"name": "Supermarket", "section": "suuq", "subs": []},
+  {"name": "Dukan", "section": "suuq", "subs": []},
+  {"name": "Clothes", "section": "suuq", "subs": ["Men’s Clothing", "Women’s Clothing"]},
+  {"name": "Electronics", "section": "suuq", "subs": []},
+  {"name": "Mobile Phones", "section": "suuq", "subs": []},
+  {"name": "Shoes", "section": "suuq", "subs": []},
+  {"name": "Bags", "section": "suuq", "subs": []},
+  {"name": "Cosmetics", "section": "suuq", "subs": []},
+  {"name": "Perfumes", "section": "suuq", "subs": []},
+  {"name": "Jewelry", "section": "suuq", "subs": []},
+  {"name": "Furniture", "section": "suuq", "subs": []},
+  {"name": "Home Appliances", "section": "suuq", "subs": []},
+  {"name": "Restaurant", "section": "restaurant", "subs": []},
+  {"name": "Cafe", "section": "restaurant", "subs": []},
+  {"name": "Bakery", "section": "restaurant", "subs": []},
+  {"name": "Car Spare Parts", "section": "suuq", "subs": []},
+  {"name": "Car Dealership", "section": "suuq", "subs": []},
+  {"name": "Hardware Store", "section": "suuq", "subs": []},
+  {"name": "Building Materials", "section": "suuq", "subs": []},
+  {"name": "Bookshop", "section": "suuq", "subs": []},
+  {"name": "Stationery", "section": "suuq", "subs": []},
+  {"name": "Barber Shop", "section": "technician", "subs": []},
+  {"name": "Beauty Salon", "section": "technician", "subs": []},
+  {"name": "Travel Agency", "section": "ticket", "subs": []},
+  {"name": "Cargo Services", "section": "suuq", "subs": []},
+  {"name": "Computer Shop", "section": "suuq", "subs": []},
+  {"name": "Car Rental", "section": "car-rent", "subs": []},
+  {"name": "Car Wash", "section": "technician", "subs": []},
+  {"name": "Mechanic & Garage", "section": "technician", "subs": []},
+  {"name": "Fuel Station", "section": "suuq", "subs": []},
+  {"name": "Real Estate", "section": "suuq", "subs": []},
+  {"name": "Hotel", "section": "hotels", "subs": []},
+  {"name": "Printing Services", "section": "technician", "subs": []},
+  {"name": "Sports & Fitness", "section": "suuq", "subs": []},
+  {"name": "Toys & Kids Products", "section": "suuq", "subs": []}
+];
+
 const DEFAULT_SETTINGS = {
+  bizCats: DEFAULT_BIZ_CATS,
   services: DEFAULT_SERVICES,
   // Suuq seller subscription plans (set by the Suuq admin). Paid from the seller's wallet; the money is platform income.
   // Where customers send money to top up their wallet: *880*<number>*<amount># (codes per currency, set by the super admin).
@@ -427,6 +469,7 @@ async function getSettings() {
   // Older installs had "1 month / 12 months" plans with no tiers: switch to the tiered plans.
   if (!s.suuq.plans.some(p => p.id === "free")) s.suuq.plans = structuredClone(DEFAULT_SETTINGS.suuq.plans);
   if (Number(saved.earnFeePct) >= 0) s.earnFeePct = Number(saved.earnFeePct);
+  if (Array.isArray(saved.bizCats)) s.bizCats = saved.bizCats;
   s.ticketAdminAgency = Number(saved.ticketAdminAgency) || 0; // the Ticket admin's agency: it gets half of all ticket requests
   if (saved.safePay) s.safePay = { ...s.safePay, ...saved.safePay, codes: { SLSH: { ...s.safePay.codes.SLSH, ...(saved.safePay.codes?.SLSH || {}) }, USD: { ...s.safePay.codes.USD, ...(saved.safePay.codes?.USD || {}) } } };
   if (saved.walletTopup) s.walletTopup = { ...s.walletTopup, ...saved.walletTopup, ussd: { ...s.walletTopup.ussd, ...(saved.walletTopup.ussd || {}) }, numbers: { ...s.walletTopup.numbers, ...(saved.walletTopup.numbers || {}) } };

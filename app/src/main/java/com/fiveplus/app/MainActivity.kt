@@ -344,6 +344,18 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isApp(): Boolean = true
 
+        // Internet calls: the loudspeaker on or off, and back to normal when the call ends.
+        @JavascriptInterface
+        fun callAudio(active: Boolean, speaker: Boolean) {
+            runOnUiThread {
+                val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                am.mode = if (active) android.media.AudioManager.MODE_IN_COMMUNICATION else android.media.AudioManager.MODE_NORMAL
+                @Suppress("DEPRECATION")
+                am.isSpeakerphoneOn = active && speaker
+                volumeControlStream = if (active) android.media.AudioManager.STREAM_VOICE_CALL else android.media.AudioManager.USE_DEFAULT_STREAM_TYPE
+            }
+        }
+
         // Push notifications: the web app sends this phone's address to the server after login ("" = not ready / off).
         @JavascriptInterface
         fun pushToken(): String = prefs.getString("fcmToken", "") ?: ""

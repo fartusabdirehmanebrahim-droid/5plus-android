@@ -409,3 +409,6 @@ ALTER TABLE public.service_docs ADD COLUMN IF NOT EXISTS earn_cur TEXT NOT NULL 
 -- Safe payments go to the admin of each part (Suuq, Technician…); Salah time and Sleep time pause a seller's orders.
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS safe_svc TEXT NOT NULL DEFAULT '';
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS pause TEXT NOT NULL DEFAULT '';
+
+-- Private face photo (only admins can see it).
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS face TEXT NOT NULL DEFAULT '';

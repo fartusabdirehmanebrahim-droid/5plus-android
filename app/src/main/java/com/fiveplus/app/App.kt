@@ -28,13 +28,22 @@ class App : Application() {
             val info = NotificationChannel(CH_INFO, "Updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Prices sent, orders accepted, messages and documents."
             }
-            nm.createNotificationChannel(ring); nm.createNotificationChannel(info)
+            val call = NotificationChannel(CH_CALL, "Calls", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Internet calls from chats. Rings like a phone call."
+                setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
+                    AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 1000, 600, 1000, 600, 1000)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+            nm.createNotificationChannel(ring); nm.createNotificationChannel(info); nm.createNotificationChannel(call)
         }
     }
 
     companion object {
         const val CH_RING = "orders_ring"
         const val CH_INFO = "updates"
+        const val CH_CALL = "calls"
         val pushReady: Boolean get() = BuildConfig.FCM_APP_ID.isNotEmpty()
 
         fun startFirebase(app: Application) {

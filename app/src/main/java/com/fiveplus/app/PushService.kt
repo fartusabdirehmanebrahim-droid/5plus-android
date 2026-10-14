@@ -22,14 +22,17 @@ class PushService : FirebaseMessagingService() {
         val kind = d["kind"] ?: "info"
         val title = d["title"] ?: "5PLUS"
         val body = d["body"] ?: ""
-        val ring = kind == "ring" || kind == "paid"
+        // The call ended (hung up, answered on another phone, or missed): stop the ringing.
+        if (kind == "cancel") { NotificationManagerCompat.from(this).cancel((d["tag"] ?: "").hashCode()); return }
+        val call = kind == "call"
+        val ring = kind == "ring" || kind == "paid" || call
         val open = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("push_goto", d["goto"] ?: "")
         }
         val id = (d["tag"] ?: (title + body)).hashCode()
         val pi = PendingIntent.getActivity(this, id, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val n = NotificationCompat.Builder(this, if (ring) App.CH_RING else App.CH_INFO)
+        val n = NotificationCompat.Builder(this, if (call) App.CH_CALL else if (ring) App.CH_RING else App.CH_INFO)
             .setSmallIcon(R.drawable.ic_stat_5plus)
             .setColor(0xFF0E7A55.toInt())
             .setContentTitle(title)
@@ -43,7 +46,13 @@ class PushService : FirebaseMessagingService() {
         if (ring) {
             n.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)) // Android 7 and older
             n.setVibrate(longArrayOf(0, 800, 400, 800, 400, 800))
-            n.setTimeoutAfter(if (kind == "paid") 10_000L else 25_000L) // stops the ringing, like the in-app alarm
+            n.setTimeoutAfter(if (kind == "paid") 10_000L else if (call) 45_000L else 25_000L) // stops the ringing, like the in-app alarm
+        }
+        // An incoming call: shows over the lock screen where the phone allows it, with an Answer button.
+        if (call) {
+            n.setFullScreenIntent(pi, true)
+            n.addAction(0, "Answer", pi)
+            n.setOngoing(true)
         }
         val built = n.build()
         if (ring) built.flags = built.flags or Notification.FLAG_INSISTENT // keep ringing until answered or timed out

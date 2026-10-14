@@ -48,6 +48,17 @@
           <div class="mini"><label for="push-key">Service account key (JSON)</label><textarea class="input" id="push-key" rows="4" autocomplete="off" spellcheck="false" placeholder='{"type": "service_account", "project_id": "…", …}'></textarea></div>
           <div class="row-actions"><button class="btn btn-primary" id="push-save">Save</button><button class="btn btn-ghost" id="push-test">Send a test alarm to my phone</button><button class="btn btn-ghost" id="push-off">Remove key</button><span class="status-msg" id="st-push"></span></div>
         </div>
+        <div class="panel" id="biz-cats-panel"><div class="empty">Loading…</div></div>
+        <div class="panel" id="call-panel">
+          <div class="panel-head"><div><h3>Internet calls</h3><p>Calls from chats go straight between the two phones over the internet, with no airtime. On some mobile networks the phones can't reach each other directly; a TURN relay server fixes that. Calls work without one, but add one for calls that always connect (for example a free account at metered.ca → TURN server, then paste its address, username and password).</p></div></div>
+          <p class="note" style="margin:0" id="call-state">…</p>
+          <div class="grid2">
+            <div class="mini"><label for="turn-urls">TURN addresses</label><input class="input" id="turn-urls" autocomplete="off" spellcheck="false" placeholder="turn:global.relay.metered.ca:80, turns:global.relay.metered.ca:443"></div>
+            <div class="mini"><label for="turn-user">Username</label><input class="input" id="turn-user" autocomplete="off" spellcheck="false"></div>
+            <div class="mini"><label for="turn-pass">Password</label><input class="input" id="turn-pass" type="password" autocomplete="new-password" placeholder="Leave empty to keep the saved one"></div>
+          </div>
+          <div class="row-actions"><button class="btn btn-primary" id="turn-save">Save</button><span class="status-msg" id="st-turn"></span></div>
+        </div>
         <div class="panel">
           <div class="panel-head"><div><h3>Services on the home page</h3><p>Hide a service to remove it from every customer's home page. Built-in services can be hidden but not deleted.</p></div>
             <div class="row-actions"><span class="status-msg" id="st-svcs"></span><button class="btn btn-primary" id="save-svcs">Save services</button></div></div>

@@ -179,6 +179,34 @@ function vAdminPw() {
     <button class="btn btn-primary btn-block" id="do-adminpw">Log in as admin</button>
   </div>`;
 }
+/* ---------- Face photo at registration: private, only the 5PLUS administration sees it ---------- */
+const FACE_ICON = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+const LOCK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+// account: the person already has an account (Account page); otherwise it is part of a registration form.
+function faceField(account) {
+  const f = account ? "" : S.face, has = account && S.user?.has_face;
+  return `<div class="field face-field"><label>Photo of your face</label>
+    <div class="face-box">
+      <div class="face-pv">${f ? `<img src="${f}" alt="Your face photo">` : has ? `<span class="face-ok">✓</span>` : FACE_ICON}</div>
+      <div class="face-t">
+        <p class="face-private">${LOCK_ICON}<span><b>Private.</b> Only the administration of 5PLUS can see this photo. Buyers, sellers and other users will never see your face.</span></p>
+        <small>We use it only to confirm who you are and to keep everyone safe. Look at the camera in good light, without sunglasses.</small>
+        ${has ? `<small><b>Your face photo is saved.</b></small>` : ""}
+        <div class="face-acts"><label class="btn btn-ghost">${f || has ? "Take a new photo" : "Take photo"}<input type="file" accept="image/*" capture="user" data-face="${account ? "account" : "form"}" hidden></label>
+          <label class="btn-link">Choose from gallery<input type="file" accept="image/jpeg,image/png,image/webp" data-face="${account ? "account" : "form"}" hidden></label></div>
+        <span class="status-msg" id="st-face" role="status"></span>
+      </div></div></div>`;
+}
+function bindFace() {
+  document.querySelectorAll("[data-face]").forEach(i => i.onchange = async () => {
+    const f = i.files[0]; if (!f) return;
+    try {
+      const url = await compressImage(f, 300_000);
+      if (i.dataset.face === "account") { msg("#st-face", "Saving…"); const r = await api("/api/me/face", { body: { image: url } }); S.user = r.user; render(); msg("#st-face", "Saved. Only the administration can see it.", "ok"); }
+      else { if (S.screen === "merchant") SUUQ.keepPf(); S.face = url; S.err = ""; render(); }
+    } catch (e) { msg("#st-face", e.message || "That photo could not be used.", "bad"); }
+  });
+}
 function walletFields(prefix, vals, list) {
   return `<div class="wallet-nums">${list.map(s => `<label class="wnum" for="${prefix}-${s.id}"><img src="${LOGO(s.id)}" alt=""><span>${esc(s.company)}</span><input id="${prefix}-${s.id}" data-w="${s.id}" inputmode="tel" placeholder="${esc(s.name)} number" value="${esc(vals[s.id] || "")}"></label>`).join("")}</div>`;
 }
@@ -205,7 +233,7 @@ function vMerchantSignup() {
         ${rows.map(([l, v]) => `<div class="m-rev-r"><span>${l}</span><b>${dash(v)}</b></div>`).join("")}</div>`).join("")}</div>
       <div class="field"><label for="m-pin">Choose a 4-digit PIN</label>${pinInput("m-pin", m.pin, "new-password")}</div>
       <div class="field"><label for="m-pin2">Enter the PIN again</label>${pinInput("m-pin2", m.pin2, "new-password", "Same PIN again")}</div>`
-      : SUUQ.profileForm(true, k)}
+      : SUUQ.profileForm(true, k) + (k === 1 ? faceField() : "")}
     <div class="err" role="alert" id="m-err">${esc(S.err)}</div>
     <div class="m-nav">
       ${k > 1 ? `<button class="btn btn-ghost" id="m-prev">Back</button>` : ""}
@@ -216,7 +244,7 @@ function vMerchantSignup() {
 }
 function merchantStep(to) {
   const m = S.merchant; SUUQ.keepPf();
-  if (to > m.step) { const e = SUUQ.pfCheck(m.step); if (e) { S.err = e; render(); return; } }
+  if (to > m.step) { const e = SUUQ.pfCheck(m.step) || (m.step === 1 && !S.face ? "Take a photo of your face. Only the administration can see it." : ""); if (e) { S.err = e; render(); return; } }
   S.err = ""; m.step = to; render();
   const v = document.querySelector("#app .view"); if (v) v.scrollTop = 0; window.scrollTo(0, 0);
   const first = document.querySelector("#app input:not([type=hidden]), #app select"); if (first && to < M_STEPS().length) first.focus();
@@ -226,11 +254,12 @@ async function doMerchantSignup() {
   const fail = t => { S.err = t; render(); const e = document.getElementById("m-err"); if (e) e.scrollIntoView({ block: "center" }); };
   // Send the person back to any step that still has a problem.
   for (let s = 1; s < M_STEPS().length; s++) { const e = SUUQ.pfCheck(s); if (e) { m.step = s; return fail(e); } }
+  if (!S.face) { m.step = 1; return fail("Take a photo of your face. Only the administration can see it."); }
   if (m.pin.length !== 4 || m.pin !== m.pin2) return fail("Enter the same 4-digit PIN in both PIN fields.");
   const b = document.getElementById("do-merchant"); if (b) b.disabled = true;
   try {
-    const r = await api("/api/auth/signup-merchant", { body: { profile: SUUQ.pfDraft(), pin: m.pin } });
-    S.merchant = null; SUUQ.resetPf(); await loggedIn(r.user); S.service = "suuq"; SUUQ.state.tab = "sell"; await SUUQ.open("suuq");
+    const r = await api("/api/auth/signup-merchant", { body: { profile: SUUQ.pfDraft(), pin: m.pin, face: S.face } });
+    S.merchant = null; S.face = null; SUUQ.resetPf(); await loggedIn(r.user); S.service = "suuq"; SUUQ.state.tab = "sell"; await SUUQ.open("suuq");
   } catch (e) { m.pin = ""; m.pin2 = ""; fail(e.message); }
 }
 function vSignup() {
@@ -242,6 +271,7 @@ function vSignup() {
     <div class="field"><label for="s-phone">Phone number</label>
       <div class="phone-input"><span>+252</span><input id="s-phone" inputmode="tel" autocomplete="tel" placeholder="63 4123456" value="${esc(s.phone)}"></div></div>
     <div class="field"><label>Your wallet numbers</label>${walletFields("sw", s.wallets, activeServices())}<span class="note">Enter these once. Add every wallet you use (at least two) so you can send between them.</span></div>
+    ${faceField()}
     <div class="field"><label for="s-pin">Choose a 4-digit PIN</label>${pinInput("s-pin", s.pin, "new-password")}</div>
     <div class="field"><label for="s-pin2">Enter the PIN again</label>${pinInput("s-pin2", s.pin2, "new-password", "Same PIN again")}</div>
     <div class="err" role="alert">${esc(S.err)}</div>
@@ -980,6 +1010,7 @@ function vMe() {
   return `<h2 style="font-size:20px">Account</h2>
     <div class="leg"><div class="sum-row"><span>Name</span><b>${esc(S.user.name)}</b></div>
     <div class="sum-row"><span>Phone</span><b class="num">+252 ${esc(S.user.phone)}</b></div></div>
+    ${S.user.role === "customer" ? faceField(true) : ""}
     <div class="field"><label>Your wallet numbers</label><div class="wallet-nums">
       ${have.map(s => `<div class="wnum"><img src="${LOGO(s.id)}" alt=""><span>${esc(s.company)}</span><b class="num" style="padding:7px 0">${esc(w[s.id])}</b></div>`).join("")}
     </div><span class="note">Saved at signup. To change a saved number, contact support.</span></div>
@@ -1043,6 +1074,7 @@ function bindPad(id, fn) { const p = document.getElementById(id); if (p) p.query
 function bind() {
   const on = (id, fn) => { const el = document.getElementById(id); if (el) el.oninput = e => fn(e.target.value); };
   const click = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+  bindFace();
   appEl.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
   appEl.querySelectorAll("[data-svcgo]").forEach(b => b.onclick = () => openService(b.dataset.svcgo));
   bindHubSearch();
@@ -1143,8 +1175,9 @@ async function doAdminPw() {
 async function doSignup() {
   const s = S.signup;
   if (s.pin !== s.pin2) { S.err = "The two PINs don't match. Choose your PIN again."; s.pin = ""; s.pin2 = ""; return render(); }
+  if (!S.face) { S.err = "Take a photo of your face. Only the administration can see it."; return render(); }
   S.busy = true; render();
-  try { const r = await api("/api/auth/signup", { body: { name: s.name, phone: s.phone, pin: s.pin, wallets: s.wallets } }); S.signup = { name: "", phone: "", pin: "", pin2: "", wallets: {} }; await loggedIn(r.user); }
+  try { const r = await api("/api/auth/signup", { body: { name: s.name, phone: s.phone, pin: s.pin, wallets: s.wallets, face: S.face } }); S.signup = { name: "", phone: "", pin: "", pin2: "", wallets: {} }; S.face = null; await loggedIn(r.user); }
   catch (e) { S.err = e.message; s.pin = ""; s.pin2 = ""; }
   S.busy = false; render();
 }
@@ -1175,6 +1208,8 @@ window.__pushOpen = goto => {
     else if (goto === "chats") SUUQ.openChats();
     else if (String(goto).startsWith("chat:")) SUUQ.openChatById(String(goto).slice(5));
   }
+  // An incoming internet call (the notification was tapped).
+  if (String(goto).startsWith("call:")) return SUUQ.CALL.openFromPush(String(goto).slice(5));
   // A part admin opens their safe payments.
   if (S.user.role === "admin" && goto === "safepay") {
     SUUQ.goSafeTab(S.user.service); SUUQ.resetSafe(); renderSvcDash();
@@ -1229,6 +1264,7 @@ function connectEvents() {
   es.addEventListener("tracking", e => { const d = JSON.parse(e.data || "{}"); if (S.trk && S.trk.svc === d.service && S.ytTab === "track" && S.user?.role === "customer") { S.trk.mine = null; if (S.trk.result) api(`/api/track/${encodeURIComponent(d.service)}?code=${encodeURIComponent(S.trk.result.code)}`).then(r => { S.trk.result = r.tracking; render(); }).catch(() => {}); render(); } if (typeof trkAdminReload === "function") trkAdminReload(d.service); });
   es.addEventListener("settings", e => { settings = JSON.parse(e.data); if (S.user?.role === "customer" && !S.sheet) { if (S.service && !hubServices().some(x => x.id === S.service)) S.service = null; render(); } });
   es.addEventListener("logout", () => { S.user = null; S.screen = "login"; S.err = "This account is suspended. Contact support."; es.close(); es = null; render(); });
+  es.addEventListener("call", e => { try { SUUQ.CALL.onEvent(JSON.parse(e.data)); } catch {} });
   es.addEventListener("chat", e => { if (S.user?.role === "customer") SUUQ.onChat(JSON.parse(e.data)); });
   es.addEventListener("order", e => { if (S.user?.role === "customer") SUUQ.onOrder(JSON.parse(e.data)); });
   es.addEventListener("earnings", () => { if (S.user?.role === "customer") SUUQ.onEarnings(); });
@@ -1426,10 +1462,17 @@ async function loadPeople() {
 let searchTimer = null;
 $("#cust-search").oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadPeople, 250); };
 const openPw = {};
+// A person's face photo, for admins only (the server refuses everyone else). Tap to see it bigger.
+function faceAvatar(id, name, has, cls = "") {
+  const L = esc(String(name || "?")[0].toUpperCase());
+  return has && id ? `<button type="button" class="avatar face-av ${cls}" data-facezoom="/api/admin/face/${encodeURIComponent(id)}" data-facename="${esc(name || "")}" aria-label="Face photo of ${esc(name || "")}">${L}<img src="/api/admin/face/${encodeURIComponent(id)}" alt="" loading="lazy"></button>` : `<div class="avatar ${cls}">${L}</div>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-facezoom]"); if (b) { e.preventDefault(); SUUQ.zoom.open([b.dataset.facezoom], 0, b.dataset.facename || "Face photo"); } });
+document.addEventListener("error", e => { if (e.target && e.target.matches && e.target.matches(".face-av img")) e.target.remove(); }, true);
 function personCard(u) {
   const w = u.wallets || {}, admin = u.role === "admin";
   return `<div class="person ${u.suspended ? "susp" : ""}">
-    <div class="person-top"><div class="avatar">${esc((u.name || "?")[0].toUpperCase())}</div>
+    <div class="person-top">${faceAvatar(u.id, u.name, u.has_face)}
       <div class="t"><b>${esc(u.name)}</b><small>+252 ${esc(u.phone)}${admin ? ` · admin of <b>${esc(serviceName(u.service))}</b>` : ""} · joined ${new Date(u.created_at).toLocaleDateString()}${u.role === "customer" ? ` · ${u.requests} request${u.requests === 1 ? "" : "s"}` : ""}${u.locked ? " · locked after wrong tries" : ""}</small></div>
       <span class="pill ${u.suspended ? "susp" : "active"}">${u.suspended ? "Suspended" : "Active"}</span></div>
     ${u.role === "customer" ? `<div class="wchips">${SERVICES.filter(s => w[s.id]).map(s => `<span class="wchip"><img src="${LOGO(s.id)}" alt="">${esc(w[s.id])}</span>`).join("") || `<span class="note">No wallet numbers</span>`}</div>` : ""}
@@ -1573,8 +1616,44 @@ function paintSuperTabs() {
   $("#sup-title").textContent = t[0]; $("#sup-sub").textContent = t[1];
 }
 // Push notifications settings (super admin).
+// Business categories merchants choose from, each under a section (Suuq, Technician…).
+let bizCats = null;
+async function loadBizCats() {
+  const el = document.getElementById("biz-cats-panel"); if (!el) return;
+  if (!bizCats) { try { bizCats = (await api("/api/super/biz-categories")).categories.map(c => ({ ...c, subs: (c.subs || []).join(", ") })); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; } }
+  const secs = (overview?.services || settings.services || []).filter(x => x.id !== "ibedel");
+  el.innerHTML = `<div class="panel-head"><div><h3>Business categories (${bizCats.length})</h3><p>Merchants choose one when they register. Put each category under a section. Choices after a comma become a second question (for example Clothes → Men’s Clothing, Women’s Clothing).</p></div>
+      <div class="row-actions"><span class="status-msg" id="st-bc"></span><button class="btn btn-primary" id="bc-save">Save</button></div></div>
+    ${secs.map(sv => { const rows = bizCats.map((c, i) => [c, i]).filter(([c]) => c.section === sv.id); return rows.length ? `<h4 class="bc-sec">${esc(sv.name)} <span class="pill">${rows.length}</span></h4>
+      <div class="bc-list">${rows.map(([c, i]) => `<div class="bc-row"><input class="input" data-bc="${i}:name" value="${esc(c.name)}" aria-label="Category name" maxlength="40">
+        <select class="input" data-bc="${i}:section" aria-label="Section">${secs.map(x => `<option value="${esc(x.id)}" ${x.id === c.section ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
+        <input class="input" data-bc="${i}:subs" value="${esc(c.subs)}" placeholder="Second choices (optional)" aria-label="Second choices, separated by commas">
+        <button class="icon-btn" data-bcrm="${i}" aria-label="Remove ${esc(c.name)}">✕</button></div>`).join("")}</div>` : ""; }).join("")}
+    <div class="bc-row bc-new"><input class="input" id="bc-name" placeholder="New category" maxlength="40" aria-label="New category name">
+      <select class="input" id="bc-sec" aria-label="Section">${secs.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("")}</select>
+      <input class="input" id="bc-subs" placeholder="Second choices (optional)" aria-label="Second choices"><button class="btn btn-ghost" id="bc-add">Add</button></div>`;
+  const keep = () => el.querySelectorAll("[data-bc]").forEach(i => { const [ix, f] = i.dataset.bc.split(":"); bizCats[+ix][f] = i.value; });
+  el.querySelectorAll("[data-bc]").forEach(i => i.onchange = () => { keep(); if (i.dataset.bc.endsWith(":section")) loadBizCats(); });
+  el.querySelectorAll("[data-bcrm]").forEach(b => b.onclick = () => { keep(); bizCats.splice(+b.dataset.bcrm, 1); loadBizCats(); });
+  $("#bc-add").onclick = () => { keep(); const n = $("#bc-name").value.trim(); if (!n) return $("#bc-name").focus(); bizCats.push({ name: n, section: $("#bc-sec").value, subs: $("#bc-subs").value }); loadBizCats().then(() => msg("#st-bc", "Added. Press Save to keep it.", "")); };
+  $("#bc-save").onclick = async () => { keep();
+    try { bizCats = (await api("/api/super/biz-categories", { method: "PUT", body: { categories: bizCats.map(c => ({ ...c, subs: String(c.subs || "").split(",") })) } })).categories.map(c => ({ ...c, subs: c.subs.join(", ") })); await loadBizCats(); msg("#st-bc", "Saved. New merchants see this list.", "ok"); }
+    catch (e) { msg("#st-bc", e.message, "bad"); } };
+}
+async function loadCallSettings() {
+  const el = document.getElementById("call-state"); if (!el) return;
+  try { const r = await api("/api/super/call-settings");
+    $("#turn-urls").value = r.urls; $("#turn-user").value = r.username;
+    el.textContent = r.urls ? `TURN relay on${r.fromEnv ? " (from the server settings)" : ""}. Calls connect on strict networks too.` : "No TURN relay yet. Calls connect directly when the networks allow it.";
+  } catch (e) { el.textContent = e.message; }
+}
+if (document.getElementById("turn-save")) $("#turn-save").onclick = async () => {
+  try { await api("/api/super/call-settings", { method: "PUT", body: { urls: $("#turn-urls").value, username: $("#turn-user").value, credential: $("#turn-pass").value } }); $("#turn-pass").value = ""; msg("#st-turn", "Saved.", "ok"); loadCallSettings(); }
+  catch (e) { msg("#st-turn", e.message, "bad"); }
+};
 async function loadPush() {
   const el = document.getElementById("push-state"); if (!el) return;
+  loadCallSettings(); loadBizCats();
   try { const r = await api("/api/super/push");
     el.textContent = r.set ? `On · Firebase project ${r.project}${r.fromEnv ? " (from the server settings)" : ""} · ${r.phones} phone${r.phones === 1 ? "" : "s"} registered` : `Off · ${r.phones} phone${r.phones === 1 ? "" : "s"} ready. Paste the key to turn it on.`;
   } catch (e) { el.textContent = e.message; }
@@ -1752,7 +1831,7 @@ async function loadDeskChats(keepOpen) {
   if (keepOpen && deskChat.open) { try { const r = await api(`/api/admin/service-chats/${encodeURIComponent(svc)}/${deskChat.open.id}`); deskChat.open = r.chat; deskChat.msgs = r.messages; } catch {} }
   const o = deskChat.open;
   el.innerHTML = `<div class="panel-head"><div><h3>Customer chats${deskChat.list.some(c => c.unread) ? ` <span class="pill warn">${deskChat.list.reduce((a, c) => a + c.unread, 0)} new</span>` : ""}</h3><p>Customers chat from the Chat tab on the service page. Only admins of this service see these chats.</p></div></div>
-    ${o ? `<div class="desk-thread"><div class="svc-bar"><button class="btn btn-ghost" data-dcback>‹ All chats</button><div style="flex:1;min-width:0"><b>${esc(o.name)}</b><small class="note" style="display:block">+252 ${esc(o.phone)}</small></div>${C.callBtn("+252" + o.phone)}</div>
+    ${o ? `<div class="desk-thread"><div class="svc-bar"><button class="btn btn-ghost" data-dcback>‹ All chats</button><div style="flex:1;min-width:0"><b>${esc(o.name)}</b><small class="note" style="display:block">+252 ${esc(o.phone)}</small></div>${C.callBtn(o.id, o.name, "+252" + o.phone)}</div>
       <div class="msgs" id="desk-msgs">${deskChat.msgs.map(C.msgHtml).join("") || `<div class="empty">No messages yet.</div>`}</div>${C.composerHtml("desk-composer")}</div>`
     : deskChat.list.length ? `<div class="olist">${deskChat.list.map(c => `<button class="ccard" data-dcopen="${esc(c.id)}"><span class="noimg">${esc((c.name || "?")[0].toUpperCase())}</span>
         <span class="t"><b>${esc(c.name)}</b><small>+252 ${esc(c.phone)}</small><small class="last">${c.last.mine ? "You: " : ""}${esc(c.last.body)}</small></span>${c.unread ? `<span class="badge">${c.unread}</span>` : ""}</button>`).join("")}</div>`

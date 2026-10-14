@@ -190,7 +190,7 @@ const SUUQ = (() => {
   async function loadOrders() { try { st.orders = (await api("/api/suuq/orders/mine")).orders; } catch {} }
   async function loadChats() { try { st.chats = (await api("/api/suuq/chats")).chats; } catch {} }
   async function loadShop() {
-    try { const [a, b] = await Promise.all([api("/api/suuq/my-shop"), api("/api/suuq/plans")]); st.shop = a.shop ?? null; st.plans = b.plans; st.countries = b.countries || []; } catch {}
+    try { const [a, b] = await Promise.all([api("/api/suuq/my-shop"), api("/api/suuq/plans")]); st.shop = a.shop ?? null; st.plans = b.plans; st.countries = b.countries || []; st.bizCats = b.categories || []; } catch {}
     if (st.shop) { try { const [p, o] = await Promise.all([api("/api/suuq/seller/products"), api("/api/suuq/seller/orders")]); st.myProducts = p.products; st.sellerOrders = o.orders; } catch {} }
   }
   async function loadAff() { try { st.aff = await api("/api/affiliate"); } catch {} }
@@ -1056,7 +1056,160 @@ const SUUQ = (() => {
     box.querySelectorAll("[data-chatimg]").forEach(b => b.onclick = () => zoom.open([b.dataset.chatimg], 0, "Picture"));
     box.scrollTop = box.scrollHeight;
   }
-  const callBtn = phone => phone ? `<a class="btn btn-ghost chat-call" href="tel:${esc(phone)}" aria-label="Call">${CI.call}Call</a>` : "";
+  // Call: an internet call inside 5PLUS (like WhatsApp), no airtime. If it can't connect, the phone number is offered.
+  const callBtn = (convId, name, phone) => convId ? `<button type="button" class="btn btn-ghost chat-call" data-netcall="${esc(convId)}" data-callname="${esc(name || "")}" data-callphone="${esc(phone || "")}" aria-label="Call ${esc(name || "")}">${CI.call}Call</button>` : "";
+
+  /* ---------- Internet calls ---------- */
+  // Voice goes straight between the two phones (WebRTC). The server rings the other person (and Firebase rings a closed
+  // app), and passes the connection details between the phones.
+  const CALL = (() => {
+    let k = null, box = null, audio = null, tone = null, tick = null, endTimer = null;
+    const IC = {
+      mic: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+      micOff: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V6a3 3 0 0 0-5.9-.7"/><path d="M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3"/></svg>',
+      spk: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+      end: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 9c-3.2 0-6.2.8-8.8 2.3-.8.5-1.1 1.4-.8 2.2l.9 2c.3.7 1.1 1.1 1.9.9l3-.8c.6-.2 1.1-.8 1.1-1.5v-1.6a12 12 0 0 1 5.4 0v1.6c0 .7.5 1.3 1.1 1.5l3 .8c.8.2 1.6-.2 1.9-.9l.9-2c.3-.8 0-1.7-.8-2.2A17.3 17.3 0 0 0 12 9z"/></svg>',
+      ans: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>',
+    };
+    const android = () => window.SarrifAndroid && typeof window.SarrifAndroid.callAudio === "function";
+    const setAudio = (on, spk) => { try { if (android()) window.SarrifAndroid.callAudio(!!on, !!spk); } catch {} };
+    const post = (path, body) => api(path, { body: body || {} });
+    // Sounds: the ring for an incoming call, and the "ringing" tone the caller hears.
+    function playTone(kind) {
+      stopTone();
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)(), g = ctx.createGain(); g.connect(ctx.destination); g.gain.value = 0;
+        const o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+        o1.frequency.value = kind === "ring" ? 880 : 425; o2.frequency.value = kind === "ring" ? 660 : 425;
+        o1.connect(g); o2.connect(g); o1.start(); o2.start();
+        const beat = () => { const t = ctx.currentTime, v = kind === "ring" ? 0.18 : 0.07;
+          if (kind === "ring") { [0, 0.5].forEach(d => { g.gain.setValueAtTime(v, t + d); g.gain.setValueAtTime(0, t + d + 0.35); }); }
+          else { g.gain.setValueAtTime(v, t); g.gain.setValueAtTime(0, t + 1); } };
+        beat(); const iv = setInterval(beat, kind === "ring" ? 2000 : 3000);
+        if (kind === "ring" && navigator.vibrate) navigator.vibrate([800, 400, 800, 400, 800, 400, 800, 400, 800]);
+        tone = { stop() { clearInterval(iv); try { ctx.close(); } catch {} if (navigator.vibrate) navigator.vibrate(0); } };
+      } catch { tone = null; }
+    }
+    function stopTone() { if (tone) { tone.stop(); tone = null; } }
+    const clock = () => { const s = Math.max(0, Math.floor((Date.now() - (k?.start || Date.now())) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+    const STATUS = { starting: "Starting the call…", calling: "Calling…", ringing: "Ringing…", incoming: "Incoming call…", connecting: "Connecting…" };
+    const ENDED = { ended: "Call ended", cancelled: "Call ended", declined: "They declined the call", missed: "No answer", taken: "Answered on another phone", failed: "The call couldn't connect", busy: "On another call", error: "" };
+    function draw() {
+      if (!k) { if (box) { box.remove(); box = null; } return; }
+      if (!box) { box = document.createElement("div"); box.className = "call-ui"; box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); document.body.appendChild(box);
+        box.addEventListener("click", onClick); }
+      box.setAttribute("aria-label", `Call with ${k.name}`);
+      const st = k.state, live = st === "active", ended = st === "ended";
+      const status = ended ? (k.msg || ENDED[k.reason] || "Call ended") : live ? clock() : STATUS[st] || "";
+      box.innerHTML = `<div class="call-top">${LOCK_S}<span>5PLUS call · free over the internet</span></div>
+        <div class="call-who"><div class="call-av ${st === "incoming" || st === "ringing" || st === "calling" ? "pulse" : ""}" aria-hidden="true">${esc((k.name || "?")[0].toUpperCase())}</div>
+          <b data-no-i18n>${esc(k.name || "")}</b><span class="call-st num" aria-live="polite">${esc(status)}</span>${k.topic ? `<small data-no-i18n>${esc(k.topic)}</small>` : ""}
+          ${ended && k.reason === "failed" && k.phone ? `<a class="btn btn-ghost call-phone" href="tel:${esc(k.phone)}">${IC.ans}Call by phone instead</a>` : ""}</div>
+        <div class="call-acts">${st === "incoming"
+          ? `<div class="call-act"><button class="call-b red" data-cl="decline" aria-label="Decline">${IC.end}</button><span>Decline</span></div><div class="call-act"><button class="call-b green" data-cl="answer" aria-label="Answer">${IC.ans}</button><span>Answer</span></div>`
+          : ended ? `<div class="call-act"><button class="call-b grey" data-cl="close" aria-label="Close">✕</button><span>Close</span></div>`
+          : `<div class="call-act"><button class="call-b ${k.muted ? "on" : "grey"}" data-cl="mute" aria-pressed="${!!k.muted}" aria-label="Mute">${k.muted ? IC.micOff : IC.mic}</button><span>${k.muted ? "Unmute" : "Mute"}</span></div>
+             ${android() ? `<div class="call-act"><button class="call-b ${k.speaker ? "on" : "grey"}" data-cl="speaker" aria-pressed="${!!k.speaker}" aria-label="Speaker">${IC.spk}</button><span>Speaker</span></div>` : ""}
+             <div class="call-act"><button class="call-b red" data-cl="hangup" aria-label="End call">${IC.end}</button><span>End</span></div>`}</div>`;
+    }
+    const LOCK_S = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+    function onClick(e) {
+      const b = e.target.closest("[data-cl]"); if (!b || !k) return;
+      const a = b.dataset.cl;
+      if (a === "answer") answer(); else if (a === "decline") { post(`/api/call/${k.id}/end`, { reason: "declined" }).catch(() => {}); finish(null, true, true); }
+      else if (a === "hangup") { if (k.id) post(`/api/call/${k.id}/end`, {}).catch(() => {}); finish("ended", true); }
+      else if (a === "mute") { k.muted = !k.muted; (k.stream?.getAudioTracks() || []).forEach(t => t.enabled = !k.muted); draw(); }
+      else if (a === "speaker") { k.speaker = !k.speaker; setAudio(true, k.speaker); draw(); }
+      else if (a === "close") finish(null, true, true);
+    }
+    async function media() {
+      if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) throw new Error("Internet calls don't work on this phone. Update the app or the phone's browser.");
+      try { return await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+      catch { throw new Error("Allow the microphone to make calls."); }
+    }
+    function makePc(ice) {
+      const pc = new RTCPeerConnection({ iceServers: ice });
+      pc.onicecandidate = e => { if (!e.candidate || !k) return; const c = e.candidate.toJSON(); if (k.id) post(`/api/call/${k.id}/ice`, { candidate: c }).catch(() => {}); else k.outIce.push(c); };
+      pc.ontrack = e => { if (!audio) { audio = document.createElement("audio"); audio.autoplay = true; audio.setAttribute("playsinline", ""); document.body.appendChild(audio); } audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
+      pc.onconnectionstatechange = () => {
+        if (!k || k.pc !== pc) return;
+        if (pc.connectionState === "connected" && k.state !== "active") { k.state = "active"; k.start = Date.now(); stopTone(); clearInterval(tick); tick = setInterval(() => { if (k?.state === "active") { const s = box?.querySelector(".call-st"); if (s) s.textContent = clock(); } }, 1000); draw(); }
+        if (pc.connectionState === "failed") { if (k.id) post(`/api/call/${k.id}/end`, {}).catch(() => {}); finish("failed", true); }
+      };
+      return pc;
+    }
+    function teardown() {
+      stopTone(); clearInterval(tick); tick = null;
+      if (k) { try { k.pc?.close(); } catch {} (k.stream?.getTracks() || []).forEach(t => t.stop()); }
+      if (audio) { audio.srcObject = null; audio.remove(); audio = null; }
+      setAudio(false, false);
+    }
+    // Ends the call on this phone; the screen says why for a moment.
+    function finish(reason, local, now) {
+      if (!k) return;
+      teardown(); clearTimeout(endTimer);
+      if (now || !reason) { k = null; return draw(); }
+      k.state = "ended"; k.reason = reason; k.pc = null; draw();
+      endTimer = setTimeout(() => { if (k && k.state === "ended") { k = null; draw(); } }, reason === "failed" ? 12000 : 2200);
+    }
+    async function start(convId, name, phone) {
+      if (k && k.state !== "ended") return;
+      clearTimeout(endTimer);
+      k = { id: null, convId, name, phone, state: "starting", outIce: [], caller: true }; draw();
+      try {
+        const cfg = await api("/api/call/config");
+        k.stream = await media(); if (!k) return;
+        const pc = k.pc = makePc(cfg.iceServers);
+        k.stream.getTracks().forEach(t => pc.addTrack(t, k.stream));
+        await pc.setLocalDescription(await pc.createOffer({ offerToReceiveAudio: true }));
+        const r = await post("/api/call/start", { conv_id: convId, offer: { type: "offer", sdp: pc.localDescription.sdp } });
+        if (!k || k.pc !== pc) { post(`/api/call/${r.call.id}/end`, {}).catch(() => {}); return; }
+        k.id = r.call.id; k.state = "ringing"; k.topic = r.call.topic;
+        for (const c of k.outIce.splice(0)) post(`/api/call/${k.id}/ice`, { candidate: c }).catch(() => {});
+        setAudio(true, false); playTone("ringback"); draw();
+      } catch (e) { if (k) { k.msg = e.message; finish("error", true); } }
+    }
+    function incoming(d) {
+      if (k && k.state !== "ended") return; // already in a call: it keeps ringing on their other phones, or is missed
+      clearTimeout(endTimer);
+      k = { id: d.id, convId: d.conv_id, name: d.from_name, topic: d.topic, state: "incoming", outIce: [], caller: false };
+      playTone("ring"); draw();
+    }
+    async function answer() {
+      if (!k || k.state !== "incoming") return;
+      stopTone(); k.state = "connecting"; draw();
+      try {
+        const r = await api(`/api/call/${k.id}`);
+        if (!r.call || r.call.state !== "ringing") return finish(r.call ? "taken" : "cancelled", true);
+        k.stream = await media(); if (!k) return;
+        const pc = k.pc = makePc(r.iceServers);
+        k.stream.getTracks().forEach(t => pc.addTrack(t, k.stream));
+        await pc.setRemoteDescription(r.call.offer);
+        for (const c of r.call.ice || []) { try { await pc.addIceCandidate(c); } catch {} }
+        await pc.setLocalDescription(await pc.createAnswer());
+        await post(`/api/call/${k.id}/answer`, { answer: { type: "answer", sdp: pc.localDescription.sdp } });
+        setAudio(true, false);
+      } catch (e) { if (k) { if (k.id) post(`/api/call/${k.id}/end`, {}).catch(() => {}); k.msg = e.message; finish("error", true); } }
+    }
+    // Live news about a call, from the server.
+    async function onEvent(d) {
+      if (d.type === "ring") return incoming(d);
+      if (!k || k.id !== d.id) return;
+      if (d.type === "answer" && k.caller && k.pc) { stopTone(); k.state = "connecting"; draw(); try { await k.pc.setRemoteDescription(d.answer); } catch { finish("failed", true); } }
+      else if (d.type === "ice" && k.pc) { try { await k.pc.addIceCandidate(d.candidate); } catch {} }
+      else if (d.type === "end") finish(d.reason === "cancelled" || d.reason === "ended" ? "ended" : d.reason, false);
+    }
+    // Opened from the "Incoming call" notification.
+    async function openFromPush(id) {
+      try { const r = await api(`/api/call/${encodeURIComponent(id)}`);
+        if (r.call && r.call.state === "ringing" && !r.call.caller) incoming({ id: r.call.id, conv_id: r.call.conv_id, from_name: r.call.from_name, topic: r.call.topic });
+        else if (!k) { k = { name: r.call?.from_name || "", state: "ended", reason: r.call ? "taken" : "missed" }; draw(); endTimer = setTimeout(() => { if (k?.state === "ended") { k = null; draw(); } }, 2500); }
+      } catch {}
+    }
+    document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-netcall]"); if (b) { e.preventDefault(); start(b.dataset.netcall, b.dataset.callname, b.dataset.callphone); } });
+    window.addEventListener("pagehide", () => { if (k && k.id && k.state !== "ended") navigator.sendBeacon?.(`/api/call/${k.id}/end`, new Blob(["{}"], { type: "application/json" })); });
+    return { start, onEvent, openFromPush, get active() { return !!k && k.state !== "ended"; } };
+  })();
   // A small banner when a message arrives while you are somewhere else in the app.
   function msgBanner(m, open) {
     document.getElementById("msg-banner")?.remove();
@@ -1076,7 +1229,7 @@ const SUUQ = (() => {
   function vThread() {
     const c = st.chat;
     return `<div class="view thread-view">
-      <div class="svc-bar">${back("closechat")}<div style="min-width:0;flex:1"><b>${esc(c.with_name)}</b><small class="note" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.product_name)} · only you two can see this chat</small></div>${callBtn(c.with_phone)}</div>
+      <div class="svc-bar">${back("closechat")}<div style="min-width:0;flex:1"><b>${esc(c.with_name)}</b><small class="note" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.product_name)} · only you two can see this chat</small></div>${callBtn(c.id, c.with_name, c.with_phone)}</div>
       <div class="msgs" id="msgs">${st.messages.length ? st.messages.map(msgHtml).join("") : `<div class="empty">Say hello and ask about ${esc(c.product_name)}.</div>`}</div>
       ${composerHtml()}
     </div>`;
@@ -1109,13 +1262,26 @@ const SUUQ = (() => {
   }
   const defaultPlan = () => (paidPlans().find(p => p.id === st.shop?.plan) || paidPlans()[0])?.id;
   // Seller registration form (new sellers fill it in before paying; it can be edited later).
-  const PF_FIELDS = ["full_name", "birth_date", "country", "city", "kind", "business_name", "address", "phone", "zaad_merchant", "edahab_merchant", "shop_phone"];
+  const PF_FIELDS = ["full_name", "birth_date", "country", "city", "kind", "category", "category_sub", "business_name", "address", "phone", "zaad_merchant", "edahab_merchant", "shop_phone"];
   function pfDraft() {
     if (!st.pf) st.pf = { country: "Somaliland", kind: "shop", phone: S.user?.phone || "", full_name: S.user?.name || "", ...(st.shop?.profile || {}) };
     return st.pf;
   }
-  async function loadCountries() { try { const r = await api("/api/suuq/plans"); st.countries = r.countries; st.plans = r.plans; } catch { st.countries = ["Somaliland"]; } }
-  function bindPf(root) { root.querySelectorAll("[data-pfkind]").forEach(b => b.onclick = () => { keepPf(); pfDraft().kind = b.dataset.pfkind; render(); }); }
+  async function loadCountries() { try { const r = await api("/api/suuq/plans"); st.countries = r.countries; st.plans = r.plans; st.bizCats = r.categories || []; } catch { st.countries = ["Somaliland"]; } }
+  // Business categories, grouped under the section the super admin put them in (Suuq, Technician…).
+  function catSelect(d) {
+    const cats = st.bizCats || [], names = Object.fromEntries((settings.services || []).map(x => [x.id, x.name]));
+    const groups = []; for (const c of cats) { let g = groups.find(x => x.id === c.section); if (!g) groups.push(g = { id: c.section, items: [] }); g.items.push(c); }
+    const cur = cats.find(c => c.name === d.category);
+    return `<div class="field"><label for="pf-category">Business category</label><select class="input" id="pf-category" data-pfcat><option value="">Choose your category</option>
+        ${groups.map(g => `<optgroup label="${esc(names[g.id] || g.id)}">${g.items.map(c => `<option value="${esc(c.name)}" ${c.name === d.category ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
+      ${cur && (cur.subs || []).length ? `<div class="field"><label>Which kind?</label><div class="cur-toggle" style="grid-template-columns:repeat(${Math.min(cur.subs.length, 3)},1fr)">${cur.subs.map(x => `<button type="button" data-pfsub="${esc(x)}" aria-pressed="${d.category_sub === x}">${esc(x)}</button>`).join("")}</div><input type="hidden" id="pf-category_sub" value="${esc(d.category_sub || "")}"></div>` : `<input type="hidden" id="pf-category_sub" value="">`}`;
+  }
+  function bindPfCat(root) {
+    root.querySelectorAll("[data-pfcat]").forEach(i => i.onchange = () => { keepPf(); pfDraft().category_sub = ""; render(); const n = document.getElementById("pf-category"); if (n) n.focus(); });
+    root.querySelectorAll("[data-pfsub]").forEach(b => b.onclick = () => { keepPf(); pfDraft().category_sub = b.dataset.pfsub; render(); });
+  }
+  function bindPf(root) { root.querySelectorAll("[data-pfkind]").forEach(b => b.onclick = () => { keepPf(); pfDraft().kind = b.dataset.pfkind; render(); }); bindPfCat(root); }
   function keepPf() { const d = pfDraft(); for (const k of PF_FIELDS) { const el = document.getElementById("pf-" + k); if (el) d[k] = el.value; } }
   // The form is in three parts. The merchant sign-up shows one part per step (step = 1, 2 or 3);
   // everywhere else all three parts are shown together.
@@ -1134,6 +1300,7 @@ const SUUQ = (() => {
         ${f("city", "City", 'maxlength="60" placeholder="Hargeisa"')}</div>`,
       () => `${head(1)}
       <div class="field"><label>Shop or company</label><div class="cur-toggle" style="grid-template-columns:1fr 1fr"><button type="button" class="USD" data-pfkind="shop" aria-pressed="${d.kind === "shop"}">Shop</button><button type="button" class="SLSH" data-pfkind="company" aria-pressed="${d.kind === "company"}">Company</button></div><input type="hidden" id="pf-kind" value="${esc(d.kind)}"></div>
+      ${catSelect(d)}
       ${f("business_name", `Name of the ${biz}`, 'maxlength="60" placeholder="' + (biz === "company" ? "Asha Trading Ltd" : "Asha Electronics") + '"')}
       ${f("address", "Address", 'maxlength="160" placeholder="Street, district"')}`,
       () => `${head(2)}
@@ -1159,6 +1326,10 @@ const SUUQ = (() => {
     }
     if (step === 2) {
       if (!["shop", "company"].includes(d.kind)) return "Choose Shop or Company.";
+      const cat = (st.bizCats || []).find(c => c.name === d.category);
+      // A new merchant must choose one; a shop registered before categories existed may add it later.
+      if ((st.bizCats || []).length && !cat && S.user?.account_type !== "merchant") return "Choose your business category.";
+      if (cat && (cat.subs || []).length && !cat.subs.includes(d.category_sub)) return `Choose the kind of ${cat.name.toLowerCase()}.`;
       if (t("business_name").length < 2) return `Enter the name of your ${d.kind === "company" ? "company" : "shop"}.`;
       if (t("address").length < 4) return "Enter your address.";
     }
@@ -1391,7 +1562,7 @@ const SUUQ = (() => {
     q("[data-editprod]").forEach(b => b.onclick = () => { const p = st.myProducts.find(x => x.id === b.dataset.editprod); st.edit = { ...p, images: [...p.images] }; render(); });
     q("[data-hideprod]").forEach(b => b.onclick = async () => { try { await api(`/api/suuq/products/${b.dataset.hideprod}`, { method: "PUT", body: { hidden: b.dataset.to === "1" } }); } catch {} await loadShop(); render(); });
     const fin = one("sq-fin"); if (fin) mountFinance(fin);
-    q("[data-pfkind]").forEach(b => b.onclick = () => { keepPf(); pfDraft().kind = b.dataset.pfkind; render(); });
+    q("[data-pfkind]").forEach(b => b.onclick = () => { keepPf(); pfDraft().kind = b.dataset.pfkind; render(); }); bindPfCat(root);
     q("[data-tpcur]").forEach(b => b.onclick = () => { st.topup.cur = b.dataset.tpcur; render(); });
     const ta = one("tp-amount");
     if (ta) ta.oninput = () => {
@@ -1679,8 +1850,8 @@ const SUUQ = (() => {
     const subTotal = (a.subs || []).map(r => money(r.total, r.cur)).join(" · ") || "—";
     let body = "";
     if (st.adminTab === "shops") body = `<div class="kpis"><div class="kpi"><span class="label">Sellers</span><b>${a.shops.length}</b></div><div class="kpi"><span class="label">Active shops</span><b>${a.shops.filter(s => s.active).length}</b></div><div class="kpi"><span class="label">Subscription income</span><b style="font-size:15px">${subTotal}</b></div></div>
-      <div class="people">${a.shops.length ? a.shops.map(s => `<div class="person ${s.suspended ? "susp" : ""}"><div class="person-top"><div class="avatar">${esc(s.name[0].toUpperCase())}</div>
-        <div class="t"><b>${esc(s.name)}</b><small>${esc(s.owner_name)} · +252 ${esc(s.owner_phone)} · ${s.products} products · ${s.sales} sales</small></div>
+      <div class="people">${a.shops.length ? a.shops.map(s => `<div class="person ${s.suspended ? "susp" : ""}"><div class="person-top">${faceAvatar(s.owner_id, s.owner_name || s.name, s.owner_face)}
+        <div class="t"><b>${esc(s.name)}</b>${s.profile?.category ? `<span class="cat-tag">${esc(s.profile.category)}${s.profile.category_sub ? " · " + esc(s.profile.category_sub) : ""}</span>` : ""}<small>${esc(s.owner_name)} · +252 ${esc(s.owner_phone)} · ${s.products} products · ${s.sales} sales</small></div>
         <span class="pill ${s.suspended ? "susp" : s.active ? "active" : "waiting"}">${s.suspended ? "Suspended" : s.active ? "Active until " + new Date(s.sub_until).toLocaleDateString() : "Subscription ended"}</span></div>
         <details class="pf-details"><summary>Registration details</summary>${detailRows(s.profile || {}) || `<p class="note">No details.</p>`}</details>
         <div class="person-actions"><button class="btn ${s.suspended ? "btn-primary" : "btn-danger"}" data-shopsusp="${s.id}" data-to="${s.suspended ? 0 : 1}">${s.suspended ? "Reopen shop" : "Suspend shop"}</button></div></div>`).join("") : `<div class="empty">No sellers yet.</div>`}</div>`;
@@ -1736,7 +1907,7 @@ const SUUQ = (() => {
     return `<dl class="safe-facts">
       <div><dt>Buyer</dt><dd><span data-no-i18n>${esc(o.buyer_name)}</span> · <a href="tel:+252${esc(o.buyer_phone)}" class="num">+252 ${esc(o.buyer_phone)}</a></dd></div>
       <div><dt>Item</dt><dd><span data-no-i18n>${esc(o.product_name)}</span> × ${o.qty} · Ref <span class="num">${esc(o.ref)}</span></dd></div>
-      <div><dt>Seller</dt><dd><span data-no-i18n>${esc(o.shop_name)}${o.seller_name && o.seller_name !== o.shop_name ? " · " + esc(o.seller_name) : ""}</span>${o.seller_phone ? ` · <a href="tel:+252${esc(o.seller_phone)}" class="num">+252 ${esc(o.seller_phone)}</a>` : ""}</dd></div>
+      <div><dt>Seller</dt><dd>${o.seller_face ? faceAvatar(o.seller_id, o.seller_name, true, "face-sm") + " " : ""}<span data-no-i18n>${esc(o.shop_name)}${o.seller_name && o.seller_name !== o.shop_name ? " · " + esc(o.seller_name) : ""}</span>${o.seller_phone ? ` · <a href="tel:+252${esc(o.seller_phone)}" class="num">+252 ${esc(o.seller_phone)}</a>` : ""}</dd></div>
       <div><dt>Seller's price</dt><dd>${m(o.total)}${o.qty > 1 ? ` (${money(o.unit_price, o.cur)} × ${o.qty})` : ""}</dd></div>
       <div><dt>Paid</dt><dd>${m(o.paid_amount)} = price ${money(o.total, o.cur)} + charge ${money(o.pay_fee, o.cur)} · to ${esc(o.paid_to)}</dd></div>
       <div><dt>Earning</dt><dd>${earn}</dd></div>
@@ -1746,7 +1917,7 @@ const SUUQ = (() => {
     const tot = Object.entries(heldTotals).map(([c, v]) => money(v, c)).join(" · ");
     return `<div class="panel" id="held-panel"><div class="panel-head"><div><h3>Held safely${heldList.length ? ` <span class="pill warn">${heldList.length}</span>` : ""}</h3>
       <p>Money from Safe payments, kept until the customer has the item. Call the customer, ask if they received it, then release. ${tot ? `Held now: <b class="num">${esc(tot)}</b>` : ""}</p></div></div>
-      <div class="people">${heldList.length ? heldList.map(o => `<div class="person ${o.buyer_ok ? "to-review" : ""}"><div class="person-top"><div class="avatar">${esc((o.buyer_name || "?")[0].toUpperCase())}</div>
+      <div class="people">${heldList.length ? heldList.map(o => `<div class="person ${o.buyer_ok ? "to-review" : ""}"><div class="person-top">${faceAvatar(o.buyer_id, o.buyer_name, o.buyer_face)}
         <div class="t"><b><span data-no-i18n>${esc(o.buyer_name)}</span> · ${money(o.paid_amount, o.cur)}</b><small>${new Date(o.updated_at).toLocaleString()}</small></div>
         <span class="pill ${o.buyer_ok ? "ok" : ""}">${o.buyer_ok ? "Customer says received" : o.status === "delivered" ? "Delivered" : "Paid"}</span></div>
         ${safeFacts(o)}
@@ -1770,7 +1941,7 @@ const SUUQ = (() => {
       ? `When a buyer chooses Safe payment for a <span data-no-i18n>${esc(own.name || "")}</span> item, the whole amount (the seller's price plus the charge) comes to your numbers below. Check you received it, then confirm. Keep it until the customer has the item, then release it in Held safely: the seller gets their price minus the earning, and the earning goes to the buyer or to the person who shared the link.`
       : "Buyers pay the item price plus the charge by USSD: to the admin of that part (Suuq, Technician…) when that admin set their numbers, otherwise to the main money processor. Check the money arrived, then confirm. It is held until the customer has the item, then released from Held safely."}</p></div></div>
         <div class="agent-tabs" role="group"><button data-spt="pending" aria-pressed="${pend}">Pending</button><button data-spt="done" aria-pressed="${!pend}">Done</button></div>
-        <div class="people">${safeList.length ? safeList.map(o => `<div class="person"><div class="person-top"><div class="avatar">${esc((o.buyer_name || "?")[0].toUpperCase())}</div>
+        <div class="people">${safeList.length ? safeList.map(o => `<div class="person"><div class="person-top">${faceAvatar(o.buyer_id, o.buyer_name, o.buyer_face)}
           <div class="t"><b><span data-no-i18n>${esc(o.buyer_name)}</span> · ${money(o.paid_amount, o.cur)}</b><small>Dialled <span class="num">${esc(o.pay_ussd)}</span> · ${new Date(o.updated_at).toLocaleString()}</small></div>
           <span class="pill ${statusTone(o.status)}">${esc(orderLabel(o))}</span></div>
           ${safeFacts(o)}
@@ -1848,7 +2019,7 @@ const SUUQ = (() => {
       <div class="panel"><div class="panel-head"><div><h3>Top up or withdraw for a person</h3><p>Find the person by phone number. Use this after they pay you or collect cash from you.</p></div></div>
         <div class="inline-form"><input class="input" id="wl-phone" inputmode="tel" placeholder="Phone number, e.g. 63 4123456" value="${esc(found?.user?.phone || "")}"><button class="btn btn-primary" id="wl-find">Find</button></div>
         <span class="status-msg" id="st-wl"></span>
-        ${found ? `<div class="leg"><div class="person-top"><div class="avatar">${esc(found.user.name[0].toUpperCase())}</div><div class="t"><b>${esc(found.user.name)}</b><small>+252 ${esc(found.user.phone)} · ${esc(found.user.role)}</small></div></div>
+        ${found ? `<div class="leg"><div class="person-top">${faceAvatar(found.user.id, found.user.name, found.user.has_face)}<div class="t"><b>${esc(found.user.name)}</b><small>+252 ${esc(found.user.phone)} · ${esc(found.user.role)}</small></div></div>
           <div class="wal-cards">${CURS.map(c => `<div class="wal-card ${c}"><span class="label">${c}</span><b class="num">${money(found.balances[c], c)}</b></div>`).join("")}</div>
           <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
             <div class="mini"><label for="wl-type">Action</label><select class="input" id="wl-type"><option value="topup">Top up (add)</option><option value="withdraw">Withdraw (take out)</option></select></div>
@@ -1925,6 +2096,6 @@ const SUUQ = (() => {
   async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { CALL, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; heldList = null; }, state: st };
 })();
