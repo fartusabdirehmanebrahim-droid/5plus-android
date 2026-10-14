@@ -1385,7 +1385,11 @@
   "Pause calls": "ጥሪዎችን አቁም",
   "Enter your 4-digit PIN": "ባለ 4 አሃዝ ፒንዎን ያስገቡ",
   "Confirm": "አረጋግጥ",
-  "Send your earnings": "ገቢዎን ይላኩ"
+  "Send your earnings": "ገቢዎን ይላኩ",
+  "Enter your PIN to place the order": "ትዕዛዙን ለማስገባት ፒንዎን ያስገቡ",
+  "Enter your PIN to place the order.": "ትዕዛዙን ለማስገባት ፒንዎን ያስገቡ።",
+  "Press Top up to pay this amount by phone.": "ይህን መጠን በስልክ ለመክፈል ሙላን ይጫኑ።",
+  "You pay": "የሚከፍሉት"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

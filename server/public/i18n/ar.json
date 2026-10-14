@@ -1385,7 +1385,11 @@
   "Pause calls": "إيقاف المكالمات",
   "Enter your 4-digit PIN": "أدخل رمزك المكون من 4 أرقام",
   "Confirm": "تأكيد",
-  "Send your earnings": "أرسل أرباحك"
+  "Send your earnings": "أرسل أرباحك",
+  "Enter your PIN to place the order": "أدخل رمزك لتقديم الطلب",
+  "Enter your PIN to place the order.": "أدخل رمزك لتقديم الطلب.",
+  "Press Top up to pay this amount by phone.": "اضغط شحن لدفع هذا المبلغ بالهاتف.",
+  "You pay": "ستدفع"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",

@@ -876,7 +876,7 @@ module.exports = function market(ctx) {
       bookAt = `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}`;
     }
     const limited = Number(p.stock) >= 0;
-    if (p.mode === "buy" && !ask && !plan) await needPin(u, b.pin); // paid from the wallet
+    await needPin(u, b.pin); // every order is placed with the PIN
     await tx(async () => {
       // Limited items (hotel rooms…): one is held for this order until it ends.
       if (limited) {

@@ -1384,7 +1384,11 @@
   "Pause calls": "Jooji wicitaanada",
   "Enter your 4-digit PIN": "Geli PIN-kaaga 4-ta god",
   "Confirm": "Xaqiiji",
-  "Send your earnings": "Dir dakhligaaga"
+  "Send your earnings": "Dir dakhligaaga",
+  "Enter your PIN to place the order": "Geli PIN-kaaga si aad u dalbato",
+  "Enter your PIN to place the order.": "Geli PIN-kaaga si aad u dalbato.",
+  "Press Top up to pay this amount by phone.": "Riix Ku shubo si aad lacagtan taleefanka ugu bixiso.",
+  "You pay": "Waxaad bixinaysaa"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

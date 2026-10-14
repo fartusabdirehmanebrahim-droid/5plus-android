@@ -1385,7 +1385,11 @@
   "Pause calls": "Suspendre les appels",
   "Enter your 4-digit PIN": "Entrez votre code à 4 chiffres",
   "Confirm": "Confirmer",
-  "Send your earnings": "Envoyer vos gains"
+  "Send your earnings": "Envoyer vos gains",
+  "Enter your PIN to place the order": "Entrez votre code pour passer la commande",
+  "Enter your PIN to place the order.": "Entrez votre code pour passer la commande.",
+  "Press Top up to pay this amount by phone.": "Appuyez sur Recharger pour payer ce montant par téléphone.",
+  "You pay": "Vous payez"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",

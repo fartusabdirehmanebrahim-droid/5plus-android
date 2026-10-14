@@ -848,7 +848,7 @@ const SUUQ = (() => {
       ${box.method !== "wallet" ? `${o.merchant && o.number ? `<div class="paym-via" role="group" aria-label="Number to pay"><button data-payvia="merchant" aria-pressed="${box.via === "merchant"}">Merchant number</button><button data-payvia="normal" aria-pressed="${box.via === "normal"}">Normal number</button></div>` : ""}
         <div class="summary"><div class="sum-row"><span>Price</span><b class="num">${money(total, cur)}</b></div><div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div>
           ${disc ? `<div class="sum-row earn-row"><span>Your earnings</span><b class="num">− ${money(disc, cur)}</b></div>` : ""}
-          <div class="sum-row total"><span>You dial</span><b class="num">${money(base + fee, cur)}</b></div></div>
+          <div class="sum-row total"><span>You pay</span><b class="num">${money(base + fee, cur)}</b></div></div>
         ${box.method === "safe" ? `<p class="note" style="margin:0">Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.</p>` : ""}` : ""}
     </div>`;
   }
@@ -865,6 +865,8 @@ const SUUQ = (() => {
   const dialNow = code => { if (code) dialUssd(code); };
 
 
+  // Every order is placed with the PIN (the server checks it).
+  const orderPin = os => `<div class="field"><label for="sq-pin">Enter your PIN to place the order</label>${pinInput("sq-pin", os.pin)}</div>`;
   function vOrderSheet(p, os) {
     if (os.done && os.done.status === "awaiting_payment") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
       <h3 style="font-size:20px">Order placed · pay by USSD</h3>
@@ -881,8 +883,8 @@ const SUUQ = (() => {
       <div class="qty"><span>${UNIT_NAME[p.unit] ? UNIT_NAME[p.unit][1] : "Quantity"}</span><button class="icon-btn" data-qty="-1" aria-label="Less">−</button><b class="num">${os.qty}</b><button class="icon-btn" data-qty="1" aria-label="More">+</button></div>
       <div class="field"><label for="sq-note">Note for the seller</label><input class="input" id="sq-note" maxlength="300" value="${esc(os.note || "")}" placeholder="${st.product?.service === "ticket" ? "From, to, travel date and number of people…" : st.market === "visa" ? "Travel dates, number of people…" : st.market === "scholarship" ? "Your level of study and the subject you want…" : "Anything the seller should know"}"></div>
       <p class="note" style="margin:0">The seller sends you the price in My orders. Nothing is paid now.</p>
-      <div class="err" role="alert">${esc(os.err || "")}</div>
-      <button class="btn btn-primary btn-block" data-sq="book">Send request</button>
+      ${orderPin(os)}<div class="err" role="alert">${esc(os.err || "")}</div>
+      <button class="btn btn-primary btn-block" data-sq="book" data-needpin ${(os.pin || "").length === 4 ? "" : "disabled"}>Send request</button>
       <button class="btn btn-ghost btn-block" data-sq="closesheet">Cancel</button></div></div>`;
     const total = p.price * os.qty, bal = st.wallet?.balances?.[p.cur] ?? 0;
     const shopI = shopInfoOf(p, os.qty);
@@ -898,9 +900,11 @@ const SUUQ = (() => {
         ${p.mode === "buy" && wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, p.cur)}</b></div>` : ""}</div>
       ${p.mode === "buy" ? payChooser(os, p.cur, total, p.pay_shop, shopI) : ""}
       ${low ? topupInline(p.cur, total, os) : ""}
-      ${p.mode === "buy" && !wal ? ussdButton(os, p.cur, dialBase(os, total, shopI), "payussd", p.pay_shop) : p.mode === "buy" ? (low ? "" : `<div class="field"><label for="sq-pin">Confirm with your PIN</label>${pinInput("sq-pin", os.pin)}</div><div class="err" role="alert">${esc(os.err || "")}</div>
-        <button class="btn btn-primary btn-block" data-sq="pay" ${(os.pin || "").length === 4 ? "" : "disabled"}>Pay ${money(total, p.cur)}</button>`)
-        : `<div class="err" role="alert">${esc(os.err || "")}</div><button class="btn btn-primary btn-block" data-sq="book">Send booking request</button>`}
+      ${low ? "" : orderPin(os)}
+      ${p.mode === "buy" && !wal ? (os.err && !/PIN/i.test(os.err) ? ussdButton(os, p.cur, dialBase(os, total, shopI), "payussd", p.pay_shop) : `<div class="err" role="alert">${esc(os.err || "")}</div>` + ussdButton({ ...os, err: "" }, p.cur, dialBase(os, total, shopI), "payussd", p.pay_shop).replace("<button ", `<button data-needpin ${(os.pin || "").length === 4 ? "" : "disabled"} `))
+        : p.mode === "buy" ? (low ? "" : `<div class="err" role="alert">${esc(os.err || "")}</div>
+        <button class="btn btn-primary btn-block" data-sq="pay" data-needpin ${(os.pin || "").length === 4 ? "" : "disabled"}>Pay ${money(total, p.cur)}</button>`)
+        : `<div class="err" role="alert">${esc(os.err || "")}</div><button class="btn btn-primary btn-block" data-sq="book" data-needpin ${(os.pin || "").length === 4 ? "" : "disabled"}>Send booking request</button>`}
       <button class="btn btn-ghost btn-block" data-sq="closesheet">Cancel</button></div></div>`;
   }
   function vOrders() {
@@ -935,7 +939,7 @@ const SUUQ = (() => {
       <p class="note" style="margin:0;color:var(--danger)">${bal > 0 ? `Your wallet doesn't have enough ${cur}.` : "Your wallet is empty."} Top up to continue.</p>
       <div class="amount-box"><span>${cur === "USD" ? "$" : "SLSH"}</span><input id="tpi-amount" data-tpicur="${cur}" inputmode="decimal" value="${esc(box.tpAmt)}" aria-label="Top-up amount"></div>
       <a class="btn btn-primary btn-block ${code ? "" : "is-off"}" id="tpi-send" data-tpicur="${cur}" href="${code ? esc(telHref(code)) : "#"}" aria-disabled="${!code}">${SVC_TOPUP}Top up</a>
-      <p class="note" style="margin:0" id="tpi-note">${pend > 0 ? `Waiting for support to confirm <b class="num">${esc(money(pend, cur))}</b>. You can pay as soon as it arrives.` : code ? `Dials <span class="num">${esc(code)}</span>` : "Type the amount, then press Top up."}</p></div>`;
+      <p class="note" style="margin:0" id="tpi-note">${pend > 0 ? `Waiting for support to confirm <b class="num">${esc(money(pend, cur))}</b>. You can pay as soon as it arrives.` : code ? "Press Top up to pay this amount by phone." : "Type the amount, then press Top up."}</p></div>`;
   }
   const SVC_TOPUP = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-inline-end:6px;vertical-align:-3px"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.6a1 1 0 0 1-.25 1z"/></svg>';
   function bindTopupInline(box) {
@@ -946,7 +950,7 @@ const SUUQ = (() => {
       box.tpAmt = inp.value.replace(/[^\d.]/g, ""); if (inp.value !== box.tpAmt) inp.value = box.tpAmt;
       const code = topupCode(cur, box.tpAmt);
       a.href = code ? telHref(code) : "#"; a.classList.toggle("is-off", !code); a.setAttribute("aria-disabled", !code);
-      byId("tpi-note").innerHTML = code ? `Dials <span class="num">${esc(code)}</span>` : "Type the amount, then press Top up.";
+      byId("tpi-note").innerHTML = code ? "Press Top up to pay this amount by phone." : "Type the amount, then press Top up.";
     };
     a.onclick = e => {
       const code = topupCode(cur, box.tpAmt);
@@ -1526,7 +1530,7 @@ const SUUQ = (() => {
     if (st.orderSheet || st.paySheet) bindTopupInline(st.paySheet || st.orderSheet);
     q("[data-paym]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.method = b.dataset.paym; box.err = ""; render(); });
     q("[data-payvia]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.via = b.dataset.payvia; render(); });
-    pinOn("sq-pin", v => { st.orderSheet.pin = v; st.orderSheet.err = ""; }, v => { const b = root.querySelector('[data-sq="pay"]'); if (b) b.disabled = v.length !== 4; }, () => { if ((st.orderSheet.pin || "").length === 4) placeOrder(); });
+    pinOn("sq-pin", v => { st.orderSheet.pin = v; st.orderSheet.err = ""; }, v => root.querySelectorAll("[data-needpin]").forEach(b => b.disabled = v.length !== 4), () => { if ((st.orderSheet.pin || "").length === 4) placeOrder(); });
     bindComposer(one("composer"), sendMsg);
     bindMsgs(one("msgs"));
     // product editor
@@ -1684,10 +1688,10 @@ const SUUQ = (() => {
   }
   async function placeOrder() {
     const p = st.product, os = st.orderSheet;
-    if (p.mode === "buy" && !asksPrice(p) && (os.method || "wallet") === "wallet") {
-      try { await api("/api/auth/check-pin", { body: { pin: os.pin } }); }
-      catch (e) { os.err = e.message; os.pin = ""; return render(); }
-    }
+    // The PIN first, for every order (before the phone dials anything).
+    if ((os.pin || "").length !== 4) { os.err = "Enter your PIN to place the order."; return render(); }
+    try { await api("/api/auth/check-pin", { body: { pin: os.pin } }); }
+    catch (e) { os.err = e.message; os.pin = ""; return render(); }
     if (p.mode === "book") {
       os.bdate = (document.getElementById("sq-bdate") || {}).value || os.bdate || ""; os.btime = (document.getElementById("sq-btime") || {}).value || os.btime || "";
       if (!os.bdate || !os.btime) { os.err = "Choose the date and time you want it."; return render(); }
