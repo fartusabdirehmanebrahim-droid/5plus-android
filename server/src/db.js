@@ -222,6 +222,12 @@ CREATE TABLE IF NOT EXISTS service_docs (
   status     TEXT    NOT NULL DEFAULT 'new',
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS favorites (
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  product_id TEXT    NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, product_id)
+);
 CREATE TABLE IF NOT EXISTS push_tokens (
   token      TEXT    PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES users(id),
@@ -294,6 +300,8 @@ async function init() {
   await addColumn("products", "stock", "INTEGER NOT NULL DEFAULT -1");
   await addColumn("products", "unit", "TEXT NOT NULL DEFAULT ''");
   await addColumn("orders", "reserved", "INTEGER NOT NULL DEFAULT 0"); // a room (or other limited item) is held for this order
+  await addColumn("orders", "pay_discount", "REAL NOT NULL DEFAULT 0"); // Pay to shop: the buyer's own earning taken off the price
+  await addColumn("orders", "buyer_ok", "INTEGER NOT NULL DEFAULT 0"); // Safe payment: the buyer said they received it (the admin releases)
   await addColumn("orders", "from_order", "TEXT NOT NULL DEFAULT ''");
   await addColumn("orders", "forwarded_to", "TEXT NOT NULL DEFAULT ''");
   // Every shop has a shop number people can search for: 1001, 1002 … (more digits once 9999 is used).

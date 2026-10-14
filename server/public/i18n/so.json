@@ -132,7 +132,7 @@
   "Chat not found.": "Wadahadalka lama helin.",
   "Chat on WhatsApp": "Kula hadal WhatsApp",
   "Chat with seller": "La hadal iibiyaha",
-  "Chats": "Wadahadallo",
+  "Chats": "Wada-hadallo",
   "Check the affiliate earning.": "Hubi kasbada wadaagga.",
   "Check the services list.": "Hubi liiska adeegyada.",
   "Check the wallet number.": "Hubi lambarka jeebka.",
@@ -291,7 +291,7 @@
   "Hide visa": "Qari fiisaha",
   "Hide wallet": "Qari jeebka",
   "Hide ▴": "Qari ▴",
-  "History": "Taariikhda",
+  "History": "Taariikh",
   "Hodan Ahmed": "Hodan Ahmed",
   "Homes": "Guryo",
   "I received it": "Waan helay",
@@ -1202,7 +1202,22 @@
   "The files together are bigger than 30 MB. Send fewer at a time.": "Faylasha oo dhan waxay ka weyn yihiin 30 MB. Mar kasta in yar dir.",
   "Documents": "Dukumentiyo",
   "Note (optional), e.g. invoice for my order": "Qoraal (ikhtiyaari), tusaale qaansheegta dalabkayga",
-  "Choose a 4-digit PIN.": "Dooro PIN 4 god ah."
+  "Choose a 4-digit PIN.": "Dooro PIN 4 god ah.",
+  "Pay to the money processor · held safely until you receive it": "U bixi shirkadda lacagta · si ammaan ah ayaa loo hayaa ilaa aad hesho",
+  "Pay straight to the merchant": "Si toos ah ugu bixi ganacsadaha",
+  "Home": "Hoyga",
+  "Favourites": "Kuwa aan jeclahay",
+  "Money transfers": "Lacag dirista",
+  "Your orders and bookings will show here.": "Dalabyadaada iyo ballamahaagu halkan ayay ka muuqan doonaan.",
+  "Tap the heart on any product to save it here.": "Taabo wadnaha alaab kasta si aad halkan ugu kaydiso.",
+  "Add to favourites": "Ku dar kuwa aan jeclahay",
+  "Remove from favourites": "Ka saar kuwa aan jeclahay",
+  "Thank you. Sarrif will check with you and release the payment to the seller.": "Mahadsanid. Sarrif ayaa kula xiriiri doona kadibna lacagta u sii dayn doona iibiyaha.",
+  "Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.": "Taleefankaagu isla markiiba wuxuu garaacayaa shirkadda lacagta. Sarrif ayaa haysa lacagta, wuxuuna u sii daayaa iibiyaha marka uu kaala xaqiijiyo inaad heshay alaabta.",
+  "Pay to shop isn't available for this item right now. Choose another way to pay.": "Ku bixinta dukaanka hadda looma heli karo alaabtan. Dooro hab kale oo lacag bixin.",
+  "Held safely": "Si ammaan ah loo hayo",
+  "Release": "Sii dee",
+  "Nothing is held right now.": "Hadda waxba lama hayo."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
@@ -1377,6 +1392,8 @@
   "Sent. {0} files were received.": "Waa la diray. {0} fayl ayaa la helay.",
   "Sent. {0} file was received.": "Waa la diray. {0} fayl ayaa la helay.",
   "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Marka Sarrif xaqiijiso lacagta, iibiyuhu wuu keenayaa. Lacagta waa la hayaa ilaa aad xaqiijiso inaad heshay.",
-  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Marka iibiyuhu xaqiijiyo lacagta, wuu keenayaa."
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Marka iibiyuhu xaqiijiyo lacagta, wuu keenayaa.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Marka Sarrif xaqiijiso lacagta, iibiyuhu wuu keenayaa. Lacagta waa la hayaa ilaa Sarrif kula xaqiijiso inaad heshay.",
+  "Call +252 {0}": "Wac +252 {0}"
  }
 }

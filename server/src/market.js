@@ -521,6 +521,21 @@ module.exports = function market(ctx) {
     const f = await firstSender(u.id, p.id); return f ? f.ref_code : u.ref_code;
   }
 
+  /* ---------- favourites ---------- */
+  route("GET", "/api/suuq/favorites", async (req, res) => {
+    const u = await needUser(req);
+    const rows = await db.all(`${PROD_SELECT} JOIN favorites f ON f.product_id = p.id WHERE f.user_id = ? AND ${LIVE_T} ORDER BY f.created_at DESC LIMIT 200`, u.id, now());
+    send(res, 200, { products: rows.map(p => shopperRow(p, u, { fav: true })) });
+  });
+  route("POST", "/api/suuq/favorites/:id", async (req, res, url, [id]) => {
+    const u = await needUser(req), b = await readJson(req);
+    if (b.on) {
+      if (!await db.get("SELECT id FROM products WHERE id = ? AND deleted = 0", id)) fail("This product is not available.", 404);
+      if (!await db.get("SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?", u.id, id))
+        await db.run("INSERT INTO favorites (user_id, product_id, created_at) VALUES (?, ?, ?)", u.id, id, now());
+    } else await db.run("DELETE FROM favorites WHERE user_id = ? AND product_id = ?", u.id, id);
+    send(res, 200, { fav: !!b.on });
+  });
   route("GET", "/api/suuq/products/:id", async (req, res, url, [id]) => {
     const u = await needUser(req);
     const p = await db.get(`${PROD_SELECT} WHERE p.id = ? AND p.deleted = 0`, id);
@@ -528,7 +543,11 @@ module.exports = function market(ctx) {
     if (!p || (!live && p.owner_id !== u.id)) fail("This product is not available.", 404);
     if (live && u.role === "customer") await rememberRef(u.id, p, url.searchParams.get("ref"));
     const code = await shareCode(u, p);
-    send(res, 200, { product: shopperRow(p, u, { share_code: code, first_sender: !!code && code !== u.ref_code }) });
+    // Pay to shop: how many items the merchant's wallet can cover the earning for, and whether this buyer earns it.
+    const per = p.mode === "buy" && !p.price_hidden ? COMMISSION(p, 1) : 0, bal = per > 0 ? await balance(p.owner_id, p.cur) : 0;
+    const fav = !!(await db.get("SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?", u.id, p.id));
+    send(res, 200, { product: shopperRow(p, u, { share_code: code, first_sender: !!code && code !== u.ref_code,
+      earn_mine: u.role === "customer" && p.owner_id !== u.id && !!code && code === u.ref_code, shop_cover: per > 0 ? Math.min(100, Math.floor(bal / per + 1e-9)) : 100, fav }) });
   });
 
   async function readProduct(b, existing) {
@@ -642,6 +661,17 @@ module.exports = function market(ctx) {
     return { fee, ussd: ussdOf(useMerchant ? codes.merchant : codes.normal, useMerchant ? nums.merchant : nums.number, total + fee, cur) };
   }
 
+  // Pay to shop: the merchant already gets all the money, so the earning has to come from somewhere.
+  //  "wallet":   the merchant's 5PLUS wallet covers it (taken when the order is finished)
+  //  "discount": the buyer earns it themselves, so they simply pay the price minus their earning
+  //  "none":     someone else would earn it and the merchant's wallet can't cover it: Pay to shop isn't offered
+  async function shopPayMode(sellerId, cur, commission, affId, buyerId) {
+    if (!(commission > 0) || !affId) return "wallet";
+    if (await balance(sellerId, cur) >= commission) return "wallet";
+    return affId === buyerId ? "discount" : "none";
+  }
+  const NO_SHOP_PAY = "Pay to shop isn't available for this item right now. Choose another way to pay.";
+
   /* ---------- orders ---------- */
   const ORDER_SELECT = `SELECT o.*, b.name AS buyer_name, b.phone AS buyer_phone, s.name AS shop_name, p.images AS p_images, p.price AS p_price, p.service AS p_service, p.comm_type AS p_comm_type, p.comm_value AS p_comm_value, s.profile AS shop_profile
     FROM orders o JOIN users b ON b.id = o.buyer_id JOIN shops s ON s.id = o.shop_id JOIN products p ON p.id = o.product_id`;
@@ -652,6 +682,7 @@ module.exports = function market(ctx) {
       created_at: o.created_at, updated_at: o.updated_at, completed_at: o.completed_at, service: o.p_service || "suuq",
       pay_method: o.pay_method || "wallet", pay_fee: o.pay_fee || 0, pay_ussd: o.pay_ussd || "",
       my_earn: !forSeller && o.affiliate_id === o.buyer_id ? o.commission : 0,
+      pay_discount: o.pay_discount || 0, buyer_ok: !!o.buyer_ok,
       pay_vias: o.pay_method === "shop" ? (n => ({ merchant: !!n.merchant, number: !!n.number }))(shopPayNums(o.shop_profile)) : undefined };
     // A hidden-price request: the seller sends the price, then the buyer pays it from the wallet.
     if (o.kind === "buy" && (o.status === "requested" || o.status === "accepted")) r.needs_price = true;
@@ -779,8 +810,14 @@ module.exports = function market(ctx) {
     // Nobody shared it with them: the buyer earns the affiliate earning themselves.
     if (!aff) { const me = await earner(u.ref_code); if (me && me.id === u.id && me.id !== p.owner_id) aff = me.id; }
     const method = PAY_METHODS.includes(b.method) ? b.method : "wallet";
-    const plan = p.mode === "buy" && !ask && method !== "wallet" ? await payPlan(method, b.via, p.cur, total, p.shop_profile) : null;
     const commission = p.mode === "buy" && aff && !ask ? COMMISSION(p, qty) : 0;
+    let discount = 0;
+    if (p.mode === "buy" && !ask && method === "shop") {
+      const mode = await shopPayMode(p.owner_id, p.cur, commission, aff, u.id);
+      if (mode === "none") fail(NO_SHOP_PAY);
+      if (mode === "discount") discount = commission;
+    }
+    const plan = p.mode === "buy" && !ask && method !== "wallet" ? await payPlan(method, b.via, p.cur, round(p.cur, total - discount), p.shop_profile) : null;
     const id = crypto.randomUUID(), ref = "SQ" + crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 7);
     const note = ((chosen ? `Customer chose ${chosen}. ` : "") + String(b.note || "").trim()).slice(0, 300);
     const limited = Number(p.stock) >= 0;
@@ -797,6 +834,7 @@ module.exports = function market(ctx) {
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, ref, p.id, p.shop_id, u.id, p.owner_id, p.mode, p.name, qty, ask ? 0 : p.price, ask ? 0 : total, p.cur, commission, aff,
                   p.mode === "buy" && !ask ? (plan ? "awaiting_payment" : "paid") : "requested", note, now(), now(), plan ? method : "wallet", plan ? plan.fee : 0, plan ? plan.ussd : "");
       if (limited) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
+      if (discount) await db.run("UPDATE orders SET pay_discount = ? WHERE id = ?", discount, id);
     });
     if (plan?.ussd && method === "safe") broadcast("safepay", { new: true, name: u.name, product: p.name, amount: total + plan.fee, cur: p.cur }, x => isSuper(x));
     await pushOrder(id);
@@ -804,7 +842,14 @@ module.exports = function market(ctx) {
   });
   route("GET", "/api/suuq/orders/mine", async (req, res) => {
     const u = await needUser(req);
-    send(res, 200, { orders: (await db.all(`${ORDER_SELECT} WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, u.id)).map(o => orderRow(o, false)) });
+    const rows = await db.all(`${ORDER_SELECT} WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, u.id), out = [];
+    for (const o of rows) {
+      const r = orderRow(o, false);
+      if (o.status === "quoted") r.shop_mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id);
+      if (o.status === "quoted" && r.shop_mode === "discount") r.shop_discount = o.commission;
+      out.push(r);
+    }
+    send(res, 200, { orders: out });
   });
   route("GET", "/api/suuq/seller/orders", async (req, res) => {
     const u = await needRole(req, "customer");
@@ -815,9 +860,16 @@ module.exports = function market(ctx) {
   // Book: requested → accepted (seller) → completed (seller). The seller can decline a request.
   async function complete(o) {
     const net = round(o.cur, o.total - o.commission);
-    if (o.kind === "buy" && o.pay_method !== "shop") {
+    if (o.kind === "buy" && o.pay_method === "safe") {
+      // Safe payment, released by the admin: the seller gets the price minus the earning, and the earning goes
+      // straight to the wallet of whoever shared the link (or the buyer).
+      await ledger(o.seller_id, o.cur, net, "sale", o.ref, `${o.product_name} × ${o.qty}`);
+      if (o.affiliate_id && o.commission > 0) await ledger(o.affiliate_id, o.cur, o.commission, "affiliate", o.ref, `${o.product_name} × ${o.qty}`);
+    } else if (o.kind === "buy" && o.pay_method !== "shop") {
       await ledger(o.seller_id, o.cur, net, "sale", o.ref, `${o.product_name} × ${o.qty}`);
       if (o.affiliate_id && o.commission > 0) await addEarning(o.affiliate_id, o.cur, o.commission, "affiliate", o.ref, `${o.product_name} × ${o.qty}`);
+    } else if (o.kind === "buy" && o.pay_discount > 0) {
+      // Pay to shop with the buyer's own earning taken off the price: nothing more to pay out.
     } else if (o.kind === "buy" && o.affiliate_id && o.commission > 0) {
       // Paid to the shop: the seller already has all the money, so the affiliate earning comes from the seller's wallet.
       await ledger(o.seller_id, o.cur, -o.commission, "affiliate_fee", o.ref, `${o.product_name} × ${o.qty}`);
@@ -853,7 +905,7 @@ module.exports = function market(ctx) {
   // request passed on to another merchant, if any.
   async function orderAction(id, u, b) {
     const action = String(b.action);
-    let fwd = null;
+    let fwd = null, heldPing = false;
     await tx(async () => {
       const o = await db.get("SELECT * FROM orders WHERE id = ?", id);
       if (!o || (o.buyer_id !== u.id && o.seller_id !== u.id)) fail("Order not found.", 404);
@@ -877,9 +929,15 @@ module.exports = function market(ctx) {
           return;
         }
         if (action === "pay" && !seller && o.status === "quoted" && PAY_METHODS.includes(b.method) && b.method !== "wallet") {
-          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(b.method, b.via, o.cur, o.total, shop?.profile);
-          await db.run("UPDATE orders SET status = 'awaiting_payment', pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, updated_at = ? WHERE id = ?",
-            b.method, plan.fee, plan.ussd, o.commission, now(), o.id);
+          let discount = 0;
+          if (b.method === "shop") {
+            const mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id);
+            if (mode === "none") fail(NO_SHOP_PAY);
+            if (mode === "discount") discount = o.commission;
+          }
+          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(b.method, b.via, o.cur, round(o.cur, o.total - discount), shop?.profile);
+          await db.run("UPDATE orders SET status = 'awaiting_payment', pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, updated_at = ? WHERE id = ?",
+            b.method, plan.fee, plan.ussd, o.commission, discount, now(), o.id);
           if (b.method === "safe") broadcast("safepay", { new: true, name: u.name, product: o.product_name, amount: o.total + plan.fee, cur: o.cur }, x => isSuper(x));
           return;
         }
@@ -889,7 +947,7 @@ module.exports = function market(ctx) {
         if (action === "cancel" && !seller && o.status === "awaiting_payment") return await set("cancelled");
         // Try again: dial once more, with the merchant number or the normal number.
         if (action === "retry" && !seller && o.status === "awaiting_payment") {
-          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(o.pay_method, b.via, o.cur, o.total, shop?.profile);
+          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(o.pay_method, b.via, o.cur, round(o.cur, o.total - (o.pay_discount || 0)), shop?.profile);
           await db.run("UPDATE orders SET pay_fee = ?, pay_ussd = ?, updated_at = ? WHERE id = ?", plan.fee, plan.ussd, now(), o.id);
           if (o.pay_method === "safe") broadcast("safepay", {}, x => isSuper(x));
           return;
@@ -902,6 +960,10 @@ module.exports = function market(ctx) {
         if (action === "decline" && seller && ["requested", "accepted", "quoted"].includes(o.status)) { await set("declined"); fwd = await forward(o); return; }
         if (action === "cancel" && !seller && ["requested", "accepted", "quoted"].includes(o.status)) return await set("cancelled");
         if (action === "deliver" && seller && o.status === "paid") return await set("delivered");
+        // Safe payment: the money stays held until the admin releases it (after calling the customer).
+        if (action === "received" && !seller && (o.status === "paid" || o.status === "delivered") && o.pay_method === "safe") {
+          await db.run("UPDATE orders SET buyer_ok = 1, updated_at = ? WHERE id = ?", now(), o.id); heldPing = true; return;
+        }
         if (action === "received" && !seller && (o.status === "paid" || o.status === "delivered")) return await complete(o);
         if (action === "cancel" && o.status === "paid") { await refund(); return await set(seller ? "cancelled_by_seller" : "cancelled"); }
       } else {
@@ -930,6 +992,7 @@ module.exports = function market(ctx) {
     });
     await pushOrder(id);
     if (fwd) await pushOrder(fwd);
+    if (heldPing) broadcast("safepay", {}, x => isSuper(x));
     return fwd;
   }
   route("POST", "/api/suuq/orders/:id/action", async (req, res, url, [id]) => {
@@ -1077,6 +1140,35 @@ module.exports = function market(ctx) {
     broadcast("safepay", {}, x => isSuper(x));
     send(res, 200, { ok: true });
   });
+  // Held safely: Safe payments the admin confirmed. The admin calls the customer, asks if they received it, then releases:
+  // the seller gets the price minus the earning, and the earning goes to the wallet of whoever shared the link (or the buyer).
+  route("GET", "/api/super/held", async (req, res) => {
+    await needRole(req, "super");
+    const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND o.status IN ('paid', 'delivered') ORDER BY o.buyer_ok DESC, o.updated_at DESC LIMIT 200`);
+    const out = [];
+    for (const o of rows) {
+      const aff = o.affiliate_id ? await db.get("SELECT name, phone FROM users WHERE id = ?", o.affiliate_id) : null;
+      const seller = await db.get("SELECT name, phone FROM users WHERE id = ?", o.seller_id);
+      out.push({ ...orderRow(o, true), buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, seller_name: seller?.name || "", seller_phone: seller?.phone || "",
+        earner_name: aff ? (o.affiliate_id === o.buyer_id ? "the buyer" : aff.name) : "", earner_phone: aff?.phone || "" });
+    }
+    const totals = {}; for (const o of rows) totals[o.cur] = round(o.cur, (totals[o.cur] || 0) + o.total);
+    send(res, 200, { orders: out, totals });
+  });
+  route("POST", "/api/super/held/:id/release", async (req, res, url, [id]) => {
+    await needRole(req, "super");
+    await tx(async () => {
+      const o = await db.get("SELECT * FROM orders WHERE id = ?", id);
+      if (!o || o.pay_method !== "safe") fail("Order not found.", 404);
+      if (!["paid", "delivered"].includes(o.status)) fail("This order was already released or ended.");
+      await complete(o);
+      if (o.reserved) { await db.run("UPDATE orders SET reserved = 0 WHERE id = ?", o.id); await db.run("UPDATE products SET stock = stock + 1 WHERE id = ? AND stock >= 0", o.product_id); }
+    });
+    await pushOrder(id);
+    broadcast("safepay", {}, x => isSuper(x));
+    send(res, 200, { ok: true });
+  });
+
   route("PUT", "/api/super/safepay-settings", async (req, res) => {
     await needRole(req, "super");
     const b = await readJson(req), merchant = digits(b.merchant), number = digits(b.number), codes = {};

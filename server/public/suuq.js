@@ -428,7 +428,7 @@ const SUUQ = (() => {
       body: `${what}<br>${esc(money(o.total, o.cur))}${o.pay_method && o.pay_method !== "wallet" ? ` · ${esc(PAY_NAME[o.pay_method])}` : ""}`,
       actions: [{ label: "See order", cls: "btn-primary", fn: goSellerOrders }] });
     else if (o.status === "awaiting_payment" && o.pay_method === "shop") alarm.show({ key: o.id + o.status, secs: 10, tone: "paid", title: "A buyer is paying you",
-      body: `${what}<br>${esc(money(o.total + o.pay_fee, o.cur))} · ${esc(PAY_NAME.shop)}. Confirm when the money arrives.`,
+      body: `${what}<br>${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))} · ${esc(PAY_NAME.shop)}. Confirm when the money arrives.`,
       actions: [{ label: "See order", cls: "btn-primary", fn: goSellerOrders }] });
   }
   function ringChat(m) {
@@ -570,7 +570,7 @@ const SUUQ = (() => {
     if (o.status === "requested") alarm.show({ key: "d" + o.id + o.status, secs: 25, tone: "staff", title: "New service request", body: what,
       actions: [{ label: "Accept", cls: "btn-primary", fn: () => deskAction(o.desk, o.id, "accept") }, { label: "Reject", cls: "btn-danger", fn: () => deskAction(o.desk, o.id, "decline") }] });
     else if (o.status === "paid") alarm.show({ key: "d" + o.id + o.status, secs: 10, tone: "staff", title: "Service order paid", body: `${what}<br>${esc(money(o.total, o.cur))} · money held`, actions: [{ label: "OK", cls: "btn-primary", fn: null }] });
-    else if (o.status === "awaiting_payment" && o.pay_method === "shop") alarm.show({ key: "d" + o.id + o.status, secs: 10, tone: "staff", title: "A customer is paying you", body: `${what}<br>${esc(money(o.total + o.pay_fee, o.cur))}. Confirm when the money arrives.`, actions: [{ label: "OK", cls: "btn-primary", fn: null }] });
+    else if (o.status === "awaiting_payment" && o.pay_method === "shop") alarm.show({ key: "d" + o.id + o.status, secs: 10, tone: "staff", title: "A customer is paying you", body: `${what}<br>${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))}. Confirm when the money arrives.`, actions: [{ label: "OK", cls: "btn-primary", fn: null }] });
   }
 
   /* ---------- top-up by USSD ---------- */
@@ -789,6 +789,7 @@ const SUUQ = (() => {
       ${cs.length ? `<div class="country-chips" role="group" aria-label="Countries"><button data-vcountry="" aria-pressed="${!st.visaCountry}">🌍 All countries</button>${cs.map(c => `<button data-vcountry="${esc(c.name)}" aria-pressed="${st.visaCountry === c.name}">${countryTag(c.name)} <span>${c.n}</span></button>`).join("")}</div>` : ""}
       ${st.products.length ? (visa ? `<div class="hlist">${st.products.map(visaCard).join("")}</div>` : `<div class="pgrid">${st.products.map(productCard).join("")}</div>`) : `<div class="empty">${st.q ? "Nothing matches your search." : visa ? "No visas yet. Sellers will post them here soon." : scholar ? "No scholarships yet. Travel agencies will post them here soon." : "No products yet. Sellers will post here soon."}</div>`}`;
   }
+  const HEART = '<svg width="22" height="22" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.9 4.5 6.7 4.5c2.2 0 3.6 1.3 5.3 3.3 1.7-2 3.1-3.3 5.3-3.3 3.8 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>';
   function vProduct() {
     const p = st.product, mine = p.seller_id === S.user.id, os = st.orderSheet;
     const code = S.user.ref_code;
@@ -799,7 +800,7 @@ const SUUQ = (() => {
         <button class="gal-zoom" data-zoomimg="cur" aria-label="Zoom photo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M10.5 7.5v6M7.5 10.5h6"/></svg></button></div>` : ""}
       ${p.images.length > 1 ? `<div class="thumbs" role="group" aria-label="Photos">${p.images.map((src, i) => `<button data-thumb="${i}" aria-label="Show photo ${i + 1}" aria-current="${i === 0}"><img src="${esc(src)}" alt=""></button>`).join("")}</div>` : ""}
       ${videoEmbed(p.video)}
-      <div>${hasCountry(p.service) && p.country ? `<span class="visa-country big">${countryTag(p.country)}</span>` : ""}<div class="ptitle-row"><h2 style="font-size:21px">${esc(p.name)}</h2>${ttButton(p, "tt-btn")}</div><div class="price ${p.price == null ? "hidden-price" : "num"}" style="font-size:22px">${esc(priceText(p))}</div>
+      <div>${hasCountry(p.service) && p.country ? `<span class="visa-country big">${countryTag(p.country)}</span>` : ""}<div class="ptitle-row"><h2 style="font-size:21px">${esc(p.name)}</h2>${mine ? "" : `<button class="fav-btn" data-fav="${esc(p.id)}" aria-pressed="${!!p.fav}" aria-label="${p.fav ? "Remove from favourites" : "Add to favourites"}">${HEART}</button>`}${ttButton(p, "tt-btn")}</div><div class="price ${p.price == null ? "hidden-price" : "num"}" style="font-size:22px">${esc(priceText(p))}</div>
         ${mine && p.price_hidden ? `<small class="note">Price hidden: customers see “${esc(p.price_label)}”.</small>` : ""}
         <small class="note">Sold by <button class="link-btn" data-openshop="${esc(p.shop_id)}">${esc(p.shop_name)}${p.shop_no ? ` (no. ${esc(p.shop_no)})` : ""}</button> · ${asksPrice(p) ? "Ask for the price, then pay from your wallet" : p.mode === "buy" ? "Buy now, pay from your wallet" : "Book now, pay the seller later"}</small></div>
       ${p.description ? `<p style="margin:0;white-space:pre-wrap">${esc(p.description)}</p>` : ""}
@@ -820,24 +821,35 @@ const SUUQ = (() => {
     shop: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9"/><path d="M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11z"/><path d="M5 13v7h14v-7"/><path d="M10 20v-4h4v4"/></svg>',
   };
   const payFeeOf = (cur, amt) => { for (const r of settings.tiers?.[cur] || []) if (r.upTo == null || amt <= Number(r.upTo)) { const f = Number(r.fee) || 0; return cur === "SLSH" ? Math.round(f) : f; } return 0; };
-  function payOptions(payShop) {
-    const sp = settings.safePay || {}, ps = payShop || {};
-    return { wallet: { merchant: false, number: false, ok: true }, safe: { merchant: !!sp.merchant, number: !!sp.number, ok: !!(sp.merchant || sp.number) }, shop: { merchant: !!ps.merchant, number: !!ps.number, ok: !!(ps.merchant || ps.number) } };
+  // Pay to shop: { mode: "wallet" | "discount" | "none", discount }. "none": the merchant's wallet can't cover the
+  // earning of the person who shared the link, so Pay to shop isn't offered. "discount": the buyer earns it, so they
+  // pay the price minus their earning.
+  function shopInfoOf(p, qty) {
+    const per = Number(p.earn) || 0;
+    if (!(per > 0) || p.price == null || qty <= (p.shop_cover ?? 100)) return { mode: "wallet", discount: 0 };
+    return p.earn_mine ? { mode: "discount", discount: Math.round(per * qty * 100) / 100 } : { mode: "none", discount: 0 };
   }
-  function payChooser(box, cur, total, payShop) {
-    const opts = payOptions(payShop);
+  const dialBase = (box, total, shop) => box.method === "shop" && shop?.mode === "discount" ? Math.max(0, total - shop.discount) : total;
+  function payOptions(payShop, shop) {
+    const sp = settings.safePay || {}, ps = payShop || {};
+    return { wallet: { merchant: false, number: false, ok: true }, safe: { merchant: !!sp.merchant, number: !!sp.number, ok: !!(sp.merchant || sp.number) }, shop: { merchant: !!ps.merchant, number: !!ps.number, ok: !!(ps.merchant || ps.number) && shop?.mode !== "none" } };
+  }
+  function payChooser(box, cur, total, payShop, shop) {
+    const opts = payOptions(payShop, shop);
     if (!box.method || !opts[box.method].ok) box.method = "wallet";
     const bal = st.wallet?.balances?.[cur] ?? 0;
-    const sub = { wallet: `Balance ${money(bal, cur)} · held safely until you receive it`, safe: "Pay by USSD to the money processor · held safely until you receive it", shop: "Pay by USSD straight to the merchant" };
+    const sub = { wallet: `Balance ${money(bal, cur)} · held safely until you receive it`, safe: "Pay to the money processor · held safely until you receive it", shop: "Pay straight to the merchant" };
     const o = opts[box.method];
     if (box.method !== "wallet") { if (!box.via || !o[box.via === "normal" ? "number" : "merchant"]) box.via = o.merchant ? "merchant" : "normal"; }
-    const fee = payFeeOf(cur, total);
+    const disc = box.method === "shop" && shop?.mode === "discount" ? shop.discount : 0, base = Math.max(0, total - disc);
+    const fee = payFeeOf(cur, base);
     return `<div class="paym" role="radiogroup" aria-label="How do you want to pay?"><b class="paym-h">How do you want to pay?</b>
       ${["wallet", "safe", "shop"].filter(m => opts[m].ok).map(m => `<button class="paym-opt" role="radio" data-paym="${m}" aria-checked="${box.method === m}"><span class="paym-ic ${m}">${PAY_IC[m]}</span><span class="paym-t"><b>${PAY_NAME[m]}</b><small>${sub[m]}</small></span><span class="paym-dot" aria-hidden="true"></span></button>`).join("")}
       ${box.method !== "wallet" ? `${o.merchant && o.number ? `<div class="paym-via" role="group" aria-label="Number to pay"><button data-payvia="merchant" aria-pressed="${box.via === "merchant"}">Merchant number</button><button data-payvia="normal" aria-pressed="${box.via === "normal"}">Normal number</button></div>` : ""}
         <div class="summary"><div class="sum-row"><span>Price</span><b class="num">${money(total, cur)}</b></div><div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div>
-          <div class="sum-row total"><span>You dial</span><b class="num">${money(total + fee, cur)}</b></div></div>
-        ${box.method === "safe" ? `<p class="note" style="margin:0">Your phone dials the money processor straight away. Sarrif confirms the money arrived and holds it; the seller gets it when you confirm you received the item.</p>` : ""}` : ""}
+          ${disc ? `<div class="sum-row earn-row"><span>Your earnings</span><b class="num">− ${money(disc, cur)}</b></div>` : ""}
+          <div class="sum-row total"><span>You dial</span><b class="num">${money(base + fee, cur)}</b></div></div>
+        ${box.method === "safe" ? `<p class="note" style="margin:0">Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.</p>` : ""}` : ""}
     </div>`;
   }
   // The order didn't go through: show the error, then Try again with the merchant number or the normal number.
@@ -856,7 +868,7 @@ const SUUQ = (() => {
   function vOrderSheet(p, os) {
     if (os.done && os.done.status === "awaiting_payment") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
       <h3 style="font-size:20px">Order placed · pay by USSD</h3>
-      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it." : "When the seller confirms the money arrived, they deliver."}</p>
+      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it." : "When the seller confirms the money arrived, they deliver."}</p>
       <p class="note" style="margin:0">Ref <span class="num">${esc(os.done.ref)}</span></p></div>
       <button class="btn btn-ghost btn-block" data-sq="myorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closesheet">Keep shopping</button></div></div>`;
     if (os.done) return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
@@ -873,7 +885,8 @@ const SUUQ = (() => {
       <button class="btn btn-primary btn-block" data-sq="book">Send request</button>
       <button class="btn btn-ghost btn-block" data-sq="closesheet">Cancel</button></div></div>`;
     const total = p.price * os.qty, bal = st.wallet?.balances?.[p.cur] ?? 0;
-    if (p.mode === "buy" && (!os.method || !payOptions(p.pay_shop)[os.method].ok)) os.method = "wallet";
+    const shopI = shopInfoOf(p, os.qty);
+    if (p.mode === "buy" && (!os.method || !payOptions(p.pay_shop, shopI)[os.method].ok)) os.method = "wallet";
     const wal = os.method === "wallet", low = p.mode === "buy" && wal && bal < total;
     return `<div class="sheet"><div class="sheet-card">
       <h3 style="font-size:19px">${p.mode === "buy" ? "Buy" : "Book"} ${esc(p.name)}</h3>
@@ -881,9 +894,9 @@ const SUUQ = (() => {
       <div class="field"><label for="sq-note">${p.unit === "night" ? "Check-in date and number of guests" : String(p.service).startsWith("svc:") ? "Where and when, and what you need" : p.mode === "buy" ? "Delivery address or note" : "Date, time or note for the seller"}</label><input class="input" id="sq-note" maxlength="300" value="${esc(os.note || "")}"></div>
       <div class="summary"><div class="sum-row total"><span>Total</span><b class="num">${money(total, p.cur)}</b></div>
         ${p.mode === "buy" && wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, p.cur)}</b></div>` : ""}</div>
-      ${p.mode === "buy" ? payChooser(os, p.cur, total, p.pay_shop) : ""}
+      ${p.mode === "buy" ? payChooser(os, p.cur, total, p.pay_shop, shopI) : ""}
       ${low ? topupInline(p.cur, total, os) : ""}
-      ${p.mode === "buy" && !wal ? ussdButton(os, p.cur, total, "payussd", p.pay_shop) : p.mode === "buy" ? (low ? "" : `<div class="field"><label for="sq-pin">Confirm with your PIN</label>${pinInput("sq-pin", os.pin)}</div><div class="err" role="alert">${esc(os.err || "")}</div>
+      ${p.mode === "buy" && !wal ? ussdButton(os, p.cur, dialBase(os, total, shopI), "payussd", p.pay_shop) : p.mode === "buy" ? (low ? "" : `<div class="field"><label for="sq-pin">Confirm with your PIN</label>${pinInput("sq-pin", os.pin)}</div><div class="err" role="alert">${esc(os.err || "")}</div>
         <button class="btn btn-primary btn-block" data-sq="pay" ${(os.pin || "").length === 4 ? "" : "disabled"}>Pay ${money(total, p.cur)}</button>`)
         : `<div class="err" role="alert">${esc(os.err || "")}</div><button class="btn btn-primary btn-block" data-sq="book">Send booking request</button>`}
       <button class="btn btn-ghost btn-block" data-sq="closesheet">Cancel</button></div></div>`;
@@ -896,14 +909,15 @@ const SUUQ = (() => {
         <div class="orow"><span class="pill ${statusTone(o.status)}">${esc(orderLabel(o))}</span><b class="num">${o.needs_price ? "—" : money(o.total, o.cur)}</b></div>
         ${o.offer_desc ? `<small class="onote">${esc(o.offer_desc)}</small>` : ""}
         ${o.my_earn > 0 ? `<span class="earn">${o.status === "completed" ? `You earned ${esc(money(o.my_earn, o.cur))} · added to your earnings` : ["cancelled", "cancelled_by_seller", "declined", "payment_rejected"].includes(o.status) ? "" : `You earn ${esc(money(o.my_earn, o.cur))} when you confirm you received it`}</span>` : ""}
-        ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · <span class="num">${esc(money(o.total + o.pay_fee, o.cur))}</span></small>` : ""}
+        ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · <span class="num">${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))}</span>${o.pay_discount ? ` · your earnings ${esc(money(o.pay_discount, o.cur))} taken off` : ""}</small>` : ""}
         ${o.status === "awaiting_payment" ? `<small class="note">${o.pay_method === "safe" ? "Sarrif confirms the money arrived, then the seller delivers." : "The seller confirms the money arrived, then delivers."}</small>` : ""}
         ${o.status === "payment_rejected" ? `<small class="note" style="color:var(--danger)">${o.pay_method === "safe" ? "Sarrif didn't receive this payment. Contact support if you paid." : "The seller didn't receive this payment. Chat with them if you paid."}</small>` : ""}
         <div class="req-actions">
           ${o.status === "awaiting_payment" ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">Cancel</button>` : ""}
           ${o.status === "quoted" ? `<button class="btn btn-primary" data-payorder="${o.id}">Pay ${money(o.total, o.cur)}</button>` : ""}
           ${o.kind === "buy" && ["requested", "accepted", "quoted"].includes(o.status) ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">${o.status === "requested" ? "Cancel" : "Reject"}</button>` : ""}
-          ${o.kind === "buy" && ["paid", "delivered"].includes(o.status) ? `<button class="btn btn-primary" data-oact="received" data-oid="${o.id}">${String(o.service).startsWith("svc:") ? "Work finished · I received it" : "I received it"}</button>` : ""}
+          ${o.kind === "buy" && ["paid", "delivered"].includes(o.status) && o.pay_method === "safe" && o.buyer_ok ? `<small class="note">Thank you. Sarrif will check with you and release the payment to the seller.</small>`
+            : o.kind === "buy" && ["paid", "delivered"].includes(o.status) ? `<button class="btn btn-primary" data-oact="received" data-oid="${o.id}">${String(o.service).startsWith("svc:") ? "Work finished · I received it" : "I received it"}</button>` : ""}
           ${(o.kind === "buy" && o.status === "paid") || (o.kind === "book" && ["requested", "accepted"].includes(o.status)) ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">Cancel${o.kind === "buy" && o.pay_method !== "shop" ? " and refund" : ""}</button>` : ""}
           <button class="btn btn-ghost" data-chat="${esc(o.product_id)}">Chat</button>
         </div></div></div>`).join("")}</div>${vPaySheet()}`;
@@ -945,14 +959,15 @@ const SUUQ = (() => {
     const ps = st.paySheet; if (!ps) return "";
     const o = st.orders.find(x => x.id === ps.id); if (!o) return "";
     const bal = st.wallet?.balances?.[o.cur] ?? 0;
-    if (!ps.method || !payOptions(ps.pay_shop)[ps.method].ok) ps.method = "wallet";
+    const shopI = { mode: o.shop_mode || "wallet", discount: o.shop_discount || 0 };
+    if (!ps.method || !payOptions(ps.pay_shop, shopI)[ps.method].ok) ps.method = "wallet";
     const wal = ps.method === "wallet", low = wal && bal < o.total;
     return `<div class="sheet"><div class="sheet-card">
       <h3 style="font-size:19px">Pay for ${esc(o.product_name)} × ${o.qty}</h3>
       <div class="summary"><div class="sum-row total"><span>Price from the seller</span><b class="num">${money(o.total, o.cur)}</b></div>
         ${wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, o.cur)}</b></div>` : ""}</div>
-      ${payChooser(ps, o.cur, o.total, ps.pay_shop)}
-      ${!wal ? ussdButton(ps, o.cur, o.total, "payquotedussd", ps.pay_shop) : low ? topupInline(o.cur, o.total, ps)
+      ${payChooser(ps, o.cur, o.total, ps.pay_shop, shopI)}
+      ${!wal ? ussdButton(ps, o.cur, dialBase(ps, o.total, shopI), "payquotedussd", ps.pay_shop) : low ? topupInline(o.cur, o.total, ps)
         : `<p class="note" style="margin:0">The money is held safely until you confirm you received it.</p>
         <div class="field"><label for="pay-pin">Confirm with your PIN</label>${pinInput("pay-pin", ps.pin)}</div><div class="err" role="alert">${esc(ps.err || "")}</div>
         <button class="btn btn-primary btn-block" id="pay-go" ${(ps.pin || "").length === 4 ? "" : "disabled"}>Pay ${money(o.total, o.cur)}</button>`}
@@ -1175,7 +1190,7 @@ const SUUQ = (() => {
           <div class="req-actions"><button class="btn btn-ghost" data-chat-seller="${esc(o.product_id)}" data-buyer="${esc(o.buyer_name)}">Chat with buyer</button><button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button></div></div>` : ""}
         ${o.status === "quoted" ? `<small class="note">Waiting for the buyer to pay. You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}.</small>` : ""}
         ${o.kind === "buy" && !o.needs_price && o.status !== "quoted" ? `<small class="note">You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}</small>` : ""}
-        ${o.kind === "buy" && o.pay_method !== "wallet" ? `<small class="note">${esc(PAY_NAME[o.pay_method])}${o.pay_ussd ? ` · <span class="num">${esc(o.pay_ussd)}</span> (${esc(money(o.total + o.pay_fee, o.cur))})` : ""}${o.pay_method === "shop" ? " · paid to you directly" : ""}</small>` : ""}
+        ${o.kind === "buy" && o.pay_method !== "wallet" ? `<small class="note">${esc(PAY_NAME[o.pay_method])}${o.pay_ussd ? ` · <span class="num">${esc(o.pay_ussd)}</span> (${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))})` : ""}${o.pay_method === "shop" ? " · paid to you directly" : ""}</small>` : ""}
         ${o.status === "awaiting_payment" && o.pay_method === "safe" ? `<small class="note">Waiting for Sarrif to confirm the buyer's payment. Don't deliver yet.</small>` : ""}
         <div class="req-actions">
           ${o.status === "awaiting_payment" && o.pay_method === "shop" ? `<button class="btn btn-primary" data-oact="money_received" data-oid="${o.id}">Money received</button><button class="btn btn-ghost" data-oact="decline" data-oid="${o.id}">Not received</button>` : ""}
@@ -1201,6 +1216,11 @@ const SUUQ = (() => {
     q("[data-openshop]").forEach(b => b.onclick = () => openShop(Number(b.dataset.openshop)));
     q("[data-viewprod]").forEach(b => b.onclick = async () => { await openProduct(b.dataset.viewprod); render(); });
     q("[data-share]").forEach(b => b.onclick = () => copy(shareLink(b.dataset.share, codeFor(b.dataset.share)), b, "Link copied"));
+    q("[data-fav]").forEach(b => b.onclick = async () => {
+      const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.setAttribute("aria-label", on ? "Remove from favourites" : "Add to favourites");
+      if (st.product && st.product.id === b.dataset.fav) st.product.fav = on;
+      try { await api(`/api/suuq/favorites/${encodeURIComponent(b.dataset.fav)}`, { body: { on } }); } catch { b.setAttribute("aria-pressed", !on); if (st.product) st.product.fav = !on; }
+    });
     bindTikTok(root);
     const ews = one("ew-save"); if (ews) ews.onclick = async () => {
       try { const r = await api("/api/earnings/limit", { method: "PUT", body: { USD: one("ew-usd").value.replace(/[^\d.]/g, ""), SLSH: one("ew-slsh").value.replace(/[^\d]/g, "") } }); st.aff.withdraw_at = r.withdraw_at; render(); }
@@ -1331,6 +1351,7 @@ const SUUQ = (() => {
       st.product = null; st.orderSheet = null;
       if (st.fromTicket) { st.fromTicket = false; S.service = "ticket"; render(); return; }
       if (st.fromSvc) { S.service = st.fromSvc; st.fromSvc = null; render(); return; }
+      if (st.fromFavs) { st.fromFavs = false; S.service = "favs"; render(); return; }
       if (st.fromHub && !st.shopView) { st.fromHub = false; S.service = null; render(); return; } // back to the search results
       await loadProducts(); render(); return;
     }
@@ -1588,12 +1609,39 @@ const SUUQ = (() => {
   let topupsTab = "pending", topups = null, tpCfg = null, safeTab = "pending", safeList = null, spCfg = null;
   // Safe payments: buyers dial the money processor; the super admin confirms the money arrived (then it is held until
   // the buyer confirms they received the item) or says it never came.
+  // Held safely: Safe payments Sarrif is holding. The admin calls the customer, asks if they received the item (or
+  // the work is finished), then releases: the seller gets the price minus the earning, the earning goes to the wallet
+  // of whoever shared the link (or the buyer).
+  const ICON_CALL = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>';
+  let heldList = null, heldTotals = {};
+  function heldPanel() {
+    const tot = Object.entries(heldTotals).map(([c, v]) => money(v, c)).join(" · ");
+    return `<div class="panel" id="held-panel"><div class="panel-head"><div><h3>Held safely${heldList.length ? ` <span class="pill warn">${heldList.length}</span>` : ""}</h3>
+      <p>Money from Safe payments, kept until the customer has the item. Call the customer, ask if they received it, then release. ${tot ? `Held now: <b class="num">${esc(tot)}</b>` : ""}</p></div></div>
+      <div class="people">${heldList.length ? heldList.map(o => `<div class="person ${o.buyer_ok ? "to-review" : ""}"><div class="person-top"><div class="avatar">${esc((o.buyer_name || "?")[0].toUpperCase())}</div>
+        <div class="t"><b>${esc(o.buyer_name)} · ${money(o.total, o.cur)}</b><small>${esc(o.product_name)} × ${o.qty} · ${esc(o.shop_name)} · Ref ${esc(o.ref)}<br>
+          Seller gets <b class="num">${money(o.net, o.cur)}</b>${o.commission > 0 ? ` · earning <b class="num">${money(o.commission, o.cur)}</b> to ${esc(o.earner_name)}${o.earner_phone && o.earner_name !== "the buyer" ? " (+252 " + esc(o.earner_phone) + ")" : ""}` : ""}</small></div>
+        <span class="pill ${o.buyer_ok ? "ok" : ""}">${o.buyer_ok ? "Customer says received" : o.status === "delivered" ? "Delivered" : "Paid"}</span></div>
+        <div class="person-actions"><a class="btn btn-ghost" href="tel:+252${esc(o.buyer_phone)}">${ICON_CALL}Call +252 ${esc(o.buyer_phone)}</a>
+          <button class="btn btn-primary" data-release="${esc(o.id)}">Release</button></div></div>`).join("")
+        : `<div class="empty">Nothing is held right now.</div>`}</div><span class="status-msg" id="st-held"></span></div>`;
+  }
+  function bindHeldPanel() {
+    const el = document.getElementById("held-panel"); if (!el) return;
+    el.querySelectorAll("[data-release]").forEach(b => b.onclick = async () => {
+      const o = heldList.find(x => x.id === b.dataset.release); if (!o) return;
+      if (!confirm(`Release ${money(o.total, o.cur)} for ${o.product_name}? Do this only after the customer told you they received it.`)) return;
+      b.disabled = true;
+      try { await api(`/api/super/held/${o.id}/release`, { body: {} }); heldList = null; await renderSuperWallets(); msg("#st-held", "Released. The seller and the earner have the money in their wallets.", "ok"); }
+      catch (e) { b.disabled = false; msg("#st-held", e.message, "bad"); }
+    });
+  }
   function safePanel() {
     const pend = safeTab === "pending", c = spCfg?.codes || {};
     return `<div class="panel" id="safe-panel"><div class="panel-head"><div><h3>Safe payments</h3><p>Buyers pay the item price plus the charge to the money processor by USSD. Check the processor received it, then confirm. The money is held and reaches the seller's wallet when the buyer confirms they received the item.</p></div></div>
         <div class="agent-tabs" role="group"><button data-spt="pending" aria-pressed="${pend}">Pending</button><button data-spt="done" aria-pressed="${!pend}">Done</button></div>
         <div class="people">${safeList.length ? safeList.map(o => `<div class="person"><div class="person-top"><div class="avatar">${esc((o.buyer_name || "?")[0].toUpperCase())}</div>
-          <div class="t"><b>${esc(o.buyer_name)} · ${money(o.total + o.pay_fee, o.cur)}</b><small>+252 ${esc(o.buyer_phone)} · ${esc(o.product_name)} × ${o.qty} · ${esc(o.shop_name)} · Ref ${esc(o.ref)}<br>Price ${money(o.total, o.cur)} + charge ${money(o.pay_fee, o.cur)} · dialled <span class="num">${esc(o.pay_ussd)}</span> · ${new Date(o.updated_at).toLocaleString()}</small></div>
+          <div class="t"><b>${esc(o.buyer_name)} · ${money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur)}</b><small>+252 ${esc(o.buyer_phone)} · ${esc(o.product_name)} × ${o.qty} · ${esc(o.shop_name)} · Ref ${esc(o.ref)}<br>Price ${money(o.total, o.cur)} + charge ${money(o.pay_fee, o.cur)} · dialled <span class="num">${esc(o.pay_ussd)}</span> · ${new Date(o.updated_at).toLocaleString()}</small></div>
           <span class="pill ${statusTone(o.status)}">${esc(orderLabel(o))}</span></div>
           ${o.status === "awaiting_payment" ? `<div class="person-actions"><button class="btn btn-primary" data-spok="${esc(o.id)}">Money received · confirm</button><button class="btn btn-danger" data-spno="${esc(o.id)}">Not received</button></div>` : ""}</div>`).join("") : `<div class="empty">${pend ? "No safe payments waiting." : "Nothing yet."}</div>`}</div>
         <span class="status-msg" id="st-sp"></span>
@@ -1623,6 +1671,7 @@ const SUUQ = (() => {
   async function renderSuperWallets() {
     const el = document.getElementById("sup-wallets"); if (!el) return;
     if (!safeList) { try { const r = await api("/api/super/safepay?status=" + safeTab); safeList = r.orders; spCfg = r.settings; } catch { safeList = []; } }
+    if (!heldList) { try { const r = await api("/api/super/held"); heldList = r.orders; heldTotals = r.totals || {}; } catch { heldList = []; } }
     if (!income) { try { income = await api("/api/super/income"); } catch { income = { balances: {}, customerMoney: {}, tx: [] }; } }
     if (!topups) { try { const r = await api("/api/super/topups?status=" + topupsTab); topups = r.topups; tpCfg = r.settings; } catch { topups = []; } }
     const pend = topupsTab === "pending";
@@ -1659,6 +1708,7 @@ const SUUQ = (() => {
           ${CURS.map(c => `<div class="kpi"><span class="label">In customer wallets ${c}</span><b>${money(income.customerMoney[c] || 0, c)}</b></div>`).join("")}</div>
         <div class="hist">${income.tx.map(t => `<div class="hist-item"><div class="t"><b>${esc(t.label)}</b><small>${new Date(t.created_at).toLocaleString()} · ${esc(t.note)}</small></div><div class="a num" style="color:var(--green)">+${money(t.amount, t.cur)}</div></div>`).join("") || `<div class="empty">No income yet.</div>`}</div></div>`;
     el.insertAdjacentHTML("afterbegin", safePanel()); bindSafePanel();
+    el.insertAdjacentHTML("afterbegin", heldPanel()); bindHeldPanel();
     el.querySelectorAll("[data-tpt]").forEach(b => b.onclick = () => { topupsTab = b.dataset.tpt; topups = null; renderSuperWallets(); });
     const decide = async (id, d) => {
       try { const r = await api(`/api/super/topups/${id}/${d}`, { body: {} }); topups = null; income = null; await renderSuperWallets(); msg("#st-tp", d === "approve" ? (r.subscribed ? "Released. Money added and the shop was renewed." : "Released. Money added to the wallet.") : "Rejected.", "ok"); }
@@ -1703,10 +1753,11 @@ const SUUQ = (() => {
   async function shareTicket(pid, btn) { try { const p = (await api("/api/suuq/products/" + encodeURIComponent(pid))).product; await copy(shareLink(pid, p.share_code), btn, "Link copied"); } catch {} }
   const earnLabel = (type, value, cur = "USD") => Number(value) > 0 ? `Earn ${type === "percent" ? value + "%" : money(value, cur)} by sharing` : "";
   // From a push notification: the customer's orders, or the chats list.
+  async function openFavProduct(pid) { st.fromFavs = true; st.tab = "shop"; st.shopView = null; st.chat = null; S.service = "suuq"; await Promise.all([openProduct(pid), loadWallet()]); render(); }
   async function openMyOrders() { S.service = "suuq"; S.drawer = false; st.tab = "orders"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
-    get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; }, state: st };
+  return { openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+    get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; heldList = null; }, state: st };
 })();

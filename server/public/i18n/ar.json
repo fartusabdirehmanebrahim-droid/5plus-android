@@ -1203,7 +1203,22 @@
   "The files together are bigger than 30 MB. Send fewer at a time.": "الملفات معاً أكبر من 30 ميغابايت. أرسل عدداً أقل في كل مرة.",
   "Documents": "المستندات",
   "Note (optional), e.g. invoice for my order": "ملاحظة (اختياري)، مثلاً فاتورة طلبي",
-  "Choose a 4-digit PIN.": "اختر رمزاً من 4 أرقام."
+  "Choose a 4-digit PIN.": "اختر رمزاً من 4 أرقام.",
+  "Pay to the money processor · held safely until you receive it": "ادفع لمعالج الأموال · محفوظ بأمان حتى تستلم",
+  "Pay straight to the merchant": "ادفع مباشرة للتاجر",
+  "Home": "الرئيسية",
+  "Favourites": "المفضلة",
+  "Money transfers": "تحويلات الأموال",
+  "Your orders and bookings will show here.": "ستظهر طلباتك وحجوزاتك هنا.",
+  "Tap the heart on any product to save it here.": "اضغط على القلب في أي منتج لحفظه هنا.",
+  "Add to favourites": "أضف إلى المفضلة",
+  "Remove from favourites": "إزالة من المفضلة",
+  "Thank you. Sarrif will check with you and release the payment to the seller.": "شكراً. سيتواصل معك Sarrif ثم يحرر المبلغ للبائع.",
+  "Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.": "يتصل هاتفك بمعالج الأموال فوراً. يحتفظ Sarrif بالمال ويحرره للبائع بعد التأكد منك أنك استلمت المنتج.",
+  "Pay to shop isn't available for this item right now. Choose another way to pay.": "الدفع للمتجر غير متاح لهذا المنتج الآن. اختر طريقة دفع أخرى.",
+  "Held safely": "محفوظ بأمان",
+  "Release": "حرّر",
+  "Nothing is held right now.": "لا شيء محفوظ الآن."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",
@@ -1378,6 +1393,8 @@
   "Sent. {0} files were received.": "تم الإرسال. تم استلام {0} ملفات.",
   "Sent. {0} file was received.": "تم الإرسال. تم استلام {0} ملف.",
   "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "هاتفك يتصل لدفع {0}. عندما يؤكد Sarrif وصول المال، يسلّم البائع. يُحتفظ بالمال حتى تؤكد استلامك.",
-  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "هاتفك يتصل لدفع {0}. عندما يؤكد البائع وصول المال، يسلّم."
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "هاتفك يتصل لدفع {0}. عندما يؤكد البائع وصول المال، يسلّم.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it.": "هاتفك يتصل لدفع {0}. عندما يؤكد Sarrif وصول المال، يسلّم البائع. يُحتفظ بالمال حتى يتحقق Sarrif معك من الاستلام.",
+  "Call +252 {0}": "اتصل +252 {0}"
  }
 }

@@ -1203,7 +1203,22 @@
   "The files together are bigger than 30 MB. Send fewer at a time.": "Les fichiers dépassent 30 Mo au total. Envoyez-en moins à la fois.",
   "Documents": "Documents",
   "Note (optional), e.g. invoice for my order": "Note (facultatif), ex. facture de ma commande",
-  "Choose a 4-digit PIN.": "Choisissez un code PIN à 4 chiffres."
+  "Choose a 4-digit PIN.": "Choisissez un code PIN à 4 chiffres.",
+  "Pay to the money processor · held safely until you receive it": "Payez au processeur de paiement · gardé en sécurité jusqu'à réception",
+  "Pay straight to the merchant": "Payez directement au commerçant",
+  "Home": "Accueil",
+  "Favourites": "Favoris",
+  "Money transfers": "Transferts d'argent",
+  "Your orders and bookings will show here.": "Vos commandes et réservations apparaîtront ici.",
+  "Tap the heart on any product to save it here.": "Touchez le cœur d'un produit pour l'enregistrer ici.",
+  "Add to favourites": "Ajouter aux favoris",
+  "Remove from favourites": "Retirer des favoris",
+  "Thank you. Sarrif will check with you and release the payment to the seller.": "Merci. Sarrif vérifiera avec vous puis versera le paiement au vendeur.",
+  "Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.": "Votre téléphone appelle aussitôt le processeur. Sarrif garde l'argent et le remet au vendeur après avoir vérifié avec vous la réception.",
+  "Pay to shop isn't available for this item right now. Choose another way to pay.": "Le paiement au magasin n'est pas disponible pour cet article. Choisissez un autre moyen.",
+  "Held safely": "Gardé en sécurité",
+  "Release": "Libérer",
+  "Nothing is held right now.": "Rien n'est gardé pour le moment."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1378,6 +1393,8 @@
   "Sent. {0} files were received.": "Envoyé. {0} fichiers ont été reçus.",
   "Sent. {0} file was received.": "Envoyé. {0} fichier a été reçu.",
   "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "Votre téléphone compose pour payer {0}. Quand Sarrif confirme la réception, le vendeur livre. L'argent est conservé jusqu'à votre confirmation.",
-  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "Votre téléphone compose pour payer {0}. Quand le vendeur confirme la réception, il livre."
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "Votre téléphone compose pour payer {0}. Quand le vendeur confirme la réception, il livre.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it.": "Votre téléphone compose pour payer {0}. Quand Sarrif confirme la réception, le vendeur livre. L'argent est gardé jusqu'à ce que Sarrif vérifie avec vous.",
+  "Call +252 {0}": "Appeler +252 {0}"
  }
 }

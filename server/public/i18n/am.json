@@ -132,7 +132,7 @@
   "Chat not found.": "ቻቱ አልተገኘም።",
   "Chat on WhatsApp": "በWhatsApp ቻት ያድርጉ",
   "Chat with seller": "ከሻጩ ጋር ቻት",
-  "Chats": "ቻቶች",
+  "Chats": "ውይይቶች",
   "Check the affiliate earning.": "የአጋር ሻጭ ገቢውን ያረጋግጡ።",
   "Check the services list.": "የአገልግሎቶች ዝርዝሩን ያረጋግጡ።",
   "Check the wallet number.": "የዋሌት ቁጥሩን ያረጋግጡ።",
@@ -1203,7 +1203,22 @@
   "The files together are bigger than 30 MB. Send fewer at a time.": "ፋይሎቹ በአንድ ላይ ከ30 MB በላይ ናቸው። በአንድ ጊዜ ጥቂት ይላኩ።",
   "Documents": "ሰነዶች",
   "Note (optional), e.g. invoice for my order": "ማስታወሻ (አማራጭ)፣ ለምሳሌ የትዕዛዜ ደረሰኝ",
-  "Choose a 4-digit PIN.": "ባለ 4 አሃዝ ፒን ይምረጡ።"
+  "Choose a 4-digit PIN.": "ባለ 4 አሃዝ ፒን ይምረጡ።",
+  "Pay to the money processor · held safely until you receive it": "ለገንዘብ አስተናጋጁ ይክፈሉ · እስኪቀበሉ ድረስ በደህና ይያዛል",
+  "Pay straight to the merchant": "በቀጥታ ለነጋዴው ይክፈሉ",
+  "Home": "መነሻ",
+  "Favourites": "ተወዳጆች",
+  "Money transfers": "የገንዘብ ዝውውሮች",
+  "Your orders and bookings will show here.": "ትዕዛዞችዎ እና ቦታ ማስያዣዎችዎ እዚህ ይታያሉ።",
+  "Tap the heart on any product to save it here.": "እዚህ ለማስቀመጥ በማንኛውም ምርት ላይ ያለውን ልብ ይንኩ።",
+  "Add to favourites": "ወደ ተወዳጆች ያክሉ",
+  "Remove from favourites": "ከተወዳጆች ያስወግዱ",
+  "Thank you. Sarrif will check with you and release the payment to the seller.": "እናመሰግናለን። Sarrif ያረጋግጥልዎታል ከዚያም ክፍያውን ለሻጩ ይለቃል።",
+  "Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.": "ስልክዎ ወዲያውኑ ወደ ገንዘብ አስተናጋጁ ይደውላል። Sarrif ገንዘቡን ይይዛል፣ ዕቃውን መቀበልዎን ካረጋገጠ በኋላ ለሻጩ ይለቃል።",
+  "Pay to shop isn't available for this item right now. Choose another way to pay.": "ለሱቁ መክፈል አሁን ለዚህ ዕቃ አይገኝም። ሌላ የመክፈያ መንገድ ይምረጡ።",
+  "Held safely": "በደህና የተያዘ",
+  "Release": "ልቀቅ",
+  "Nothing is held right now.": "አሁን ምንም የተያዘ የለም።"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1378,6 +1393,8 @@
   "Sent. {0} files were received.": "ተልኳል። {0} ፋይሎች ደርሰዋል።",
   "Sent. {0} file was received.": "ተልኳል። {0} ፋይል ደርሷል።",
   "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። Sarrif ገንዘቡ መድረሱን ሲያረጋግጥ ሻጩ ያደርሳል። እስኪያረጋግጡ ድረስ ገንዘቡ ይያዛል።",
-  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። ሻጩ ገንዘቡ መድረሱን ሲያረጋግጥ ያደርሳል።"
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። ሻጩ ገንዘቡ መድረሱን ሲያረጋግጥ ያደርሳል።",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። Sarrif ገንዘቡ መድረሱን ሲያረጋግጥ ሻጩ ያደርሳል። Sarrif ከእርስዎ ጋር እስኪያረጋግጥ ድረስ ገንዘቡ ይያዛል።",
+  "Call +252 {0}": "ይደውሉ +252 {0}"
  }
 }

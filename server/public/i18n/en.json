@@ -941,7 +941,22 @@
   "The files together are bigger than 30 MB. Send fewer at a time.",
   "Documents",
   "Note (optional), e.g. invoice for my order",
-  "Choose a 4-digit PIN."
+  "Choose a 4-digit PIN.",
+  "Pay to the money processor · held safely until you receive it",
+  "Pay straight to the merchant",
+  "Home",
+  "Favourites",
+  "Money transfers",
+  "Your orders and bookings will show here.",
+  "Tap the heart on any product to save it here.",
+  "Add to favourites",
+  "Remove from favourites",
+  "Thank you. Sarrif will check with you and release the payment to the seller.",
+  "Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.",
+  "Pay to shop isn't available for this item right now. Choose another way to pay.",
+  "Held safely",
+  "Release",
+  "Nothing is held right now."
  ],
  "patterns": [
   "A gallery can have up to {0} photos.",
@@ -1060,6 +1075,8 @@
   "Sent. {0} files were received.",
   "Sent. {0} file was received.",
   "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until you confirm you received it.",
-  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver."
+  "Your phone is dialling to pay {0}. When the seller confirms the money arrived, they deliver.",
+  "Your phone is dialling to pay {0}. When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it.",
+  "Call +252 {0}"
  ]
 }

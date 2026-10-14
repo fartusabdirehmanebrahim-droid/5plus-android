@@ -389,7 +389,7 @@ function hubResults() {
 }
 function openService(v) {
   if (v !== "hub") walletShown = false;
-  S.drawer = false; S.service = v === "hub" ? null : v; S.tab = "send"; S.sheet = null; S.ytTab = "videos"; S.trk = null;
+  S.drawer = false; S.footChats = false; S.service = v === "hub" ? null : v; S.tab = "send"; S.sheet = null; S.ytTab = "videos"; S.trk = null;
   if (S.svcItems) delete S.svcItems[v]; // fresh availability each time
   if (v === "technician") S.tech = { view: null, q: "" };
   if (v === "ibedel") { loadMine(); SUUQ.loadWallet().then(() => { if (S.service === "ibedel") render(); }); }
@@ -725,12 +725,60 @@ function bindTracking() {
   };
   go.onclick = run; inp.onkeydown = e => { if (e.key === "Enter") run(); };
 }
+/* ---------- Footer: Home, History, Chats, Favourites ---------- */
+const FOOT_IC = {
+  home: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>',
+  history: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+  chats: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg>',
+  favs: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.9 4.5 6.7 4.5c2.2 0 3.6 1.3 5.3 3.3 1.7-2 3.1-3.3 5.3-3.3 3.8 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>',
+};
+const footNav = cur => `<nav class="foot-nav" aria-label="Main">${[["home", "Home"], ["history", "History"], ["chats", "Chats"], ["favs", "Favourites"]].map(([k, l]) =>
+  `<button data-foot="${k}" aria-current="${cur === k ? "page" : "false"}">${FOOT_IC[k]}<span>${l}</span></button>`).join("")}</nav>`;
+async function goFoot(k) {
+  S.drawer = false; S.sheet = null; S.footChats = false;
+  if (k === "home") return openService("hub");
+  if (k === "chats") { S.footChats = true; await SUUQ.openChats(); return; }
+  S.service = k; scrollTo(0, 0);
+  if (k === "history") { S.act = S.act || { tab: "orders", orders: null }; S.act.orders = null; loadActOrders(); loadMine(); }
+  if (k === "favs") { S.favList = null; loadFavs(); }
+  render();
+}
+// History: your orders and bookings in every service, and your money transfers (iBedel).
+async function loadActOrders() { try { S.act.orders = (await api("/api/suuq/orders/mine")).orders; } catch { S.act.orders = []; } if (S.service === "history") render(); }
+function vActivity() {
+  const A = S.act || (S.act = { tab: "orders", orders: null }), list = A.orders;
+  const ord = list === null ? `<div class="empty">Loading…</div>` : list.length ? `<div class="act-list">${list.map(o => `<button class="act-item" data-actorder="${esc(o.id)}">
+      <span class="act-img">${o.image ? `<img src="${esc(o.image)}" alt="" loading="lazy">` : ""}</span>
+      <span class="act-t"><b>${esc(o.product_name)}${o.qty > 1 ? " × " + o.qty : ""}</b><small>${esc(o.shop_name || "")} · ${new Date(o.created_at).toLocaleDateString()}</small><span class="act-st">${esc(SUUQ.orderLabel(o))}</span></span>
+      <b class="num act-amt">${o.total ? esc(fmt(o.total, o.cur)) : ""}</b></button>`).join("")}</div>`
+    : `<div class="empty">Your orders and bookings will show here.</div>`;
+  return `<div class="view"><h2 style="font-size:22px">History</h2>
+    <div class="seg" role="group" aria-label="History"><button data-acttab="orders" aria-pressed="${A.tab === "orders"}">Orders</button><button data-acttab="money" aria-pressed="${A.tab === "money"}">Money transfers</button></div>
+    ${A.tab === "orders" ? ord : vHistory().replace(/<h2[^>]*>History<\/h2>/, "")}</div>`;
+}
+// Favourites: products you saved with the heart.
+async function loadFavs() { try { S.favList = (await api("/api/suuq/favorites")).products; } catch { S.favList = []; } if (S.service === "favs") render(); }
+function vFavs() {
+  const L = S.favList;
+  return `<div class="view"><h2 style="font-size:22px">Favourites</h2>
+    ${L === null || L === undefined ? `<div class="empty">Loading…</div>` : L.length ? `<div class="pgrid">${L.map(SUUQ.productCard).join("")}</div>`
+      : `<div class="empty">Tap the heart on any product to save it here.</div>`}</div>`;
+}
+function bindFoot() {
+  appEl.querySelectorAll("[data-foot]").forEach(b => b.onclick = () => goFoot(b.dataset.foot));
+  appEl.querySelectorAll("[data-acttab]").forEach(b => b.onclick = () => { S.act.tab = b.dataset.acttab; render(); });
+  appEl.querySelectorAll("[data-actorder]").forEach(b => b.onclick = () => SUUQ.openMyOrders());
+  if (S.service === "favs") appEl.querySelectorAll("[data-prod]").forEach(b => b.onclick = () => SUUQ.openFavProduct(b.dataset.prod));
+}
 function vHome() {
   const tabs = `<nav class="tabs">
     <button data-tab="send" aria-current="${S.tab === "send" ? "page" : "false"}">${ICON.send}Send</button>
     <button data-tab="history" aria-current="${S.tab === "history" ? "page" : "false"}">${ICON.hist}History</button>
     <button data-tab="me" aria-current="${S.tab === "me" ? "page" : "false"}">${ICON.me}Account</button></nav>`;
-  if (!S.service) return vHub();
+  if (!S.service) return vHub() + footNav("home");
+  if (S.service === "history") return vActivity() + footNav("history");
+  if (S.service === "favs") return vFavs() + footNav("favs");
+  if (S.service === "suuq" && S.footChats && SUUQ.state.tab === "chats" && !SUUQ.state.chat && !SUUQ.state.product) return SUUQ.view() + footNav("chats");
   if (["suuq", "visa", "scholarship", "wallet", "affiliate"].includes(S.service)) return SUUQ.view();
   if (S.service === "account") return `<div class="view"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button>${vMe()}</div>`;
   if (S.service !== "ibedel" || !hubServices().some(x => x.id === "ibedel")) return vSoon();
@@ -952,6 +1000,7 @@ function bind() {
   if (["suuq", "visa", "scholarship", "wallet", "affiliate"].includes(S.service) && S.user?.role === "customer") SUUQ.bind(appEl);
   SUUQ.bindAutoplay(appEl);
   if (S.service === "ticket") bindTicket();
+  bindFoot();
   bindTracking();
   appEl.querySelectorAll("[data-demo-logins]").forEach(b => b.onclick = () => window.SarrifDemo?.showLogins());
   appEl.querySelectorAll("[data-call]").forEach(b => b.onclick = () => dialUssd(b.dataset.call));

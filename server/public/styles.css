@@ -353,7 +353,7 @@ textarea.input{min-height:110px;resize:vertical;font-size:14.5px;line-height:1.5
 
 /* ---- real app overrides ---- */
 .phone{background:none;padding:0;box-shadow:none;border-radius:0;max-width:480px}
-.screen{border-radius:24px;height:auto;min-height:calc(100dvh - 110px);border:1px solid var(--line)}
+.screen{border-radius:24px;height:auto;min-height:calc(100dvh - 110px);border:1px solid var(--line);overflow:clip} /* clip, not hidden: the footer and tabs can stick to the bottom of the screen */
 .statusbar{display:none}
 .phone-wrap{position:static}
 @media (max-width:520px){ .shell{padding-inline:0;padding-block:0} .topbar{padding:12px 16px} .screen{border-radius:0;border-inline:0;min-height:calc(100dvh - 64px)} }
@@ -1052,3 +1052,22 @@ img, video, iframe{max-width:100%}
 @media (max-width:340px){
   .kpis{grid-template-columns:minmax(0,1fr)}
 }
+/* Footer: Home, History, Chats, Favourites */
+.foot-nav{position:sticky;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 18px rgba(15,39,36,.06);padding-bottom:env(safe-area-inset-bottom)}
+.foot-nav button{border:0;background:none;padding:9px 0 10px;font:inherit;font-size:11.5px;font-weight:600;color:var(--ink-3);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.foot-nav button[aria-current="page"]{color:var(--green)}
+.foot-nav button[aria-current="page"] svg{stroke-width:2.4}
+.act-list{display:flex;flex-direction:column;gap:10px}
+.act-item{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);text-align:left;font:inherit;color:var(--ink);cursor:pointer}
+.act-img{width:52px;height:52px;border-radius:10px;overflow:hidden;background:var(--surface-2);flex:none}
+.act-img img{width:100%;height:100%;object-fit:cover}
+.act-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.act-t b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act-t small{color:var(--ink-3);font-size:12px}
+.act-st{font-size:12px;font-weight:600;color:var(--green)}
+.act-amt{font-size:14px;flex:none}
+.fav-btn{border:0;background:none;color:var(--ink-3);padding:6px;border-radius:50%;cursor:pointer;flex:none}
+.fav-btn svg{fill:none}
+.fav-btn[aria-pressed="true"]{color:#E0245E}
+.fav-btn[aria-pressed="true"] svg{fill:#E0245E}
+.earn-row b{color:var(--green)}

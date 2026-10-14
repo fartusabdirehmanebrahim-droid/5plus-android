@@ -377,3 +377,25 @@ CREATE TABLE IF NOT EXISTS public.push_tokens (
   created_at BIGINT NOT NULL
 );
 ALTER TABLE public.push_tokens ENABLE ROW LEVEL SECURITY;
+
+-- Pay to shop discount, Safe payment "buyer received" flag, and favourites.
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS pay_discount DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS buyer_ok INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS public.favorites (
+  user_id    BIGINT NOT NULL REFERENCES public.users(id),
+  product_id TEXT   NOT NULL,
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, product_id)
+);
+ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
+
+-- Favourites (the heart on products), Pay to shop discount and Safe payment "customer says received".
+CREATE TABLE IF NOT EXISTS public.favorites (
+  user_id    BIGINT NOT NULL REFERENCES public.users(id),
+  product_id TEXT   NOT NULL,
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, product_id)
+);
+ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS pay_discount DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS buyer_ok INTEGER NOT NULL DEFAULT 0;
