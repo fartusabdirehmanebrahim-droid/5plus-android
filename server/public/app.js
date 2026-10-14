@@ -344,6 +344,27 @@ function earnRow(w) {
       <small>${cs.some(c => (p[c] || 0) > 0) ? `On the way ${cs.filter(c => (p[c] || 0) > 0).map(c => fmt(p[c], c)).join(" · ")} · ` : ""}${lim.USD || lim.SLSH ? `Withdraw at ${["USD", "SLSH"].filter(c => lim[c]).map(c => fmt(lim[c], c)).join(" · ")}` : "Earn on every purchase"}</small></span>
     <span class="wt-go">${ready ? "Withdraw ›" : "›"}</span></button>`;
 }
+// Salah time and Sleep time: a seller pauses new orders until they turn it off again.
+const PAUSE_ICONS = {
+  salah: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v2"/><path d="M6 21v-7a6 6 0 0 1 12 0v7"/><path d="M3 21h18"/><path d="M10 21v-3a2 2 0 0 1 4 0v3"/><path d="M12 8a6 6 0 0 0-1.2.12"/></svg>',
+  sleep: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/><path d="M15 4h3l-3 4h3"/></svg>',
+};
+const PAUSE_TEXT = {
+  salah: { name: "Salah time", mode: "Salah time mode", off: "Stop new orders while you pray", on: "On · you're not receiving orders" },
+  sleep: { name: "Sleep time", mode: "Night sleep mode", off: "Stop new orders for the night", on: "On · you're not receiving orders" },
+};
+const canPause = () => S.user && S.user.account_type === "merchant";
+function pauseBanner() {
+  const m = S.user && S.user.pause; if (!m || !PAUSE_TEXT[m]) return "";
+  return `<div class="pause-banner ${m}" role="status"><span class="pb-ic">${PAUSE_ICONS[m]}</span>
+    <span class="pb-t"><b>${PAUSE_TEXT[m].mode}</b><small>You're not receiving orders. Customers see that you're ${m === "salah" ? "at prayer" : "closed for the night"} and can still chat with you.</small></span>
+    <button class="btn btn-ghost" data-pause-off>Turn off</button></div>`;
+}
+async function setPause(mode) {
+  try { const r = await api("/api/me/pause", { body: { mode } }); S.user.pause = r.pause; }
+  catch (e) { alert(e.message); }
+  render();
+}
 function vDrawer() {
   if (!S.drawer) return "";
   const item = (go, icon, cls, title, sub) => `<button class="drawer-item" data-svcgo="${go}"><span class="hm-ic ${cls}">${icon}</span><span><b>${title}</b><small>${sub}</small></span></button>`;
@@ -355,6 +376,8 @@ function vDrawer() {
       ${S.user.account_type === "merchant" ? item("myshop", SUUQ_ICONS.shop, "shop", "My shop", "Products, orders and report") : ""}
       ${item("affiliate", SUUQ_ICONS.aff, "aff", "Affiliate", "Share products and earn")}
       ${item("account", MENU_ICONS.user, "", "Account and support", "Your details, PIN and WhatsApp help")}
+      ${canPause() ? ["salah", "sleep"].map(m => `<label class="drawer-item pause-item"><span class="hm-ic ${m}">${PAUSE_ICONS[m]}</span><span class="pi-t"><b>${PAUSE_TEXT[m].name}</b><small>${S.user.pause === m ? PAUSE_TEXT[m].on : PAUSE_TEXT[m].off}</small></span>
+        <span class="switch"><input type="checkbox" role="switch" data-pause="${m}" aria-label="${PAUSE_TEXT[m].name}" ${S.user.pause === m ? "checked" : ""}><span></span></span></label>`).join("") : ""}
       ${I18N ? `<button class="drawer-item" data-lang-open><span class="hm-ic flag-ic">${I18N.flag(I18N.lang || "en")}</span><span><b>Language</b><small>${esc((I18N.LANGS.find(l => l.code === I18N.lang) || I18N.LANGS[2]).name)}</small></span></button>` : ""}
     </nav></div>`;
 }
@@ -446,7 +469,7 @@ function vHub() {
         ${w && w.earnings ? earnRow(w) : ""}</div>`}
     ${S.user.account_type === "merchant" ? `<button class="merchant-card" data-svcgo="myshop"><span class="hm-ic">${SUUQ_ICONS.shop}</span><span><span class="label">Merchant</span><b>My shop dashboard</b><small>Products, orders, sales report and subscription</small></span><span aria-hidden="true">›</span></button>` : ""}
     <h3 style="font-size:17px">Choose a service</h3>
-    ${list.length ? `<div class="hub-grid">${list.map(hubTile).join("")}</div>`
+    ${list.length ? `<div class="hub-grid">${list.map((h, i) => hubTile(h) + (i === Math.min(1, list.length - 1) ? pauseBanner() : "")).join("")}</div>`
       : `<div class="empty">No services are open right now. Please check again later.</div>`}
     </div>
   </div>${vDrawer()}`;
@@ -1051,6 +1074,8 @@ function bind() {
     walletShown = !walletShown;
     render(); const t = appEl.querySelector("[data-wtoggle]"); if (t) t.focus();
   });
+  appEl.querySelectorAll("[data-pause]").forEach(i => i.onchange = () => setPause(i.checked ? i.dataset.pause : ""));
+  appEl.querySelectorAll("[data-pause-off]").forEach(b => b.onclick = () => { b.disabled = true; setPause(""); });
   appEl.querySelectorAll("[data-drawer]").forEach(b => b.onclick = () => {
     S.drawer = b.dataset.drawer === "open"; render();
     if (S.drawer) { const f = appEl.querySelector(".drawer-item"); if (f) f.focus(); } else { const m = appEl.querySelector(".menu-btn"); if (m) m.focus(); }
@@ -1150,6 +1175,11 @@ window.__pushOpen = goto => {
     else if (goto === "chats") SUUQ.openChats();
     else if (String(goto).startsWith("chat:")) SUUQ.openChatById(String(goto).slice(5));
   }
+  // A part admin opens their safe payments.
+  if (S.user.role === "admin" && goto === "safepay") {
+    SUUQ.goSafeTab(S.user.service); SUUQ.resetSafe(); renderSvcDash();
+    setTimeout(() => document.getElementById("safe-desk")?.scrollIntoView({ behavior: "smooth", block: "start" }), 600);
+  }
 };
 async function loggedIn(user) {
   SUUQ.reset();
@@ -1209,6 +1239,11 @@ function connectEvents() {
     const d = JSON.parse(e.data || "{}");
     if (S.user?.role === "super" && !S.viewAs && supTab === "wallets") { SUUQ.resetSuper(); SUUQ.renderSuperWallets(); }
     if (d.new && S.user?.role === "super") staffRing("sp" + Date.now(), "New safe payment", `<b>${esc(d.name || "")}</b> · ${esc(d.product || "")}<br>${esc(fmt(d.amount || 0, d.cur || "USD"))}`, goSupWallets);
+    // The admin of a part (Suuq, Technician…): the safe payments sent to them.
+    if (S.user?.role === "admin") {
+      const box = document.getElementById("safe-desk"); SUUQ.resetSafe(); if (box) SUUQ.renderSafeDesk(box);
+      if (d.new) staffRing("sp" + Date.now(), "New safe payment", `<b>${esc(d.name || "")}</b> · ${esc(d.product || "")}<br>${esc(fmt(d.amount || 0, d.cur || "USD"))}`, () => window.__pushOpen("safepay"));
+    }
   });
   es.addEventListener("topup", e => { const d = JSON.parse(e.data || "{}"); if (d.new && S.user?.role === "super") staffRing("tp" + d.id, "New top-up request", `<b>${esc(d.name || "")}</b> · ${esc(fmt(d.amount || 0, d.cur || "USD"))}`, goSupWallets); });
   es.addEventListener("topup", () => {
@@ -1839,6 +1874,7 @@ function renderSvcDash(fromLoad) {
     : id === "visa" ? `<div class="admin-head"><div><span class="label">Visa admin</span><h2>Visa dashboard</h2><p>Visas that sellers list, and the words they can show instead of a price.</p></div></div>${SUUQ.visaTabs()}<div hidden>`
     : id === "scholarship" ? `<div class="admin-head"><div><span class="label">Scholarship admin</span><h2>Scholarship dashboard</h2><p>Scholarships that travel agencies post, and which agencies may post them.</p></div></div>${SUUQ.scholarTabs()}<div hidden>` : "") + `<div class="admin-head"><div><span class="label">${esc(name)} admin</span><h2>${esc(name)} dashboard</h2><p>${(svcPage?.videos || []).length ? "Customers see this service's videos page, with your Call, WhatsApp and TikTok buttons." : `This service is ${sv?.ready ? "open" : "still being built. Customers see it as “Coming soon”"}. You can already set up its agents.`}</p></div></div>
     ${sv ? `<div class="sup-card" style="max-width:420px"><span class="hub-art">${ART(sv.art, sv.photo)}</span></div>` : ""}
+    ${m === "svc-admin" && !["suuq", "visa", "scholarship", "ibedel"].includes(id) ? `<div id="safe-desk"><div class="panel empty">Loading…</div></div>` : ""}
     ${svcPage ? `<div class="panel">
       <div class="panel-head"><div><h3>${esc(name)} videos page</h3><p>With videos, customers see a page like YouTube instead of “Coming soon”. Only admins can change it.</p></div></div>
       <div class="mini"><label for="sp-videos">Videos: one per line, the YouTube link then the title</label>
@@ -1875,6 +1911,7 @@ function renderSvcDash(fromLoad) {
   bindPeople($("#sg-list"), loadSvcAgents);
   if (id === "ticket") loadTicketAgency();
   loadSvcDocs(); loadDeskChats();
+  if (document.getElementById("safe-desk")) SUUQ.renderSafeDesk(document.getElementById("safe-desk"));
   if (id === "technician") SUUQ.marketReviewPanel(document.getElementById("mk-review"), "technician", "service");
   if (svcPage) bindTrkAdmin(id);
   const galIn = $("#sp-gal");

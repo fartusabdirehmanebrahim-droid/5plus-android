@@ -109,7 +109,7 @@ const clearFails = async u => await db.run("UPDATE users SET failed = 0, locked_
 const tooMany = `Too many wrong tries. Try again in ${LOCK_MINUTES} minutes.`;
 
 function publicUser(u) {
-  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, created_at: u.created_at };
+  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, pause: u.pause || "", created_at: u.created_at };
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
@@ -581,7 +581,8 @@ route("PUT", "/api/super/services", async (req, res) => {
     if (!id) id = "service";
     while (seen.has(id)) id += "-2";
     seen.add(id);
-    out.push({ id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: await fillVideoTitles(cleanVideos(x.videos ?? x.video)), whatsapp: cleanWa(x.whatsapp), phone: cleanPhoneNo(x.phone), tiktok: cleanTiktok(x.tiktok), gallery: old?.gallery || [] });
+    // Keep what the service's own admin set (Pay to shop and safe payment numbers, document earnings…).
+    out.push({ ...(old || {}), id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: await fillVideoTitles(cleanVideos(x.videos ?? x.video)), whatsapp: cleanWa(x.whatsapp), phone: cleanPhoneNo(x.phone), tiktok: cleanTiktok(x.tiktok), gallery: old?.gallery || [] });
   }
   for (const c of cur) if (c.builtIn && !out.some(o => o.id === c.id)) fail(`${c.name} can be hidden but not deleted.`);
   for (const c of cur) if (!out.some(o => o.id === c.id)) { if (c.photo) await db.files.del(c.photo); for (const g of c.gallery || []) await db.files.del(g.file); }

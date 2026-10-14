@@ -429,7 +429,7 @@ module.exports = function market(ctx) {
   function productRow(p, extra = {}) {
     return { id: p.id, name: p.name, description: p.description, price: p.price, cur: p.cur, mode: p.mode,
       images: JSON.parse(p.images || "[]").map(f => "/media/" + f), video: p.video, comm_type: p.comm_type, comm_value: p.comm_value,
-      earn: COMMISSION(p, 1), shop_id: p.shop_id, shop_no: p.shop_no ?? null, shop_name: p.shop_name, seller_id: p.owner_id, hidden: !!p.hidden,
+      earn: COMMISSION(p, 1), pause: PAUSES.includes(p.shop_pause) ? p.shop_pause : "", shop_id: p.shop_id, shop_no: p.shop_no ?? null, shop_name: p.shop_name, seller_id: p.owner_id, hidden: !!p.hidden,
       admin_hidden: !!p.admin_hidden, created_at: p.created_at, approval: p.approval || "approved", review_note: p.review_note || "", service: p.service || "suuq", country: p.country || "", price_hidden: !!p.price_hidden, price_label: p.price_label || "", category: p.category || "", stock: p.stock ?? -1, unit: p.unit || "",
       pay_shop: p.shop_profile !== undefined ? (n => ({ merchant: !!n.merchant, number: !!n.number }))(shopPayNums(p.shop_profile)) : undefined, ...extra };
   }
@@ -440,7 +440,10 @@ module.exports = function market(ctx) {
     if (p.price_hidden && p.owner_id !== u.id) { r.price = null; r.earn = p.comm_type === "flat" ? p.comm_value : null; }
     return r;
   }
-  const PROD_SELECT = "SELECT p.*, s.name AS shop_name, s.shop_no, s.owner_id, s.sub_until, s.suspended AS shop_suspended, s.profile AS shop_profile FROM products p JOIN shops s ON s.id = p.shop_id";
+  const PROD_SELECT = "SELECT p.*, s.name AS shop_name, s.shop_no, s.owner_id, s.sub_until, s.suspended AS shop_suspended, s.profile AS shop_profile, (SELECT pause FROM users WHERE id = s.owner_id) AS shop_pause FROM products p JOIN shops s ON s.id = p.shop_id";
+  // Salah time and Sleep time: the seller pauses new orders until they turn it off.
+  const PAUSES = ["salah", "sleep"];
+  const pauseMsg = (shop, mode) => mode === "salah" ? `${shop} is at Salah time right now. Try again a little later.` : `${shop} is closed for the night (Sleep time). Try again in the morning.`;
   // Shoppers only see products the admin approved, that the seller hasn't hidden, in an open shop.
   const LIVE = "p.deleted = 0 AND p.hidden = 0 AND p.admin_hidden = 0 AND p.approval = 'approved' AND s.suspended = 0 AND s.sub_until > ?";
   // The same, but also a travel agency's ticket item (hidden from the lists; opened from Ticket or a shared link).
@@ -634,6 +637,12 @@ module.exports = function market(ctx) {
     send(res, 200, { products: rows.map(p => productRow(p, { sold: sold[p.id] || 0 })) });
   });
 
+  route("POST", "/api/me/pause", async (req, res) => {
+    const u = await needUser(req), b = await readJson(req), mode = PAUSES.includes(b.mode) ? b.mode : "";
+    await db.run("UPDATE users SET pause = ? WHERE id = ?", mode, u.id);
+    send(res, 200, { pause: mode });
+  });
+
   /* ---------- three ways to pay for a buy order ---------- */
   // wallet: from the buyer's wallet, held until they confirm they received it.
   // safe:   the phone dials the money processor agent (price + charge); the super admin confirms the money arrived,
@@ -652,13 +661,29 @@ module.exports = function market(ctx) {
     pre = String(pre || "").trim(); if (!pre.startsWith("*")) pre = "*" + pre; if (!pre.endsWith("*")) pre += "*";
     return `${pre}${num}*${cur === "SLSH" ? Math.round(amount) : Math.round(amount * 100) / 100}#`;
   };
-  async function payPlan(method, via, cur, total, shopProfile) {
+  // Safe payment: the whole amount goes to the admin of that part (Suuq, Technician, Hotels…) on the numbers they set.
+  // A part whose admin hasn't set numbers yet uses the main money processor (the super admin) instead.
+  const sectionOf = service => { const v = String(service || "suuq"); return v.startsWith("svc:") ? v.slice(4) : v; };
+  async function safeNums(section) {
+    const s = await getSettings(), x = s.services.find(y => y.id === section), own = { merchant: digits(x?.safe_merchant), number: digits(x?.safe_number) };
+    if (section && (own.merchant || own.number)) return { ...own, section };
+    return { merchant: digits(s.safePay.merchant), number: digits(s.safePay.number), section: "" };
+  }
+  async function payPlan(method, via, cur, total, shopProfile, service) {
     const s = await getSettings(), codes = s.safePay.codes[cur];
-    const nums = method === "safe" ? { merchant: digits(s.safePay.merchant), number: digits(s.safePay.number) } : shopPayNums(shopProfile);
+    const nums = method === "safe" ? await safeNums(sectionOf(service)) : shopPayNums(shopProfile);
     if (!nums.merchant && !nums.number) fail(method === "safe" ? "Safe payment isn't set up yet. Choose another way to pay." : "This shop hasn't added its payment numbers. Choose another way to pay.");
     const useMerchant = via === "normal" ? !nums.number : !!nums.merchant;
     const fee = round(cur, feeOf(s.tiers[cur], total));
-    return { fee, ussd: ussdOf(useMerchant ? codes.merchant : codes.normal, useMerchant ? nums.merchant : nums.number, total + fee, cur) };
+    return { fee, section: method === "safe" ? nums.section : "", ussd: ussdOf(useMerchant ? codes.merchant : codes.normal, useMerchant ? nums.merchant : nums.number, total + fee, cur) };
+  }
+  // Who sees a safe payment: the super admin, and the admin of the part it was paid to.
+  const safeAudience = section => x => isSuper(x) || (!!section && x.role === "admin" && x.service === section);
+  async function safeAlarm(orderId, section, name, product, amount, cur) {
+    broadcast("safepay", { new: true, name, product, amount, cur }, safeAudience(section));
+    if (!section) return;
+    const ids = (await db.all("SELECT id FROM users WHERE role = 'admin' AND service = ?", section)).map(x => x.id);
+    pushLater(ids, { kind: "info", title: "New safe payment", body: `${name} · ${product} · ${amount} ${cur}`, goto: "safepay", tag: "sp-" + orderId });
   }
 
   // Pay to shop: the merchant already gets all the money, so the earning has to come from somewhere.
@@ -798,6 +823,7 @@ module.exports = function market(ctx) {
     if (p.service === "ticket" && p.owner_id !== u.id) { const a = await ticketRoute(p, u); if (a) { chosen = p.shop_name; p = a; } }
     if (!await marketOpen(p.service || "suuq")) fail(`${MNAME[p.service || "suuq"]} is not available right now.`);
     if (p.owner_id === u.id) fail("You can't order your own product.");
+    if (PAUSES.includes(p.shop_pause)) fail(pauseMsg(p.shop_name, p.shop_pause));
     // Hidden price + Buy: the buyer asks for the price first. Nothing is paid until the seller sends the price.
     const ask = p.mode === "buy" && !!p.price_hidden;
     const qty = Math.floor(Number(b.qty) || 1);
@@ -817,7 +843,7 @@ module.exports = function market(ctx) {
       if (mode === "none") fail(NO_SHOP_PAY);
       if (mode === "discount") discount = commission;
     }
-    const plan = p.mode === "buy" && !ask && method !== "wallet" ? await payPlan(method, b.via, p.cur, round(p.cur, total - discount), p.shop_profile) : null;
+    const plan = p.mode === "buy" && !ask && method !== "wallet" ? await payPlan(method, b.via, p.cur, round(p.cur, total - discount), p.shop_profile, p.service) : null;
     const id = crypto.randomUUID(), ref = "SQ" + crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 7);
     const note = ((chosen ? `Customer chose ${chosen}. ` : "") + String(b.note || "").trim()).slice(0, 300);
     // Book: the customer picks the date and time they want the service.
@@ -845,8 +871,9 @@ module.exports = function market(ctx) {
       if (limited) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
       if (discount) await db.run("UPDATE orders SET pay_discount = ? WHERE id = ?", discount, id);
       if (bookAt) await db.run("UPDATE orders SET book_at = ? WHERE id = ?", bookAt, id);
+      if (plan?.section) await db.run("UPDATE orders SET safe_svc = ? WHERE id = ?", plan.section, id);
     });
-    if (plan?.ussd && method === "safe") broadcast("safepay", { new: true, name: u.name, product: p.name, amount: total + plan.fee, cur: p.cur }, x => isSuper(x));
+    if (plan?.ussd && method === "safe") await safeAlarm(id, plan.section, u.name, p.name, round(p.cur, total - discount + plan.fee), p.cur);
     await pushOrder(id);
     send(res, 200, { order: orderRow(await db.get(`${ORDER_SELECT} WHERE o.id = ?`, id), false), balances: await balances(u.id) });
   });
@@ -902,7 +929,7 @@ module.exports = function market(ctx) {
     const words = t => new Set(String(t || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 4));
     const name = String(p.name).trim().toLowerCase(), pw = words(p.name);
     const score = c => String(c.name).trim().toLowerCase() === name ? 3 : (hasCountry(p.service) && p.country && c.country === p.country) ? 2 : [...words(c.name)].filter(w => pw.has(w)).length >= 2 ? 1 : 0;
-    const best = rows.filter(c => !tried.has(c.owner_id)).map(c => [score(c), c]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0] || b[1].created_at - a[1].created_at)[0];
+    const best = rows.filter(c => !tried.has(c.owner_id) && !PAUSES.includes(c.shop_pause)).map(c => [score(c), c]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0] || b[1].created_at - a[1].created_at)[0];
     if (!best) return null;
     const c = best[1], nid = crypto.randomUUID(), ref = "SQ" + crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 7);
     await db.run(`INSERT INTO orders (id, ref, product_id, shop_id, buyer_id, seller_id, kind, product_name, qty, unit_price, total, cur, commission, affiliate_id, status, note, created_at, updated_at, from_order)
@@ -915,10 +942,11 @@ module.exports = function market(ctx) {
   // request passed on to another merchant, if any.
   async function orderAction(id, u, b) {
     const action = String(b.action);
-    let fwd = null, heldPing = false;
+    let fwd = null, heldPing = false, safeNote = null, pingSvc = "";
     await tx(async () => {
       const o = await db.get("SELECT * FROM orders WHERE id = ?", id);
       if (!o || (o.buyer_id !== u.id && o.seller_id !== u.id)) fail("Order not found.", 404);
+      const svcOf = (await db.get("SELECT service FROM products WHERE id = ?", o.product_id))?.service || "suuq"; pingSvc = o.safe_svc || "";
       const seller = o.seller_id === u.id, set = async st => await db.run("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", st, now(), o.id);
       const refund = async () => { if (o.kind === "buy" && o.pay_method !== "shop") await ledger(o.buyer_id, o.cur, o.total, "refund", o.ref, `${o.product_name} × ${o.qty}`); };
       if (o.kind === "buy") {
@@ -945,10 +973,10 @@ module.exports = function market(ctx) {
             if (mode === "none") fail(NO_SHOP_PAY);
             if (mode === "discount") discount = o.commission;
           }
-          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(b.method, b.via, o.cur, round(o.cur, o.total - discount), shop?.profile);
-          await db.run("UPDATE orders SET status = 'awaiting_payment', pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, updated_at = ? WHERE id = ?",
-            b.method, plan.fee, plan.ussd, o.commission, discount, now(), o.id);
-          if (b.method === "safe") broadcast("safepay", { new: true, name: u.name, product: o.product_name, amount: o.total + plan.fee, cur: o.cur }, x => isSuper(x));
+          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(b.method, b.via, o.cur, round(o.cur, o.total - discount), shop?.profile, svcOf);
+          await db.run("UPDATE orders SET status = 'awaiting_payment', pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, safe_svc = ?, updated_at = ? WHERE id = ?",
+            b.method, plan.fee, plan.ussd, o.commission, discount, plan.section, now(), o.id);
+          if (b.method === "safe") safeNote = [plan.section, o.product_name, round(o.cur, o.total - discount + plan.fee), o.cur];
           return;
         }
         // Paid to the shop: the seller confirms the money arrived (or declines if it never came).
@@ -957,9 +985,9 @@ module.exports = function market(ctx) {
         if (action === "cancel" && !seller && o.status === "awaiting_payment") return await set("cancelled");
         // Try again: dial once more, with the merchant number or the normal number.
         if (action === "retry" && !seller && o.status === "awaiting_payment") {
-          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(o.pay_method, b.via, o.cur, round(o.cur, o.total - (o.pay_discount || 0)), shop?.profile);
-          await db.run("UPDATE orders SET pay_fee = ?, pay_ussd = ?, updated_at = ? WHERE id = ?", plan.fee, plan.ussd, now(), o.id);
-          if (o.pay_method === "safe") broadcast("safepay", {}, x => isSuper(x));
+          const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(o.pay_method, b.via, o.cur, round(o.cur, o.total - (o.pay_discount || 0)), shop?.profile, svcOf);
+          await db.run("UPDATE orders SET pay_fee = ?, pay_ussd = ?, safe_svc = ?, updated_at = ? WHERE id = ?", plan.fee, plan.ussd, plan.section, now(), o.id);
+          if (o.pay_method === "safe") broadcast("safepay", {}, safeAudience(plan.section));
           return;
         }
         if (action === "pay" && !seller && o.status === "quoted") {
@@ -1002,7 +1030,8 @@ module.exports = function market(ctx) {
     });
     await pushOrder(id);
     if (fwd) await pushOrder(fwd);
-    if (heldPing) broadcast("safepay", {}, x => isSuper(x));
+    if (heldPing) broadcast("safepay", {}, safeAudience(pingSvc));
+    if (safeNote) await safeAlarm(id, safeNote[0], u.name, safeNote[1], safeNote[2], safeNote[3]);
     return fwd;
   }
   route("POST", "/api/suuq/orders/:id/action", async (req, res, url, [id]) => {
@@ -1130,52 +1159,75 @@ module.exports = function market(ctx) {
   });
 
   /* ---------- safe payments (super admin) ---------- */
+  // The super admin sees every safe payment; the admin of a part (Suuq, Technician…) sees the ones paid to them.
+  const safeScope = u => isSuper(u) ? { sql: "1 = 1", args: [] } : { sql: "o.safe_svc = ?", args: [u.service] };
+  const needSafeAdmin = req => needRole(req, "super", "admin");
+  const canSafe = (u, o) => isSuper(u) || (!!o.safe_svc && o.safe_svc === u.service);
+  // Each safe payment, spelled out for the admin: the buyer, the seller's price, and who earns what.
+  async function safeRow(o) {
+    const aff = o.affiliate_id ? await db.get("SELECT name, phone FROM users WHERE id = ?", o.affiliate_id) : null;
+    const seller = await db.get("SELECT name, phone FROM users WHERE id = ?", o.seller_id);
+    const svcs = (await getSettings()).services, sec = svcs.find(x => x.id === o.safe_svc);
+    const earner = !o.affiliate_id || !(o.commission > 0) ? "none" : o.affiliate_id === o.buyer_id ? "buyer" : "linker";
+    return { ...orderRow(o, true), buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, seller_name: seller?.name || "", seller_phone: seller?.phone || "",
+      earner, earner_name: earner === "none" ? "" : earner === "buyer" ? o.buyer_name : aff?.name || "", earner_phone: earner === "linker" ? aff?.phone || "" : "",
+      paid_amount: round(o.cur, o.total - (o.pay_discount || 0) + (o.pay_fee || 0)), paid_to: o.safe_svc ? `${sec?.name || o.safe_svc} admin` : "Main money processor", section: o.safe_svc || "" };
+  }
   route("GET", "/api/super/safepay", async (req, res, url) => {
-    await needRole(req, "super");
+    const u = await needSafeAdmin(req), sc = safeScope(u);
     const pend = url.searchParams.get("status") !== "done";
-    const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND ${pend ? "o.status = 'awaiting_payment'" : "o.status != 'awaiting_payment'"} ORDER BY o.updated_at DESC LIMIT 100`);
-    send(res, 200, { orders: rows.map(o => ({ ...orderRow(o, true), buyer_name: o.buyer_name, buyer_phone: o.buyer_phone })), settings: (await getSettings()).safePay });
+    const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND ${sc.sql} AND ${pend ? "o.status = 'awaiting_payment'" : "o.status != 'awaiting_payment'"} ORDER BY o.updated_at DESC LIMIT 100`, ...sc.args);
+    const out = []; for (const o of rows) out.push(await safeRow(o));
+    const s = await getSettings(), mine = !isSuper(u) && s.services.find(x => x.id === u.service);
+    send(res, 200, { orders: out, settings: isSuper(u) ? s.safePay : null, own: mine ? { merchant: mine.safe_merchant || "", number: mine.safe_number || "", name: mine.name } : null });
+  });
+  // The admin of a part sets the numbers their safe payments go to.
+  route("PUT", "/api/admin/safepay-numbers", async (req, res) => {
+    const u = await needRole(req, "admin"), b = await readJson(req), merchant = digits(b.merchant).slice(0, 15), number = digits(b.number).slice(0, 15);
+    for (const n of [merchant, number]) if (n && (n.length < 4 || n.length > 15)) fail("Check the numbers.");
+    const s = await getSettings();
+    if (!s.services.some(x => x.id === u.service)) fail("Your service was not found.", 404);
+    await saveSettings({ services: s.services.map(x => x.id === u.service ? { ...x, safe_merchant: merchant, safe_number: number } : x) });
+    send(res, 200, { own: { merchant, number } });
   });
   route("POST", "/api/super/safepay/:id/:decision", async (req, res, url, [id, decision]) => {
-    await needRole(req, "super");
+    const u = await needSafeAdmin(req);
     if (!["confirm", "reject"].includes(decision)) fail("Not found.", 404);
+    let sec = "";
     await tx(async () => {
       const o = await db.get("SELECT * FROM orders WHERE id = ?", id);
-      if (!o || o.pay_method !== "safe") fail("Order not found.", 404);
+      if (!o || o.pay_method !== "safe" || !canSafe(u, o)) fail("Order not found.", 404);
+      sec = o.safe_svc || "";
       if (o.status !== "awaiting_payment") fail("This payment was already handled.");
       await db.run("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", decision === "confirm" ? "paid" : "payment_rejected", now(), o.id);
       if (decision !== "confirm" && o.reserved) { await db.run("UPDATE orders SET reserved = 0 WHERE id = ?", o.id); await db.run("UPDATE products SET stock = stock + 1 WHERE id = ? AND stock >= 0", o.product_id); }
     });
     await pushOrder(id);
-    broadcast("safepay", {}, x => isSuper(x));
+    broadcast("safepay", {}, safeAudience(sec));
     send(res, 200, { ok: true });
   });
   // Held safely: Safe payments the admin confirmed. The admin calls the customer, asks if they received it, then releases:
   // the seller gets the price minus the earning, and the earning goes to the wallet of whoever shared the link (or the buyer).
   route("GET", "/api/super/held", async (req, res) => {
-    await needRole(req, "super");
-    const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND o.status IN ('paid', 'delivered') ORDER BY o.buyer_ok DESC, o.updated_at DESC LIMIT 200`);
-    const out = [];
-    for (const o of rows) {
-      const aff = o.affiliate_id ? await db.get("SELECT name, phone FROM users WHERE id = ?", o.affiliate_id) : null;
-      const seller = await db.get("SELECT name, phone FROM users WHERE id = ?", o.seller_id);
-      out.push({ ...orderRow(o, true), buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, seller_name: seller?.name || "", seller_phone: seller?.phone || "",
-        earner_name: aff ? (o.affiliate_id === o.buyer_id ? "the buyer" : aff.name) : "", earner_phone: aff?.phone || "" });
-    }
+    const u = await needSafeAdmin(req), sc = safeScope(u);
+    const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND ${sc.sql} AND o.status IN ('paid', 'delivered') ORDER BY o.buyer_ok DESC, o.updated_at DESC LIMIT 200`, ...sc.args);
+    const out = []; for (const o of rows) out.push(await safeRow(o));
     const totals = {}; for (const o of rows) totals[o.cur] = round(o.cur, (totals[o.cur] || 0) + o.total);
     send(res, 200, { orders: out, totals });
   });
   route("POST", "/api/super/held/:id/release", async (req, res, url, [id]) => {
-    await needRole(req, "super");
+    const u = await needSafeAdmin(req);
+    let sec = "";
     await tx(async () => {
       const o = await db.get("SELECT * FROM orders WHERE id = ?", id);
-      if (!o || o.pay_method !== "safe") fail("Order not found.", 404);
+      if (!o || o.pay_method !== "safe" || !canSafe(u, o)) fail("Order not found.", 404);
+      sec = o.safe_svc || "";
       if (!["paid", "delivered"].includes(o.status)) fail("This order was already released or ended.");
       await complete(o);
       if (o.reserved) { await db.run("UPDATE orders SET reserved = 0 WHERE id = ?", o.id); await db.run("UPDATE products SET stock = stock + 1 WHERE id = ? AND stock >= 0", o.product_id); }
     });
     await pushOrder(id);
-    broadcast("safepay", {}, x => isSuper(x));
+    broadcast("safepay", {}, safeAudience(sec));
     send(res, 200, { ok: true });
   });
 
@@ -1526,8 +1578,8 @@ module.exports = function market(ctx) {
     const shop = (await travelShops()).find(x => x.id === id); if (!shop || shop.owner_id === u.id) return null;
     const { total, admin } = await ticketStats(id);
     if (admin * 2 >= total + 1) return null; // the admin agency already has its half
-    const t = await ticketProduct(shop);
-    return await db.get(`${PROD_SELECT} WHERE p.id = ?`, t.id);
+    const t = await ticketProduct(shop), a = await db.get(`${PROD_SELECT} WHERE p.id = ?`, t.id);
+    return a && PAUSES.includes(a.shop_pause) ? null : a; // the admin agency is at Salah or Sleep time: the customer's choice gets it
   }
   route("GET", "/api/admin/ticket-agency", async (req, res) => {
     await needPageEditor(req, "ticket");

@@ -1112,3 +1112,28 @@ img, video, iframe{max-width:100%}
 .earn-give .mini{flex:1;min-width:180px;display:flex;flex-direction:column;gap:4px}
 .desk-thread{display:flex;flex-direction:column;gap:10px}
 .desk-thread .msgs{max-height:420px;min-height:200px;border:1px solid var(--line);border-radius:14px;padding:10px}
+
+/* Safe payments: each order spelled out for the admin (buyer, seller's price, who earns what) */
+.safe-facts { margin: 4px 0 0; display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: 13px; }
+.safe-facts > div { display: grid; grid-template-columns: 104px 1fr; gap: 8px; align-items: baseline; }
+.safe-facts dt { color: var(--ink-2); font-weight: 600; }
+.safe-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.safe-facts a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 380px) { .safe-facts > div { grid-template-columns: 1fr; gap: 0; } }
+
+/* Salah time and Sleep time */
+.hm-ic.salah, .pause-banner.salah .pb-ic { background: var(--green-soft); color: var(--green); }
+.hm-ic.sleep, .pause-banner.sleep .pb-ic { background: var(--usd-soft); color: var(--usd); }
+.pause-item { cursor: pointer; }
+.pause-item .pi-t { flex: 1; min-width: 0; }
+.pause-banner { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; border: 2px solid var(--green); background: var(--green-soft); }
+.pause-banner.sleep { border-color: var(--usd); background: var(--usd-soft); }
+.pause-banner .pb-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; background: var(--surface) !important; }
+.pause-banner .pb-t { flex: 1; min-width: 0; }
+.pause-banner b { display: block; font-size: 16px; color: var(--green); }
+.pause-banner.sleep b { color: var(--usd); }
+.pause-banner small { display: block; color: var(--ink-2); font-size: 12px; line-height: 1.35; }
+.pause-banner .btn { flex: none; padding: 8px 12px; background: var(--surface); }
+.pause-tag { position: absolute; left: 8px; bottom: 8px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: rgba(15,39,36,.82); color: #fff; }
+.pause-note { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--green-soft); font-size: 13px; }
+.pause-note.sleep { background: var(--usd-soft); }

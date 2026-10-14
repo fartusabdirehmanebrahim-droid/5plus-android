@@ -405,3 +405,7 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS book_at TEXT NOT NULL DEFAULT
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS att TEXT NOT NULL DEFAULT '';
 ALTER TABLE public.service_docs ADD COLUMN IF NOT EXISTS earn_amount DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE public.service_docs ADD COLUMN IF NOT EXISTS earn_cur TEXT NOT NULL DEFAULT '';
+
+-- Safe payments go to the admin of each part (Suuq, Technician…); Salah time and Sleep time pause a seller's orders.
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS safe_svc TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS pause TEXT NOT NULL DEFAULT '';
