@@ -536,6 +536,7 @@ function vHub() {
     <h3 style="font-size:17px">Choose a service</h3>
     ${list.length ? `<div class="hub-grid">${list.map((h, i) => hubTile(h) + (i === Math.min(1, list.length - 1) ? pauseBanner() : "")).join("")}</div>`
       : `<div class="empty">No services are open right now. Please check again later.</div>`}
+    ${list.some(h => h.id === "suuq") && (settings.suuqCats || []).length ? `<h3 style="font-size:17px">Shop by category</h3><div class="hub-grid">${settings.suuqCats.map(SUUQ.catTile).join("")}</div>` : ""}
     </div>
   </div>${vDrawer()}`;
 }
@@ -1113,6 +1114,7 @@ function bind() {
   bindFace();
   appEl.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
   appEl.querySelectorAll("[data-svcgo]").forEach(b => b.onclick = () => openService(b.dataset.svcgo));
+  appEl.querySelectorAll("[data-catgo]").forEach(b => b.onclick = () => SUUQ.openCategory(b.dataset.catgo));
   bindHubSearch();
   bindEarnPay();
   if (["suuq", "visa", "scholarship", "wallet", "affiliate"].includes(S.service) && S.user?.role === "customer") SUUQ.bind(appEl);

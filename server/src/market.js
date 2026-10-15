@@ -918,6 +918,63 @@ module.exports = function market(ctx) {
     await pushOrder(id);
     send(res, 200, { order: orderRow(await db.get(`${ORDER_SELECT} WHERE o.id = ?`, id), false), balances: await balances(u.id) });
   });
+  // Several products bought together, with no cart: one PIN, one payment (Wallet, or one Safe payment by phone).
+  // Each product becomes its own order with its own seller; a Safe payment ties them together (pay_group).
+  route("POST", "/api/suuq/orders/multi", async (req, res) => {
+    const u = await needRole(req, "customer"), b = await readJson(req, 64 * 1024);
+    const items = Array.isArray(b.items) ? b.items.slice(0, 21) : [];
+    if (!items.length) fail("Choose at least one product.");
+    if (items.length > 20) fail("Choose up to 20 products at a time.");
+    const method = b.method === "safe" ? "safe" : "wallet", lines = [];
+    for (const it of items) {
+      const p = await db.get(`${PROD_SELECT} WHERE p.id = ? AND ${LIVE_T}`, String(it.product_id), now());
+      if (!p) fail("One of the products is not available any more.", 404);
+      if (p.mode !== "buy" || p.price_hidden || p.service === "ticket") fail(`${p.name} can't be bought together with other products. Open it to order it.`);
+      if (p.owner_id === u.id) fail("You can't order your own product.");
+      if (PAUSES.includes(p.shop_pause)) fail(pauseMsg(p.shop_name, p.shop_pause));
+      if (!await marketOpen(p.service || "suuq")) fail(`${MNAME[p.service || "suuq"]} is not available right now.`);
+      if (lines.some(l => l.p.id === p.id)) continue;
+      const qty = Math.floor(Number(it.qty) || 1); if (qty < 1 || qty > 100) fail("Choose a quantity between 1 and 100.");
+      lines.push({ p, qty, ref: it.ref });
+    }
+    const cur = lines[0].p.cur;
+    if (lines.some(l => l.p.cur !== cur)) fail("Choose products in one currency (all USD or all SLSH).");
+    for (const l of lines) {
+      await rememberRef(u.id, l.p, l.ref);
+      let aff = (await firstSender(u.id, l.p.id))?.id || null;
+      if (!aff) { const me = await earner(u.ref_code); if (me && me.id === u.id && me.id !== l.p.owner_id) aff = me.id; }
+      l.aff = aff; l.total = round(cur, l.p.price * l.qty); l.commission = aff ? COMMISSION(l.p, l.qty) : 0;
+    }
+    const total = round(cur, lines.reduce((a, l) => a + l.total, 0));
+    let plan = null;
+    if (method === "safe") {
+      const secs = new Set(lines.map(l => sectionOf(l.p.service)));
+      if (secs.size > 1) fail("Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.");
+      plan = await payPlan("safe", b.via, cur, total, null, lines[0].p.service);
+    }
+    await needPin(u, b.pin);
+    const group = lines.length > 1 && plan ? crypto.randomUUID() : "", note = String(b.note || "").trim().slice(0, 300), ids = [];
+    await tx(async () => {
+      if (!plan && await balance(u.id, cur) < total) fail(`Your wallet doesn't have enough ${cur}. Top up your wallet first.`);
+      for (const [i, l] of lines.entries()) {
+        const p = l.p;
+        if (Number(p.stock) >= 0 && (await db.run("UPDATE products SET stock = stock - 1 WHERE id = ? AND stock > 0", p.id)).changes !== 1) fail(`${p.name} is sold out.`);
+        const id = crypto.randomUUID(), ref = "SQ" + crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 7);
+        if (!plan) await ledger(u.id, cur, -l.total, "order_payment", ref, `${p.name} × ${l.qty}`);
+        await db.run(`INSERT INTO orders (id, ref, product_id, shop_id, buyer_id, seller_id, kind, product_name, qty, unit_price, total, cur, commission, affiliate_id, status, note, created_at, updated_at, pay_method, pay_fee, pay_ussd)
+                    VALUES (?, ?, ?, ?, ?, ?, 'buy', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, ref, p.id, p.shop_id, u.id, p.owner_id, p.name, l.qty, p.price, l.total, cur, l.commission, l.aff,
+                    plan ? "awaiting_payment" : "paid", note, now(), now(), plan ? "safe" : "wallet", plan && i === 0 ? plan.fee : 0, plan ? plan.ussd : "");
+        if (Number(p.stock) >= 0) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
+        if (plan?.section) await db.run("UPDATE orders SET safe_svc = ? WHERE id = ?", plan.section, id);
+        if (group) await db.run("UPDATE orders SET pay_group = ? WHERE id = ?", group, id);
+        ids.push(id);
+      }
+    });
+    if (plan) await safeAlarm(ids[0], plan.section, u.name, lines.length > 1 ? `${lines.length} products` : lines[0].p.name, round(cur, total + plan.fee), cur);
+    for (const id of ids) await pushOrder(id);
+    const orders = []; for (const id of ids) orders.push(orderRow(await db.get(`${ORDER_SELECT} WHERE o.id = ?`, id), false));
+    send(res, 200, { orders, total, fee: plan ? plan.fee : 0, pay_ussd: plan ? plan.ussd : "", balances: await balances(u.id) });
+  });
   route("GET", "/api/suuq/orders/mine", async (req, res) => {
     const u = await needUser(req);
     const rows = await db.all(`${ORDER_SELECT} WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, u.id), out = [];
@@ -1025,6 +1082,14 @@ module.exports = function market(ctx) {
         if (action === "decline" && seller && o.status === "awaiting_payment" && o.pay_method === "shop") return await set("payment_rejected");
         if (action === "cancel" && !seller && o.status === "awaiting_payment") return await set("cancelled");
         // Try again: dial once more, with the merchant number or the normal number.
+        if (action === "retry" && !seller && o.status === "awaiting_payment" && o.pay_group) {
+          // Products bought together: dial the whole payment again (the charge stays on the first order).
+          const grp = await db.all("SELECT * FROM orders WHERE pay_group = ? AND status = 'awaiting_payment' ORDER BY pay_fee DESC, created_at", o.pay_group);
+          const plan = await payPlan("safe", b.via, o.cur, round(o.cur, grp.reduce((a, g) => a + g.total, 0)), null, svcOf);
+          for (const [i, g] of grp.entries()) await db.run("UPDATE orders SET pay_fee = ?, pay_ussd = ?, safe_svc = ?, updated_at = ? WHERE id = ?", i === 0 ? plan.fee : 0, plan.ussd, plan.section, now(), g.id);
+          broadcast("safepay", {}, safeAudience(plan.section));
+          return;
+        }
         if (action === "retry" && !seller && o.status === "awaiting_payment") {
           const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(o.pay_method, b.via, o.cur, round(o.cur, o.total - (o.pay_discount || 0)), shop?.profile, svcOf);
           await db.run("UPDATE orders SET pay_fee = ?, pay_ussd = ?, safe_svc = ?, updated_at = ? WHERE id = ?", plan.fee, plan.ussd, plan.section, now(), o.id);
@@ -1375,6 +1440,8 @@ module.exports = function market(ctx) {
     const earner = !o.affiliate_id || !(o.commission > 0) ? "none" : o.affiliate_id === o.buyer_id ? "buyer" : "linker";
     return { ...orderRow(o, true), buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, seller_name: seller?.name || "", seller_phone: seller?.phone || "",
       buyer_id: o.buyer_id, seller_id: o.seller_id, buyer_face: !!buyer?.face, seller_face: !!seller?.face, earner, earner_name: earner === "none" ? "" : earner === "buyer" ? o.buyer_name : aff?.name || "", earner_phone: earner === "linker" ? aff?.phone || "" : "",
+      group_count: o.pay_group ? (await db.get("SELECT COUNT(*) AS n FROM orders WHERE pay_group = ?", o.pay_group)).n : 1,
+      group_paid: o.pay_group ? (r => round(o.cur, Number(r.t) || 0))(await db.get("SELECT SUM(total + pay_fee) AS t FROM orders WHERE pay_group = ?", o.pay_group)) : 0,
       paid_amount: round(o.cur, o.total - (o.pay_discount || 0) + (o.pay_fee || 0)), paid_to: o.safe_svc ? `${sec?.name || o.safe_svc} admin` : "Main money processor", section: o.safe_svc || "" };
   }
   route("GET", "/api/super/safepay", async (req, res, url) => {
@@ -1397,16 +1464,21 @@ module.exports = function market(ctx) {
   route("POST", "/api/super/safepay/:id/:decision", async (req, res, url, [id, decision]) => {
     const u = await needSafeAdmin(req);
     if (!["confirm", "reject"].includes(decision)) fail("Not found.", 404);
-    let sec = "";
+    let sec = ""; const touched = [];
     await tx(async () => {
       const o = await db.get("SELECT * FROM orders WHERE id = ?", id);
       if (!o || o.pay_method !== "safe" || !canSafe(u, o)) fail("Order not found.", 404);
       sec = o.safe_svc || "";
       if (o.status !== "awaiting_payment") fail("This payment was already handled.");
-      await db.run("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", decision === "confirm" ? "paid" : "payment_rejected", now(), o.id);
-      if (decision !== "confirm" && o.reserved) { await db.run("UPDATE orders SET reserved = 0 WHERE id = ?", o.id); await db.run("UPDATE products SET stock = stock + 1 WHERE id = ? AND stock >= 0", o.product_id); }
+      // Products bought together were paid in one payment: they are confirmed (or rejected) together.
+      const group = o.pay_group ? await db.all("SELECT * FROM orders WHERE pay_group = ? AND status = 'awaiting_payment'", o.pay_group) : [o];
+      for (const g of group) {
+        await db.run("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", decision === "confirm" ? "paid" : "payment_rejected", now(), g.id);
+        if (decision !== "confirm" && g.reserved) { await db.run("UPDATE orders SET reserved = 0 WHERE id = ?", g.id); await db.run("UPDATE products SET stock = stock + 1 WHERE id = ? AND stock >= 0", g.product_id); }
+        touched.push(g.id);
+      }
     });
-    await pushOrder(id);
+    for (const t of touched) await pushOrder(t);
     broadcast("safepay", {}, safeAudience(sec));
     send(res, 200, { ok: true });
   });

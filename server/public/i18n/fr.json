@@ -1411,7 +1411,15 @@
   "Week (from Saturday)": "Semaine (à partir du samedi)",
   "More products": "Autres produits",
   "No products in this category yet.": "Pas encore de produits dans cette catégorie.",
-  "No products yet. Merchants can add theirs from My shop.": "Pas encore de produits. Les marchands peuvent ajouter les leurs depuis Ma boutique."
+  "No products yet. Merchants can add theirs from My shop.": "Pas encore de produits. Les marchands peuvent ajouter les leurs depuis Ma boutique.",
+  "Shop by category": "Acheter par catégorie",
+  "All products": "Tous les produits",
+  "Choose products in one currency": "Choisissez des produits dans une seule devise",
+  "One payment by phone for everything · held safely until you receive it": "Un seul paiement par téléphone pour tout · gardé en sécurité jusqu'à réception",
+  "Choose at least one product.": "Choisissez au moins un produit.",
+  "Choose up to 20 products at a time.": "Choisissez jusqu'à 20 produits à la fois.",
+  "Choose products in one currency (all USD or all SLSH).": "Choisissez des produits dans une seule devise (tout en USD ou tout en SLSH).",
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "Le paiement sécurisé fonctionne pour les produits d'une seule section à la fois. Payez avec votre portefeuille ou achetez-les séparément."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1612,6 +1620,15 @@
   "Paused until {0}": "En pause jusqu'à {0}",
   "{0} isn't taking calls right now. Send a message instead.": "{0} n'accepte pas d'appels pour le moment. Envoyez plutôt un message.",
   "Your shop is registered as {0}, so you can only add {1}.": "Votre boutique est enregistrée comme {0}, vous pouvez donc ajouter uniquement des {1}.",
-  "See all ({0})": "Tout voir ({0})"
+  "See all ({0})": "Tout voir ({0})",
+  "{0} chosen": "{0} choisi(s)",
+  "Buy {0} products": "Acheter {0} produits",
+  "Buy {0} product": "Acheter {0} produit",
+  "{0} orders placed": "{0} commandes passées",
+  "Choose {0} to buy": "Choisir {0} pour l'acheter",
+  "{0} can't be bought together with other products. Open it to order it.": "{0} ne peut pas être acheté avec d'autres produits. Ouvrez-le pour le commander.",
+  "{0} is sold out.": "{0} est épuisé.",
+  "Your phone is dialling to pay {0} for everything. The money is held safely and each seller gets paid after you confirm you received their product.": "Votre téléphone compose pour payer {0} pour tout. L'argent est gardé en sécurité et chaque vendeur est payé après que vous confirmez avoir reçu son produit.",
+  "We took {0} from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.": "Nous avons pris {0} de votre portefeuille et le gardons en sécurité. Chaque vendeur est payé après que vous confirmez avoir reçu son produit."
  }
 }

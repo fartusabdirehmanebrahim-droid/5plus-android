@@ -1411,7 +1411,15 @@
   "Week (from Saturday)": "ሳምንት (ከቅዳሜ ጀምሮ)",
   "More products": "ተጨማሪ ምርቶች",
   "No products in this category yet.": "በዚህ ዘርፍ እስካሁን ምርት የለም።",
-  "No products yet. Merchants can add theirs from My shop.": "እስካሁን ምርት የለም። ነጋዴዎች ከሱቄ ማከል ይችላሉ።"
+  "No products yet. Merchants can add theirs from My shop.": "እስካሁን ምርት የለም። ነጋዴዎች ከሱቄ ማከል ይችላሉ።",
+  "Shop by category": "በዘርፍ ይግዙ",
+  "All products": "ሁሉም ምርቶች",
+  "Choose products in one currency": "በአንድ ምንዛሬ ያሉ ምርቶችን ይምረጡ",
+  "One payment by phone for everything · held safely until you receive it": "ለሁሉም አንድ የስልክ ክፍያ · እስኪደርስዎ ድረስ በደህና ይያዛል",
+  "Choose at least one product.": "ቢያንስ አንድ ምርት ይምረጡ።",
+  "Choose up to 20 products at a time.": "በአንድ ጊዜ እስከ 20 ምርቶች ይምረጡ።",
+  "Choose products in one currency (all USD or all SLSH).": "በአንድ ምንዛሬ ያሉ ምርቶችን ይምረጡ (ሁሉም USD ወይም ሁሉም SLSH)።",
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "ደህንነቱ የተጠበቀ ክፍያ በአንድ ጊዜ ከአንድ ክፍል ላሉ ምርቶች ይሰራል። በቦርሳዎ ይክፈሉ ወይም ለየብቻ ይግዙ።"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1612,6 +1620,15 @@
   "Paused until {0}": "እስከ {0} ቆሟል",
   "{0} isn't taking calls right now. Send a message instead.": "{0} አሁን ጥሪ አይቀበልም። በምትኩ መልእክት ይላኩ።",
   "Your shop is registered as {0}, so you can only add {1}.": "ሱቅዎ እንደ {0} ተመዝግቧል፣ ስለዚህ {1} ብቻ ማከል ይችላሉ።",
-  "See all ({0})": "ሁሉንም ይመልከቱ ({0})"
+  "See all ({0})": "ሁሉንም ይመልከቱ ({0})",
+  "{0} chosen": "{0} ተመርጠዋል",
+  "Buy {0} products": "{0} ምርቶችን ይግዙ",
+  "Buy {0} product": "{0} ምርት ይግዙ",
+  "{0} orders placed": "{0} ትዕዛዞች ተሰጥተዋል",
+  "Choose {0} to buy": "ለመግዛት {0} ይምረጡ",
+  "{0} can't be bought together with other products. Open it to order it.": "{0} ከሌሎች ምርቶች ጋር መግዛት አይቻልም። ለማዘዝ ይክፈቱት።",
+  "{0} is sold out.": "{0} አልቋል።",
+  "Your phone is dialling to pay {0} for everything. The money is held safely and each seller gets paid after you confirm you received their product.": "ስልክዎ ለሁሉም {0} ለመክፈል እየደወለ ነው። ገንዘቡ በደህና ይያዛል፣ እያንዳንዱ ሻጭ ምርቱ እንደደረሰዎ ሲያረጋግጡ ይከፈለዋል።",
+  "We took {0} from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.": "{0} ከቦርሳዎ ወስደን በደህና እንይዘዋለን። እያንዳንዱ ሻጭ ምርቱ እንደደረሰዎ ሲያረጋግጡ ይከፈለዋል።"
  }
 }

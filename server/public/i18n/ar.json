@@ -1411,7 +1411,15 @@
   "Week (from Saturday)": "الأسبوع (من السبت)",
   "More products": "منتجات أخرى",
   "No products in this category yet.": "لا توجد منتجات في هذه الفئة بعد.",
-  "No products yet. Merchants can add theirs from My shop.": "لا توجد منتجات بعد. يمكن للتجار إضافة منتجاتهم من متجري."
+  "No products yet. Merchants can add theirs from My shop.": "لا توجد منتجات بعد. يمكن للتجار إضافة منتجاتهم من متجري.",
+  "Shop by category": "تسوّق حسب الفئة",
+  "All products": "كل المنتجات",
+  "Choose products in one currency": "اختر منتجات بعملة واحدة",
+  "One payment by phone for everything · held safely until you receive it": "دفعة واحدة بالهاتف لكل شيء · محفوظة بأمان حتى تستلم",
+  "Choose at least one product.": "اختر منتجًا واحدًا على الأقل.",
+  "Choose up to 20 products at a time.": "اختر حتى 20 منتجًا في المرة.",
+  "Choose products in one currency (all USD or all SLSH).": "اختر منتجات بعملة واحدة (كلها USD أو كلها SLSH).",
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "الدفع الآمن يعمل لمنتجات قسم واحد في كل مرة. ادفع من محفظتك أو اشترها بشكل منفصل."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",
@@ -1612,6 +1620,15 @@
   "Paused until {0}": "متوقفة حتى {0}",
   "{0} isn't taking calls right now. Send a message instead.": "{0} لا يستقبل المكالمات الآن. أرسل رسالة بدلًا من ذلك.",
   "Your shop is registered as {0}, so you can only add {1}.": "متجرك مسجل باسم {0}، لذا يمكنك إضافة {1} فقط.",
-  "See all ({0})": "عرض الكل ({0})"
+  "See all ({0})": "عرض الكل ({0})",
+  "{0} chosen": "تم اختيار {0}",
+  "Buy {0} products": "اشترِ {0} منتجات",
+  "Buy {0} product": "اشترِ {0} منتج",
+  "{0} orders placed": "تم تقديم {0} طلبات",
+  "Choose {0} to buy": "اختر {0} للشراء",
+  "{0} can't be bought together with other products. Open it to order it.": "لا يمكن شراء {0} مع منتجات أخرى. افتحه لطلبه.",
+  "{0} is sold out.": "{0} نفد.",
+  "Your phone is dialling to pay {0} for everything. The money is held safely and each seller gets paid after you confirm you received their product.": "هاتفك يتصل لدفع {0} عن كل شيء. يُحفظ المال بأمان ويحصل كل بائع على ماله بعد تأكيدك استلام منتجه.",
+  "We took {0} from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.": "أخذنا {0} من محفظتك ونحتفظ به بأمان. يحصل كل بائع على ماله بعد تأكيدك استلام منتجه."
  }
 }

@@ -120,6 +120,7 @@ function publicSettings(s) {
   return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "", gallery: galleryOut(x) })),
     premierPayTo: s.agentNums.premier || "", minUsd: MIN_USD_RECEIVE,
     safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct,
+    suuqCats: (s.bizCats || []).filter(c => c.section === "suuq").map(c => c.name),
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };
 }
 

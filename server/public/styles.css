@@ -1213,16 +1213,34 @@ img, video, iframe{max-width:100%}
 .pa-pin { font-size: 26px; letter-spacing: 14px; text-align: center; }
 .pin-card .row-actions { justify-content: flex-end; }
 
-/* Suuq by category */
-.cat-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: none; }
-.cat-bar::-webkit-scrollbar { display: none; }
-.cat-bar button { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 78px; padding: 8px 4px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); font-size: 11.5px; font-weight: 600; color: var(--ink-2); line-height: 1.2; text-align: center; }
-.cat-bar button .ce { font-size: 26px; line-height: 1; }
-.cat-bar button[aria-pressed="true"] { background: var(--green-soft); border-color: var(--green); color: var(--green); }
-.cat-bar button.empty-cat { opacity: .55; }
-.cat-sec { display: flex; flex-direction: column; gap: 8px; }
-.cat-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.cat-h h3 { font-size: 16px; margin: 0; }
-.cat-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 46%); gap: 10px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
-.cat-row > * { scroll-snap-align: start; }
-@media (min-width: 700px) { .cat-row { grid-auto-columns: minmax(170px, 23%); } }
+/* Suuq categories: tiles on the home screen, and the chosen category at the top of Suuq */
+.cat-art { display: grid; place-items: center; }
+.cat-emo { width: 64%; aspect-ratio: 1; max-width: 96px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.88); font-size: clamp(30px, 9vw, 46px); line-height: 1; box-shadow: 0 8px 18px -10px rgba(0,0,0,.4); }
+.cat-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: var(--surface-2); }
+.cat-head .cat-emo-s { font-size: 26px; }
+.cat-head b { flex: 1; font: 700 17px var(--display); }
+.cat-head .btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+
+/* Buy several products together: the circle on cards, the bar at the bottom, the list in the checkout */
+.pcard-w { container-type: inline-size; }
+.pick-btn { position: absolute; z-index: 2; left: 8px; top: 38px; top: calc(100cqw - 48px); width: 38px; height: 38px; border-radius: 50%; border: 2px solid #fff; background: rgba(15,39,36,.55); color: #fff; font-size: 22px; font-weight: 700; line-height: 1; display: grid; place-items: center; cursor: pointer; box-shadow: 0 4px 12px -4px rgba(0,0,0,.5); }
+.pick-btn[aria-pressed="true"] { background: var(--green); }
+.pick-btn:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.pick-bar { position: fixed; z-index: 900; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom)); width: min(560px, calc(100% - 24px)); display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; border-radius: 18px; background: var(--ink); color: #fff; box-shadow: 0 14px 30px -12px rgba(0,0,0,.55); }
+.pick-bar .pb-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pick-bar .pb-t b { font-size: 15px; }
+.pick-bar .pb-t small { font-size: 13px; opacity: .85; }
+.pick-bar .btn { min-height: 40px; padding: 8px 14px; }
+.pick-bar .btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+.multi-list { display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto; }
+.mi { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; }
+.mi-img { width: 48px; height: 48px; flex: none; border-radius: 10px; overflow: hidden; background: var(--surface-2); }
+.mi-img img { width: 100%; height: 100%; object-fit: cover; }
+.mi-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mi-t b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mi-t small { color: var(--ink-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mi .qty.mini { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 4px; flex: none; width: auto; padding: 0; margin: 0; background: none; border: 0; }
+.mi .qty.mini b { min-width: 20px; text-align: center; }
+.mi .qty.mini .icon-btn { width: 30px; height: 30px; min-height: 30px; padding: 0; }
+.mi-rm { width: 30px; height: 30px; flex: none; }
+.multi-done { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-2); text-align: left; width: 100%; }

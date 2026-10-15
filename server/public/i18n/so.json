@@ -1410,7 +1410,15 @@
   "Week (from Saturday)": "Toddobaad (laga bilaabo Sabti)",
   "More products": "Alaab kale",
   "No products in this category yet.": "Weli alaab kuma jirto qaybtan.",
-  "No products yet. Merchants can add theirs from My shop.": "Weli alaab ma jirto. Ganacsatadu waxay ka dari karaan Dukaankayga."
+  "No products yet. Merchants can add theirs from My shop.": "Weli alaab ma jirto. Ganacsatadu waxay ka dari karaan Dukaankayga.",
+  "Shop by category": "Ka iibso qaybaha",
+  "All products": "Dhammaan alaabta",
+  "Choose products in one currency": "Dooro alaab hal lacag ah",
+  "One payment by phone for everything · held safely until you receive it": "Hal lacag-bixin oo taleefan ah oo dhammaan ah · si ammaan ah ayaa loo hayaa ilaa aad hesho",
+  "Choose at least one product.": "Dooro ugu yaraan hal alaab.",
+  "Choose up to 20 products at a time.": "Dooro ilaa 20 alaab hal mar.",
+  "Choose products in one currency (all USD or all SLSH).": "Dooro alaab hal lacag ah (dhammaan USD ama dhammaan SLSH).",
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "Lacag-bixinta ammaanka ah waxay u shaqaysaa alaab hal qayb ah hal mar. Ku bixi boorsadaada, ama kala iibso."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
@@ -1611,6 +1619,15 @@
   "Paused until {0}": "La joojiyay ilaa {0}",
   "{0} isn't taking calls right now. Send a message instead.": "{0} hadda wicitaan ma qaato. Fariin u dir.",
   "Your shop is registered as {0}, so you can only add {1}.": "Dukaankaagu wuxuu ka diiwaangashan yahay {0}, markaa waxaad ku dari kartaa oo keliya {1}.",
-  "See all ({0})": "Arag dhammaan ({0})"
+  "See all ({0})": "Arag dhammaan ({0})",
+  "{0} chosen": "{0} la doortay",
+  "Buy {0} products": "Iibso {0} alaab",
+  "Buy {0} product": "Iibso {0} alaab",
+  "{0} orders placed": "{0} dalab ayaa la sameeyay",
+  "Choose {0} to buy": "Dooro {0} si aad u iibsato",
+  "{0} can't be bought together with other products. Open it to order it.": "{0} lama iibsan karo alaab kale la jira. Fur si aad u dalbato.",
+  "{0} is sold out.": "{0} waa dhammaaday.",
+  "Your phone is dialling to pay {0} for everything. The money is held safely and each seller gets paid after you confirm you received their product.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0} dhammaan. Lacagta si ammaan ah ayaa loo hayaa, iibiye walbana waa la siinayaa marka aad xaqiijiso inaad heshay alaabtiisa.",
+  "We took {0} from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.": "Waxaan boorsadaada ka qaadnay {0} oo si ammaan ah ayaan u haynaa. Iibiye walba waa la siinayaa marka aad xaqiijiso inaad heshay alaabtiisa."
  }
 }

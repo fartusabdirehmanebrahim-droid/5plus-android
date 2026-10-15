@@ -306,6 +306,7 @@ async function init() {
   await addColumn("users", "calls_off_until", "INTEGER NOT NULL DEFAULT 0"); // a seller paused calls until then (-1 = until turned back on)
   await addColumn("users", "face", "TEXT NOT NULL DEFAULT ''"); // private face photo (only admins see it)
   await addColumn("users", "pause", "TEXT NOT NULL DEFAULT ''"); // Salah time or Sleep time: no new orders until the seller turns it off
+  await addColumn("orders", "pay_group", "TEXT NOT NULL DEFAULT ''"); // products bought together with one Safe payment
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")
   await addColumn("messages", "att", "TEXT NOT NULL DEFAULT ''"); // chat attachment: picture, voice message or file (JSON)
   await addColumn("service_docs", "earn_amount", "REAL NOT NULL DEFAULT 0"); // the earning the admin gave for these documents

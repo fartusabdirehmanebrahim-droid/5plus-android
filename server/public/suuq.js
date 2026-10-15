@@ -703,7 +703,7 @@ const SUUQ = (() => {
     return `<div class="view">
       <div class="svc-bar">${back("hub", "Back to services")}<b>${marketName()}</b><span style="flex:1"></span>${walletChip()}</div>
       <div class="sq-tabs" role="group" aria-label="${marketName()}">${tabs.map(([k, l]) => `<button data-sqtab="${k}" aria-pressed="${st.tab === k}">${esc(l)}</button>`).join("")}</div>
-      ${body}</div>`;
+      ${body}${st.multi ? vMultiSheet() : ""}</div>`;
   }
   // One shop's page: opened from search or from "Sold by" on a product.
   async function openShop(id) {
@@ -766,8 +766,84 @@ const SUUQ = (() => {
   function bindTikTok(root) {
     (root || document).querySelectorAll("[data-ptt]").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); shareTikTok(b.dataset.ptt); });
   }
+  /* ---------- Buy several products together (no cart) ---------- */
+  // Tick the circle on product cards; a bar shows how many are chosen and the total; Buy now pays for all of them at once.
+  const picked = new Map(); // product id → { p, qty }
+  const canPick = p => p && p.mode === "buy" && !asksPrice(p) && p.service !== "ticket" && !p.pause && S.user && p.seller_id !== S.user.id && S.user.role === "customer";
+  const PICK_IC = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const pickBtn = p => canPick(p) ? `<button class="pick-btn" data-pick="${esc(p.id)}" aria-pressed="${picked.has(p.id)}" aria-label="Choose ${esc(p.name)} to buy">${picked.has(p.id) ? PICK_IC : "+"}</button>` : "";
+  const pickTotals = () => { const t = {}; for (const { p, qty } of picked.values()) t[p.cur] = (t[p.cur] || 0) + p.price * qty; return t; };
+  function syncPickBar() {
+    let bar = document.getElementById("pick-bar");
+    if (!picked.size || st.multi) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = document.createElement("div"); bar.id = "pick-bar"; bar.className = "pick-bar"; bar.setAttribute("role", "region"); bar.setAttribute("aria-label", "Chosen products"); document.body.appendChild(bar); }
+    const t = pickTotals(), mixed = Object.keys(t).length > 1;
+    bar.innerHTML = `<span class="pb-t"><b>${picked.size} chosen</b><small class="num">${Object.entries(t).map(([c, v]) => money(v, c)).join(" · ")}${mixed ? ` · <span style="color:var(--danger)">${esc("Choose products in one currency")}</span>` : ""}</small></span>
+      <button class="btn btn-ghost" data-pickclear>Clear</button><button class="btn btn-primary" data-pickbuy ${mixed ? "disabled" : ""}>Buy now</button>`;
+  }
+  document.addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest("[data-pick], [data-pickclear], [data-pickbuy]"); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    if (b.dataset.pick) {
+      const id = b.dataset.pick;
+      if (picked.has(id)) picked.delete(id);
+      else { let p = [...(st.products || []), ...(st.favs || []), ...(st.shopView?.products || []), ...((typeof S !== "undefined" && S.techMk) || []), st.product].find(x => x && x.id === id);
+        if (p) picked.set(id, { p, qty: 1 });
+        else api(`/api/suuq/products/${encodeURIComponent(id)}`).then(r => { picked.set(id, { p: r.product, qty: 1 }); syncPickBar(); }).catch(() => {}); }
+      document.querySelectorAll(`[data-pick="${CSS.escape(id)}"]`).forEach(x => { const on = picked.has(id); x.setAttribute("aria-pressed", on); x.innerHTML = on ? PICK_IC : "+"; });
+      syncPickBar();
+    } else if (b.hasAttribute("data-pickclear")) { picked.clear(); document.querySelectorAll("[data-pick]").forEach(x => { x.setAttribute("aria-pressed", false); x.innerHTML = "+"; }); syncPickBar(); }
+    else openMulti();
+  }, true);
+  async function openMulti() {
+    if (!picked.size) return;
+    st.multi = { items: [...picked.values()].map(x => ({ p: x.p, qty: x.qty })), method: "wallet", pin: "", note: "", err: "" };
+    syncPickBar();
+    if (!inMarket()) { st.tab = "shop"; st.product = null; st.chat = null; S.service = "suuq"; await open("suuq"); }
+    await loadWallet(); render();
+  }
+  function vMultiSheet() {
+    const m = st.multi;
+    if (m.done) {
+      const d = m.done, cur = d.orders[0]?.cur || "USD";
+      return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
+        <h3 style="font-size:20px">${d.orders.length > 1 ? `${d.orders.length} orders placed` : "Order placed"}</h3>
+        <p class="note" style="margin:0">${d.pay_ussd ? `Your phone is dialling to pay <b class="num">${esc(money(d.total + d.fee, cur))}</b> for everything. The money is held safely and each seller gets paid after you confirm you received their product.` : `We took <b class="num">${esc(money(d.total, cur))}</b> from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.`}</p>
+        <div class="multi-done">${d.orders.map(o => `<span>${esc(o.product_name)} × ${o.qty} · <span class="num">${esc(o.ref)}</span></span>`).join("")}</div></div>
+        <button class="btn btn-primary btn-block" data-sq="multiorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closemulti">Keep shopping</button></div></div>`;
+    }
+    const cur = m.items[0]?.p.cur || "USD", total = m.items.reduce((a, x) => a + x.p.price * x.qty, 0), bal = st.wallet?.balances?.[cur] ?? 0;
+    const safeOk = payOptions({}, null).safe.ok; if (!safeOk) m.method = "wallet";
+    const wal = m.method === "wallet", low = wal && bal < total, fee = wal ? 0 : payFeeOf(cur, total);
+    return `<div class="sheet"><div class="sheet-card">
+      <h3 style="font-size:19px">Buy ${m.items.length} product${m.items.length > 1 ? "s" : ""}</h3>
+      <div class="multi-list">${m.items.map((x, i) => `<div class="mi"><span class="mi-img">${x.p.images[0] ? `<img src="${esc(x.p.images[0])}" alt="">` : ""}</span>
+        <span class="mi-t"><b>${esc(x.p.name)}</b><small>${esc(x.p.shop_name)} · <span class="num">${money(x.p.price, cur)}</span></small></span>
+        <span class="qty mini"><button class="icon-btn" data-mqty="${i}:-1" aria-label="Less">−</button><b class="num">${x.qty}</b><button class="icon-btn" data-mqty="${i}:1" aria-label="More">+</button></span>
+        <button class="icon-btn mi-rm" data-mrm="${i}" aria-label="Remove ${esc(x.p.name)}">✕</button></div>`).join("")}</div>
+      <div class="field"><label for="ms-note">Delivery address or note</label><input class="input" id="ms-note" maxlength="300" value="${esc(m.note)}"></div>
+      <div class="summary"><div class="sum-row total"><span>Total</span><b class="num">${money(total, cur)}</b></div>
+        ${wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, cur)}</b></div>` : `<div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div><div class="sum-row total"><span>You pay</span><b class="num">${money(total + fee, cur)}</b></div>`}</div>
+      ${safeOk ? `<div class="paym" role="radiogroup" aria-label="How do you want to pay?"><b class="paym-h">How do you want to pay?</b>
+        ${["wallet", "safe"].map(k => `<button class="paym-opt" role="radio" data-mpaym="${k}" aria-checked="${m.method === k}"><span class="paym-ic ${k}">${PAY_IC[k]}</span><span class="paym-t"><b>${PAY_NAME[k]}</b><small>${k === "wallet" ? `Balance ${money(bal, cur)} · held safely until you receive it` : "One payment by phone for everything · held safely until you receive it"}</small></span><span class="paym-dot"></span></button>`).join("")}</div>` : ""}
+      ${low ? topupInline(cur, total, m) : `<div class="field"><label for="ms-pin">Enter your PIN to place the order</label>${pinInput("ms-pin", m.pin)}</div>`}
+      <div class="err" role="alert">${esc(m.err || "")}</div>
+      ${low ? "" : `<button class="btn btn-primary btn-block" data-sq="multipay" ${(m.pin || "").length === 4 ? "" : "disabled"}>Pay ${money(wal ? total : total + fee, cur)}</button>`}
+      <button class="btn btn-ghost btn-block" data-sq="closemulti">Cancel</button></div></div>`;
+  }
+  async function placeMulti() {
+    const m = st.multi; if (!m) return;
+    m.note = (document.getElementById("ms-note") || {}).value ?? m.note;
+    if ((m.pin || "").length !== 4) { m.err = "Enter your PIN to place the order."; return render(); }
+    try {
+      const r = await api("/api/suuq/orders/multi", { body: { items: m.items.map(x => ({ product_id: x.p.id, qty: x.qty, ref: refFor(x.p.id) })), method: m.method, note: m.note, pin: m.pin } });
+      m.done = r; picked.clear(); if (r.balances && st.wallet) st.wallet.balances = r.balances;
+      if (r.pay_ussd) dialNow(r.pay_ussd);
+    } catch (e) { m.err = e.message; m.pin = ""; }
+    render();
+  }
   function productCard(p) {
-    return `<div class="pcard-w">${ttButton(p)}<button class="pcard" data-prod="${esc(p.id)}">
+    return `<div class="pcard-w">${ttButton(p)}${pickBtn(p)}<button class="pcard" data-prod="${esc(p.id)}">
       <span class="pimg">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy">` : `<span class="noimg">▶ Video</span>`}<span class="mode ${p.mode}">${p.mode === "buy" ? "Buy" : "Book"}</span>${p.pause ? `<span class="pause-tag">${p.pause === "salah" ? "Salah time" : "Sleep time"}</span>` : ""}</span>
       <span class="pbody">${hasCountry(p.service) && p.country ? `<span class="visa-country">${countryTag(p.country)}</span>` : ""}<b>${esc(p.name)}</b><span class="price ${p.price == null ? "hidden-price" : "num"}">${esc(priceText(p))}</span><small>${p.service === "scholarship" ? `<span class="by-agency">${PLANE_S}${esc(p.shop_name)}</span>` : `${esc(p.shop_name)}${p.shop_no ? ` · no. ${esc(p.shop_no)}` : ""}`}</small>${earnFor(p) ? `<span class="earn">${esc(earnFor(p))}</span>` : ""}</span></button></div>`;
   }
@@ -794,24 +870,21 @@ const SUUQ = (() => {
     "Building Materials": "🧱", "Bookshop": "📚", "Stationery": "✏️", "Cargo Services": "📦", "Computer Shop": "💻", "Fuel Station": "⛽", "Real Estate": "🏠",
     "Sports & Fitness": "⚽", "Toys & Kids Products": "🧸" };
   const catEmoji = n => CAT_EMOJI[n] || "🏷️";
-  function suuqCats() {
-    const cats = (st.bizCats || []).filter(c => c.section === "suuq").map(c => c.name);
-    for (const p of st.products) if (p.category && !cats.includes(p.category)) cats.push(p.category);
-    return cats;
-  }
+  // Suuq categories are tiles on the home screen; one opens Suuq showing that category.
+  const CAT_COLORS = { "Supermarket": ["#2E7D32", "#81C784"], "Dukan": ["#6D4C41", "#BCAAA4"], "Clothes": ["#AD1457", "#F48FB1"], "Electronics": ["#1565C0", "#64B5F6"], "Mobile Phones": ["#0277BD", "#81D4FA"],
+    "Shoes": ["#37474F", "#B0BEC5"], "Bags": ["#8E24AA", "#CE93D8"], "Cosmetics": ["#C2185B", "#F8BBD0"], "Perfumes": ["#5D4037", "#D7CCC8"], "Jewelry": ["#B8860B", "#FFE082"], "Furniture": ["#795548", "#D7CCC8"],
+    "Home Appliances": ["#00838F", "#80DEEA"], "Car Spare Parts": ["#424242", "#BDBDBD"], "Car Dealership": ["#B71C1C", "#EF9A9A"], "Hardware Store": ["#E65100", "#FFCC80"], "Building Materials": ["#8D6E63", "#EFEBE9"],
+    "Bookshop": ["#283593", "#9FA8DA"], "Stationery": ["#F9A825", "#FFF59D"], "Cargo Services": ["#4E342E", "#A1887F"], "Computer Shop": ["#455A64", "#CFD8DC"], "Fuel Station": ["#1B5E20", "#A5D6A7"],
+    "Real Estate": ["#00695C", "#80CBC4"], "Sports & Fitness": ["#33691E", "#C5E1A5"], "Toys & Kids Products": ["#EF6C00", "#FFE0B2"] };
+  const catTile = name => { const [a, b] = CAT_COLORS[name] || ["#0E7A55", "#8FD3B6"];
+    return `<button class="hub-tile is-ready cat-tile" data-catgo="${esc(name)}"><span class="hub-art cat-art" style="background:linear-gradient(135deg,${a},${b})"><span class="cat-emo" aria-hidden="true">${catEmoji(name)}</span></span><span class="hub-body"><b>${esc(name)}</b><small>Suuq</small></span></button>`; };
+  async function openCategory(name) { st.suuqCat = name; st.tab = "shop"; st.product = null; st.shopView = null; st.chat = null; S.service = "suuq"; await open("suuq"); window.scrollTo(0, 0); }
   function vSuuqBrowse() {
-    const cats = suuqCats(), cur = st.suuqCat || "", count = c => st.products.filter(p => p.category === c).length;
-    const bar = `<div class="cat-bar" role="group" aria-label="Categories"><button data-scat="" aria-pressed="${!cur}"><span class="ce">🛍️</span><span>All</span></button>
-      ${cats.map(c => `<button data-scat="${esc(c)}" aria-pressed="${cur === c}" class="${count(c) ? "" : "empty-cat"}"><span class="ce">${catEmoji(c)}</span><span>${esc(c)}</span></button>`).join("")}</div>`;
-    if (st.q || cur) {
-      const list = cur ? st.products.filter(p => p.category === cur) : st.products;
-      return bar + (list.length ? `<div class="pgrid">${list.map(productCard).join("")}</div>` : `<div class="empty">${st.q ? "Nothing matches your search." : "No products in this category yet."}</div>`);
-    }
-    const rows = cats.filter(c => count(c)).map(c => `<section class="cat-sec"><div class="cat-h"><h3><span aria-hidden="true">${catEmoji(c)}</span> ${esc(c)}</h3><button class="link-btn" data-scat="${esc(c)}">See all (${count(c)})</button></div>
-      <div class="cat-row">${st.products.filter(p => p.category === c).slice(0, 10).map(productCard).join("")}</div></section>`).join("");
-    const other = st.products.filter(p => !p.category || !cats.includes(p.category));
-    return bar + rows + (other.length ? `<section class="cat-sec"><div class="cat-h"><h3>More products</h3></div><div class="pgrid">${other.map(productCard).join("")}</div></section>` : "")
-      + (st.products.length ? "" : `<div class="empty">No products yet. Merchants can add theirs from My shop.</div>`);
+    const cur = st.suuqCat || "";
+    if (!cur) return st.products.length ? `<div class="pgrid">${st.products.map(productCard).join("")}</div>` : `<div class="empty">${st.q ? "Nothing matches your search." : "No products yet."}</div>`;
+    const list = st.products.filter(p => p.category === cur);
+    return `<div class="cat-head"><span class="cat-emo-s" aria-hidden="true">${catEmoji(cur)}</span><b>${esc(cur)}</b><button class="btn btn-ghost" data-scat="">All products</button></div>`
+      + (list.length ? `<div class="pgrid">${list.map(productCard).join("")}</div>` : `<div class="empty">${st.q ? "Nothing matches your search." : "No products in this category yet."}</div>`);
   }
   function vShop() {
     const visa = st.market === "visa", scholar = st.market === "scholarship";
@@ -1565,11 +1638,20 @@ const SUUQ = (() => {
     q("[data-paym]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.method = b.dataset.paym; box.err = ""; render(); });
     q("[data-payvia]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.via = b.dataset.payvia; render(); });
     pinOn("sq-pin", v => { st.orderSheet.pin = v; st.orderSheet.err = ""; }, v => root.querySelectorAll("[data-needpin]").forEach(b => b.disabled = v.length !== 4), () => { if ((st.orderSheet.pin || "").length === 4) placeOrder(); });
+    if (st.multi && !st.multi.done) {
+      const m = st.multi, keepNote = () => { const n = one("ms-note"); if (n) m.note = n.value; };
+      q("[data-mpaym]").forEach(b => b.onclick = () => { keepNote(); m.method = b.dataset.mpaym; m.err = ""; render(); });
+      q("[data-mqty]").forEach(b => b.onclick = () => { keepNote(); const [i, d] = b.dataset.mqty.split(":").map(Number); m.items[i].qty = Math.min(100, Math.max(1, m.items[i].qty + d)); m.tpAmt = undefined; render(); });
+      q("[data-mrm]").forEach(b => b.onclick = () => { keepNote(); const x = m.items.splice(Number(b.dataset.mrm), 1)[0]; if (x) picked.delete(x.p.id); if (!m.items.length) st.multi = null; render(); syncPickBar(); });
+      pinOn("ms-pin", v => { m.pin = v; m.err = ""; }, v => { const b = root.querySelector('[data-sq="multipay"]'); if (b) b.disabled = v.length !== 4; }, () => { if ((m.pin || "").length === 4) placeMulti(); });
+      bindTopupInline(m);
+    }
+    syncPickBar();
     bindComposer(one("composer"), sendMsg);
     bindMsgs(one("msgs"));
     // product editor
     q("[data-pemode]").forEach(b => b.onclick = () => { keepEdit(); st.edit.mode = b.dataset.pemode; render(); });
-    q("[data-scat]").forEach(b => b.onclick = () => { st.suuqCat = b.dataset.scat; render(); const a = document.querySelector(`.cat-bar [data-scat="${CSS.escape(st.suuqCat)}"]`); if (a) a.scrollIntoView({ inline: "center", block: "nearest" }); window.scrollTo(0, 0); });
+    q("[data-scat]").forEach(b => b.onclick = () => { st.suuqCat = b.dataset.scat; render(); window.scrollTo(0, 0); });
     q("[data-pesvc]").forEach(b => b.onclick = () => { keepEdit(); st.edit.service = b.dataset.pesvc; render(); });
     q("[data-pehide]").forEach(b => b.onclick = () => { keepEdit(); st.edit.price_hidden = b.dataset.pehide === "1"; if (!st.edit.price_label) st.edit.price_label = priceWords()[0]; render(); });
     q("[data-payorder]").forEach(b => b.onclick = async () => { await loadWallet(); const o = st.orders.find(x => x.id === b.dataset.payorder); let pay_shop = null;
@@ -1681,6 +1763,9 @@ const SUUQ = (() => {
     }
     if ((a === "newprod" || a === "newvisa" || a === "newscholar" || a === "newtech") && !mayList(a === "newvisa" ? "visa" : a === "newscholar" ? "scholarship" : a === "newtech" ? "technician" : "suuq")) { st.edit = null; st.flash = categoryNote(); render(); return; }
     if (a === "newprod" || a === "newvisa" || a === "newscholar" || a === "newtech") { st.flash = ""; st.edit = { id: null, service: a === "newvisa" ? "visa" : a === "newscholar" ? "scholarship" : a === "newtech" ? "technician" : "suuq", price_hidden: false, price_label: priceWords()[0], name: "", price: "", cur: "USD", mode: "buy", images: [], video: "", description: "", comm_type: "percent", comm_value: 5 }; render(); return; }
+    if (a === "multipay") { if (b) b.disabled = true; return placeMulti(); }
+    if (a === "closemulti") { st.multi = null; render(); syncPickBar(); return; }
+    if (a === "multiorders") { st.multi = null; st.tab = "orders"; await loadOrders(); render(); return; }
     if (a === "closepay") { st.paySheet = null; render(); return; }
     if (a === "gowallet") { st.paySheet = null; S.service = "wallet"; st.topup = { cur: "USD", amount: "" }; await open("wallet"); return; }
     if (a === "canceledit") { st.edit = null; render(); return; }
@@ -1976,6 +2061,7 @@ const SUUQ = (() => {
       <div><dt>Seller</dt><dd>${o.seller_face ? faceAvatar(o.seller_id, o.seller_name, true, "face-sm") + " " : ""}<span data-no-i18n>${esc(o.shop_name)}${o.seller_name && o.seller_name !== o.shop_name ? " · " + esc(o.seller_name) : ""}</span>${o.seller_phone ? ` · <a href="tel:+252${esc(o.seller_phone)}" class="num">+252 ${esc(o.seller_phone)}</a>` : ""}</dd></div>
       <div><dt>Seller's price</dt><dd>${m(o.total)}${o.qty > 1 ? ` (${money(o.unit_price, o.cur)} × ${o.qty})` : ""}</dd></div>
       <div><dt>Paid</dt><dd>${m(o.paid_amount)} = price ${money(o.total, o.cur)} + charge ${money(o.pay_fee, o.cur)} · to ${esc(o.paid_to)}</dd></div>
+      ${o.group_count > 1 ? `<div><dt>One payment</dt><dd>${m(o.group_paid)} for ${o.group_count} products bought together · confirming one confirms them all</dd></div>` : ""}
       <div><dt>Earning</dt><dd>${earn}</dd></div>
       <div><dt>Seller gets</dt><dd>${m(o.net)}${o.commission > 0 ? ` (price − earning)` : ""}</dd></div></dl>`;
   }
@@ -2162,6 +2248,6 @@ const SUUQ = (() => {
   async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { CALL, onChatRead, callsOffText, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { syncPickBar, catTile, openCategory, CALL, onChatRead, callsOffText, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; heldList = null; }, state: st };
 })();
