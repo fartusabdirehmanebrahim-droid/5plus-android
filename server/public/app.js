@@ -200,6 +200,7 @@ function vAdminPw() {
 }
 /* ---------- Face photo at registration: private, only the 5PLUS administration sees it ---------- */
 const FACE_ICON = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+const CAM_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-inline-end:6px;vertical-align:-3px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 const LOCK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 // account: the person already has an account (Account page); otherwise it is part of a registration form.
 function faceField(account) {
@@ -208,11 +209,8 @@ function faceField(account) {
     <div class="face-box">
       <div class="face-pv">${f ? `<img src="${f}" alt="Your face photo">` : has ? `<span class="face-ok">✓</span>` : FACE_ICON}</div>
       <div class="face-t">
-        <p class="face-private">${LOCK_ICON}<span><b>Private.</b> Only the administration of 5PLUS can see this photo. Buyers, sellers and other users will never see your face.</span></p>
-        <small>We use it only to confirm who you are and to keep everyone safe. Look at the camera in good light, without sunglasses.</small>
         ${has ? `<small><b>Your face photo is saved.</b></small>` : ""}
-        <div class="face-acts"><label class="btn btn-ghost">${f || has ? "Take a new photo" : "Take photo"}<input type="file" accept="image/*" capture="user" data-face="${account ? "account" : "form"}" hidden></label>
-          <label class="btn-link">Choose from gallery<input type="file" accept="image/jpeg,image/png,image/webp" data-face="${account ? "account" : "form"}" hidden></label></div>
+        <div class="face-acts"><label class="btn btn-ghost">${CAM_ICON}${f || has ? "Take a new photo" : "Take photo"}<input type="file" accept="image/*" capture="user" data-face="${account ? "account" : "form"}" hidden></label></div>
         <span class="status-msg" id="st-face" role="status"></span>
       </div></div></div>`;
 }
@@ -237,7 +235,7 @@ function vMerchantSignup() {
   const steps = M_STEPS(), n = steps.length, k = m.step, last = k === n;
   const d = SUUQ.pfDraft(), dash = v => v ? esc(v) : "—";
   const review = [
-    [1, [["Full name", d.full_name], ["Birth date", d.birth_date], ["Country", d.country], ["City", d.city]]],
+    [1, [["Full name", d.full_name], ["Birth date", SarrifDate.disp(d.birth_date)], ["Country", d.country], ["City", d.city]]],
     [2, [[d.kind === "company" ? "Company" : "Shop", d.business_name], ["Address", d.address]]],
     [3, [["Phone", d.phone], ["ZAAD merchant", d.zaad_merchant], ["eDahab merchant", d.edahab_merchant], ["Shop number", d.shop_phone]]],
   ];
@@ -1406,7 +1404,7 @@ let finance = null;
 function openFinance() {
   if (finance) return finance.reload();
   finance = window.SarrifFinance.mount($("#finance-root"), {
-    canEdit: true,
+    canEdit: true, reportTitle: "5PLUS · iBedel finance report", reportName: "iBedel finance report",
     load: (fromMs, toMs, fromDate, toDate) => api(`/api/admin/finance?fromMs=${fromMs}&toMs=${toMs}&fromDate=${fromDate}&toDate=${toDate}`),
     addExpense: e => api("/api/admin/expenses", { body: e }),
     deleteExpense: id => api(`/api/admin/expenses/${encodeURIComponent(id)}`, { method: "DELETE" }),

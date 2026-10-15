@@ -3,6 +3,26 @@
    grouped by day, week or month over a chosen date range. Shared by the demo page and the real app.
    mount(root, {load(fromMs, toMs, fromDate, toDate) -> {revenue:[{at,cur,fee}], expenses:[{id,date,cur,amount,category,note}]},
                 addExpense(e), deleteExpense(id), canEdit}) */
+// Dates typed on the phone's number keyboard as DD/MM/YYYY (no calendar pop-up). The slashes are added while typing;
+// SarrifDate.iso() gives the YYYY-MM-DD the server uses ("" when the date isn't complete or real).
+window.SarrifDate = (() => {
+  const pad = n => String(n).padStart(2, "0");
+  const iso = v => {
+    v = String(v || "").trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const m = v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/); if (!m) return "";
+    const d = +m[1], mo = +m[2], y = +m[3], t = new Date(y, mo - 1, d);
+    return t.getFullYear() === y && t.getMonth() === mo - 1 && t.getDate() === d ? `${y}-${pad(mo)}-${pad(d)}` : "";
+  };
+  const disp = v => { const m = String(v || "").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(v || ""); };
+  const attrs = 'type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM/YYYY" maxlength="10" data-date';
+  document.addEventListener("input", e => {
+    const el = e.target; if (!el || !el.matches || !el.matches("[data-date]")) return;
+    const dg = el.value.replace(/\D/g, "").slice(0, 8);
+    let out = dg.slice(0, 2); if (dg.length > 2) out += "/" + dg.slice(2, 4); if (dg.length > 4) out += "/" + dg.slice(4);
+    if (el.value !== out) el.value = out;
+  }, true);
+  return { iso, disp, attrs };
+})();
 (function () {
   const CATS = ["Rent", "Salaries", "Airtime & data", "Transport", "Utilities", "Bank & wallet fees", "Marketing", "Other"];
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -13,6 +33,7 @@
   // Week starts on Saturday (Somaliland working week).
   const weekStart = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -((x.getDay() + 1) % 7)); };
   const monthStart = d => new Date(d.getFullYear(), d.getMonth(), 1);
+  const DL_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-inline-end:6px;vertical-align:-3px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
   const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function fmt(n, cur) {
     if (!isFinite(n)) n = 0;
@@ -33,6 +54,8 @@
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .fin{--rev:#24A876;--exp:#9A74E8}}
   :root[data-theme="dark"] .fin{--rev:#24A876;--exp:#9A74E8}
   .fin-filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .fin-dl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .fin-dl .btn{min-height:38px;padding:7px 12px;font-size:13.5px}
   .fin-seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px}
   .fin-seg button{border:0;background:none;padding:7px 12px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--ink-2)}
   .fin-seg button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
@@ -83,9 +106,10 @@
         <div class="fin-seg" role="group" aria-label="Date range">
           <button data-preset="today">Today</button><button data-preset="week">This week</button><button data-preset="month">This month</button><button data-preset="custom">Custom</button>
         </div>
-        <label class="fin-dates"><input type="date" id="fin-from" aria-label="From date"><span>to</span><input type="date" id="fin-to" aria-label="To date"></label>
+        <label class="fin-dates"><input ${SarrifDate.attrs} id="fin-from" aria-label="From date"><span>to</span><input ${SarrifDate.attrs} id="fin-to" aria-label="To date"></label>
         <div class="fin-seg" role="group" aria-label="Group by"><button data-group="day">Per day</button><button data-group="week">Per week</button><button data-group="month">Per month</button></div>
         <div class="fin-seg" role="group" aria-label="Currency"><button data-fcur="SLSH">SLSH</button><button data-fcur="USD">USD</button></div>
+        <div class="fin-dl"><button class="btn btn-ghost" data-fdl="pdf">${DL_ICON}Download PDF</button><button class="btn btn-ghost" data-fdl="docx">${DL_ICON}Download Word</button><span class="status-msg" id="fin-dl-msg" role="status"></span></div>
       </div>
       <div class="fin-kpis" id="fin-kpis"></div>
       <div class="fin-chart"><div class="fin-chart-head"><b id="fin-chart-title">Revenue and expenses</b>
@@ -95,7 +119,7 @@
       <div class="panel">
         <div class="panel-head"><div><h3>Add an expense</h3><p>Record money the business spends. It is taken off revenue to show profit.</p></div></div>
         <div class="fin-form">
-          <div class="mini"><label for="fx-date">Date</label><input class="input" type="date" id="fx-date"></div>
+          <div class="mini"><label for="fx-date">Date</label><input class="input" ${SarrifDate.attrs} id="fx-date"></div>
           <div class="mini"><label for="fx-cat">Category</label><select class="input" id="fx-cat">${CATS.map(c => `<option>${c}</option>`).join("")}</select></div>
           <div class="mini"><label for="fx-note">Description</label><input class="input" id="fx-note" maxlength="120" placeholder="Office rent for September"></div>
           <div class="mini"><label for="fx-cur">Currency</label><select class="input" id="fx-cur"><option>SLSH</option><option>USD</option></select></div>
@@ -110,7 +134,7 @@
       </div>
     </div>`;
     const $ = s => root.querySelector(s);
-    $("#fx-date").value = ymd(today);
+    $("#fx-date").value = SarrifDate.disp(ymd(today));
 
     function setPreset(p) {
       st.preset = p; const t = new Date();
@@ -123,14 +147,15 @@
     root.querySelectorAll("[data-group]").forEach(b => b.onclick = () => { st.group = b.dataset.group; paint(); });
     root.querySelectorAll("[data-fcur]").forEach(b => b.onclick = () => { st.cur = b.dataset.fcur; $("#fx-cur").value = st.cur; paint(); });
     const onDate = () => {
-      let f = $("#fin-from").value, t = $("#fin-to").value; if (!f || !t) return;
+      let f = SarrifDate.iso($("#fin-from").value), t = SarrifDate.iso($("#fin-to").value); if (!f || !t) return;
       if (f > t) [f, t] = [t, f];
       st.from = f; st.to = t; st.preset = "custom"; load();
     };
-    $("#fin-from").onchange = onDate; $("#fin-to").onchange = onDate;
+    // A full date typed (DD/MM/YYYY) updates the report straight away.
+    for (const k of ["#fin-from", "#fin-to"]) $(k).oninput = () => { if ($(k).value.length === 10) onDate(); };
 
     $("#fx-add").onclick = async () => {
-      const amt = parseFloat(String($("#fx-amt").value).replace(/,/g, "")), date = $("#fx-date").value, cur = $("#fx-cur").value;
+      const amt = parseFloat(String($("#fx-amt").value).replace(/,/g, "")), date = SarrifDate.iso($("#fx-date").value), cur = $("#fx-cur").value;
       const m = (t, k) => { const el = $("#fx-msg"); el.textContent = t; el.className = "status-msg " + (k || ""); };
       if (!date) return m("Choose the date of the expense.", "bad");
       if (!(amt > 0)) return m("Enter an amount above 0.", "bad");
@@ -146,6 +171,42 @@
       try { st.data = await api.load(f.getTime(), t.getTime() - 1, st.from, st.to); } catch { st.data = { revenue: [], expenses: [] }; }
       paint();
     }
+
+    // The report as it is on the screen, made into a PDF or Word file by the server.
+    function reportData() {
+      const B = buckets(), cur = st.cur, rev = B.reduce((a, b) => a + b.rev, 0), exp = B.reduce((a, b) => a + b.exp, 0), n = B.reduce((a, b) => a + b.n, 0), net = rev - exp;
+      const dd = s => { const d = parseYmd(s); return `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`; };
+      const ex = st.data.expenses.filter(x => x.cur === cur && x.date >= st.from && x.date <= st.to).sort((a, b) => b.date.localeCompare(a.date));
+      const T = window.SarrifI18n ? SarrifI18n.t : s => s, now = new Date();
+      return {
+        title: api.reportTitle || T("Finance report"),
+        subtitle: `${st.from === st.to ? dd(st.from) : `${dd(st.from)} – ${dd(st.to)}`} · ${T(st.group === "day" ? "Per day" : st.group === "week" ? "Per week" : "Per month")} · ${cur}`,
+        kpis: [[T("Revenue"), fmt(rev, cur)], [T("Expenses"), fmt(exp, cur)], [T("Net profit"), fmt(net, cur)], [T(L.count), n.toLocaleString()]],
+        head: [T(st.group === "day" ? "Day" : st.group === "week" ? "Week (from Saturday)" : "Month"), T(L.countCol), T("Revenue"), T("Expenses"), T("Net profit")],
+        rows: B.slice().reverse().map(b => [b.label, String(b.n), fmt(b.rev, cur), fmt(b.exp, cur), fmt(b.rev - b.exp, cur)]),
+        foot: [T("Total"), String(n), fmt(rev, cur), fmt(exp, cur), fmt(net, cur)],
+        expHead: [T("Date"), T("Category"), T("Description"), T("Amount")],
+        expenses: ex.map(x => [dd(x.date), T(x.category), x.note || "", fmt(x.amount, x.cur)]),
+        footer: `5PLUS · ${dd(ymd(now))} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`,
+      };
+    }
+    async function download(fmtName, btn) {
+      const m = (t, k) => { const el = $("#fin-dl-msg"); el.textContent = t; el.className = "status-msg " + (k || ""); };
+      btn.disabled = true; m("Preparing…");
+      try {
+        const res = await fetch("/api/report/export", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ format: fmtName, name: `${api.reportName || "report"} ${st.from} to ${st.to}`, report: reportData() }) });
+        const j = await res.json().catch(() => ({})); if (!res.ok) throw new Error(j.error || "The file could not be made. Try again.");
+        if (window.SarrifAndroid) { location.href = j.url; m("Saved to Downloads.", "ok"); } // the app's download manager saves it
+        else {
+          const f = await fetch(j.url, { credentials: "same-origin" }); if (!f.ok) throw new Error("The file could not be downloaded.");
+          const a = document.createElement("a"); a.href = URL.createObjectURL(await f.blob()); a.download = j.name; document.body.appendChild(a); a.click();
+          setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); m("Downloaded.", "ok");
+        }
+      } catch (e) { m(e.message || "The file could not be made. Try again.", "bad"); }
+      btn.disabled = false;
+    }
+    root.querySelectorAll("[data-fdl]").forEach(b => b.onclick = () => download(b.dataset.fdl, b));
 
     function buckets() {
       const f = parseYmd(st.from), t = parseYmd(st.to), out = [];
@@ -167,7 +228,7 @@
       root.querySelectorAll("[data-preset]").forEach(b => b.setAttribute("aria-pressed", b.dataset.preset === st.preset));
       root.querySelectorAll("[data-group]").forEach(b => b.setAttribute("aria-pressed", b.dataset.group === st.group));
       root.querySelectorAll("[data-fcur]").forEach(b => b.setAttribute("aria-pressed", b.dataset.fcur === st.cur));
-      $("#fin-from").value = st.from; $("#fin-to").value = st.to;
+      $("#fin-from").value = SarrifDate.disp(st.from); $("#fin-to").value = SarrifDate.disp(st.to);
       const B = buckets(), cur = st.cur;
       const rev = B.reduce((a, b) => a + b.rev, 0), exp = B.reduce((a, b) => a + b.exp, 0), n = B.reduce((a, b) => a + b.n, 0), net = rev - exp;
       const rangeTxt = st.from === st.to ? parseYmd(st.from).toDateString() : `${parseYmd(st.from).toDateString()} – ${parseYmd(st.to).toDateString()}`;

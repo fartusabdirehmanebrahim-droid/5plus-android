@@ -17,6 +17,12 @@ const SUUQ = (() => {
   const scholarOpen = () => (settings.services || []).some(x => x.id === "scholarship");
   const scholarOk = () => !!st.shop?.profile?.scholar && scholarOpen();
   const visaOpen = () => (settings.services || []).some(x => x.id === "visa");
+  // What this merchant may list, from the business category they registered with (null = no limit, older shops).
+  const SECTION_SVCS = { suuq: ["suuq"], technician: ["technician"], ticket: ["visa", "scholarship"] };
+  const allowedSvcs = () => { const pf = st.shop?.profile; return pf?.category ? SECTION_SVCS[pf.section] || ["suuq"] : null; };
+  const mayList = svc => { const a = allowedSvcs(); return !a || a.includes(svc); };
+  const categoryNote = () => { const pf = st.shop?.profile; if (!pf?.category) return ""; const a = allowedSvcs(), w = { suuq: "Suuq products", technician: "Technician services", visa: "visas", scholarship: "scholarships" };
+    return `Your shop is registered as ${pf.category}${pf.category_sub ? ` (${pf.category_sub})` : ""}, so you can only add ${a.map(x => w[x]).join(" and ")}.`; };
   const priceWords = () => settings.priceWords?.length ? settings.priceWords : ["Contact for price"];
   // A hidden price comes back as null for shoppers; they see the seller's words instead.
   const UNIT_NAME = { night: ["night", "Nights"], day: ["day", "Days"], hour: ["hour", "Hours"], month: ["month", "Months"], trip: ["trip", "Trips"] };
@@ -893,7 +899,7 @@ const SUUQ = (() => {
     return `<div class="sheet"><div class="sheet-card">
       <h3 style="font-size:19px">${p.mode === "buy" ? "Buy" : "Book"} ${esc(p.name)}</h3>
       <div class="qty"><span>${UNIT_NAME[p.unit] ? UNIT_NAME[p.unit][1] : "Quantity"}</span><button class="icon-btn" data-qty="-1" aria-label="Less">−</button><b class="num">${os.qty}</b><button class="icon-btn" data-qty="1" aria-label="More">+</button></div>
-      ${p.mode === "book" ? `<div class="grid2 book-when"><div class="field"><label for="sq-bdate">${p.unit === "night" ? "Check-in date" : "Date"}</label><input class="input" type="date" id="sq-bdate" min="${new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10)}" value="${esc(os.bdate || "")}"></div>
+      ${p.mode === "book" ? `<div class="grid2 book-when"><div class="field"><label for="sq-bdate">${p.unit === "night" ? "Check-in date" : "Date"}</label><input class="input" ${SarrifDate.attrs} id="sq-bdate" value="${esc(SarrifDate.disp(os.bdate || ""))}"></div>
         <div class="field"><label for="sq-btime">Time</label><input class="input" type="time" id="sq-btime" value="${esc(os.btime || "")}"></div></div>` : ""}
       <div class="field"><label for="sq-note">${p.unit === "night" ? "Check-in date and number of guests" : String(p.service).startsWith("svc:") ? "Where and when, and what you need" : p.mode === "buy" ? "Delivery address or note" : "Where, and what you need (optional)"}</label><input class="input" id="sq-note" maxlength="300" value="${esc(os.note || "")}"></div>
       <div class="summary"><div class="sum-row total"><span>Total</span><b class="num">${money(total, p.cur)}</b></div>
@@ -1296,7 +1302,7 @@ const SUUQ = (() => {
     root.querySelectorAll("[data-pfsub]").forEach(b => b.onclick = () => { keepPf(); pfDraft().category_sub = b.dataset.pfsub; render(); });
   }
   function bindPf(root) { root.querySelectorAll("[data-pfkind]").forEach(b => b.onclick = () => { keepPf(); pfDraft().kind = b.dataset.pfkind; render(); }); bindPfCat(root); }
-  function keepPf() { const d = pfDraft(); for (const k of PF_FIELDS) { const el = document.getElementById("pf-" + k); if (el) d[k] = el.value; } }
+  function keepPf() { const d = pfDraft(); for (const k of PF_FIELDS) { const el = document.getElementById("pf-" + k); if (el) d[k] = k === "birth_date" ? SarrifDate.iso(el.value) || el.value : el.value; } }
   // The form is in three parts. The merchant sign-up shows one part per step (step = 1, 2 or 3);
   // everywhere else all three parts are shown together.
   const PF_STEPS = ["About you", "Your business", "Phone and merchant numbers"];
@@ -1308,7 +1314,7 @@ const SUUQ = (() => {
     const parts = [
       () => `${head(0)}
       ${f("full_name", "Full name", 'maxlength="80" autocomplete="name"')}
-      ${f("birth_date", "Birth date", `type="date" max="${maxBirth}"`, "You must be at least 18.")}
+      <div class="field"><label for="pf-birth_date">Birth date</label><input class="input" id="pf-birth_date" value="${esc(SarrifDate.disp(d.birth_date || ""))}" ${SarrifDate.attrs}><small class="note">You must be at least 18.</small></div>
       <div class="grid2" style="grid-template-columns:1fr 1fr">
         <div class="field"><label for="pf-country">Country</label><select class="input" id="pf-country">${(st.countries || ["Somaliland"]).map(c => `<option ${c === d.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
         ${f("city", "City", 'maxlength="60" placeholder="Hargeisa"')}</div>`,
@@ -1406,7 +1412,8 @@ const SUUQ = (() => {
   }
   function vMyProducts() {
     if (st.edit) return vEditProduct();
-    return `<div class="row-actions" style="gap:8px"><button class="btn btn-primary" style="flex:1" data-sq="newprod">+ Add product</button>${visaOpen() ? `<button class="btn btn-primary" style="flex:1" data-sq="newvisa">+ Add visa</button>` : ""}${scholarOk() ? `<button class="btn btn-primary" style="flex:1" data-sq="newscholar">+ Add scholarship</button>` : ""}</div>
+    return `<div class="row-actions" style="gap:8px">${mayList("suuq") ? `<button class="btn btn-primary" style="flex:1" data-sq="newprod">+ Add product</button>` : ""}${mayList("technician") && allowedSvcs() ? `<button class="btn btn-primary" style="flex:1" data-sq="newtech">+ Add service</button>` : ""}${visaOpen() && mayList("visa") ? `<button class="btn btn-primary" style="flex:1" data-sq="newvisa">+ Add visa</button>` : ""}${scholarOk() && mayList("scholarship") ? `<button class="btn btn-primary" style="flex:1" data-sq="newscholar">+ Add scholarship</button>` : ""}</div>
+      ${categoryNote() ? `<p class="note" style="margin:0">${esc(categoryNote())}</p>` : ""}
       ${st.flash ? `<div class="instr flash">${esc(st.flash)}</div>` : ""}
       ${st.myProducts.length ? `<div class="olist">${st.myProducts.map(p => `<div class="ocard ${p.hidden || p.admin_hidden || p.approval !== "approved" ? "off" : ""}">
         ${p.images[0] ? `<img src="${esc(p.images[0])}" alt="">` : `<span class="noimg">▶</span>`}
@@ -1422,7 +1429,7 @@ const SUUQ = (() => {
     const e = st.edit;
     return `<div class="leg">
       <b style="font-family:var(--display);font-size:17px">${e.id ? (e.service === "visa" ? "Edit visa" : e.service === "scholarship" ? "Edit scholarship" : "Edit product") : (e.service === "visa" ? "New visa" : e.service === "scholarship" ? "New scholarship" : "New product")}</b>
-      ${(() => { const opts = [["suuq", "Suuq"], ...(visaOpen() ? [["visa", "Visa"]] : []), ...(scholarOk() || e.service === "scholarship" ? [["scholarship", "Scholarship"]] : []), ...((settings.services || []).some(x => x.id === "technician") || e.service === "technician" ? [["technician", "Technician"]] : [])];
+      ${(() => { const opts = [["suuq", "Suuq"], ...(visaOpen() ? [["visa", "Visa"]] : []), ...(scholarOk() || e.service === "scholarship" ? [["scholarship", "Scholarship"]] : []), ...((settings.services || []).some(x => x.id === "technician") || e.service === "technician" ? [["technician", "Technician"]] : [])].filter(([k]) => mayList(k) || e.service === k);
         return opts.length > 1 ? `<div class="field"><label>List it in</label><div class="cur-toggle" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([k, l], i) => `<button class="${i % 2 ? "SLSH" : "USD"}" data-pesvc="${k}" aria-pressed="${(e.service || "suuq") === k}">${l}</button>`).join("")}</div></div>` : ""; })()}
       ${hasCountry(e.service) ? `<div class="field"><label for="pe-country">${e.service === "scholarship" ? "Country of the scholarship" : "Country of the visa"}</label><select class="input" id="pe-country"><option value="">Choose a country…</option>${(st.countries || []).filter(c => c !== "Somaliland").map(c => `<option ${c === e.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>` : ""}
       <div class="field"><label for="pe-name">Short name</label><input class="input" id="pe-name" maxlength="60" value="${esc(e.name)}" placeholder="${e.service === "visa" ? "Tourist visa, 30 days" : e.service === "scholarship" ? "Bachelor's degree, full scholarship" : e.service === "technician" ? "Plumbing repair, one visit" : "Samsung A15 128GB"}"></div>
@@ -1616,6 +1623,7 @@ const SUUQ = (() => {
     const counts = st.myProducts.reduce((m, p) => (m[p.cur] = (m[p.cur] || 0) + 1, m), {});
     st.finance = window.SarrifFinance.mount(el, {
       canEdit: true, cur: (counts.USD || 0) >= (counts.SLSH || 0) ? "USD" : "SLSH",
+      reportTitle: `${st.shop?.name || "My shop"} · ${window.SarrifI18n ? SarrifI18n.t("Sales report") : "Sales report"}`, reportName: `${st.shop?.name || "shop"} sales report`,
       labels: { revenueSub: "What you keep from completed sales", count: "Sales completed", countCol: "Sales" },
       load: (fromMs, toMs, fromDate, toDate) => api(`/api/suuq/seller/report?fromMs=${fromMs}&toMs=${toMs}&fromDate=${fromDate}&toDate=${toDate}`),
       addExpense: e => api("/api/suuq/seller/expenses", { body: e }),
@@ -1643,6 +1651,7 @@ const SUUQ = (() => {
       if (b) b.disabled = true;
       return a === "payussd" ? placeOrder() : payQuotedUssd();
     }
+    if ((a === "newprod" || a === "newvisa" || a === "newscholar" || a === "newtech") && !mayList(a === "newvisa" ? "visa" : a === "newscholar" ? "scholarship" : a === "newtech" ? "technician" : "suuq")) { st.edit = null; st.flash = categoryNote(); render(); return; }
     if (a === "newprod" || a === "newvisa" || a === "newscholar" || a === "newtech") { st.flash = ""; st.edit = { id: null, service: a === "newvisa" ? "visa" : a === "newscholar" ? "scholarship" : a === "newtech" ? "technician" : "suuq", price_hidden: false, price_label: priceWords()[0], name: "", price: "", cur: "USD", mode: "buy", images: [], video: "", description: "", comm_type: "percent", comm_value: 5 }; render(); return; }
     if (a === "closepay") { st.paySheet = null; render(); return; }
     if (a === "gowallet") { st.paySheet = null; S.service = "wallet"; st.topup = { cur: "USD", amount: "" }; await open("wallet"); return; }
@@ -1694,11 +1703,11 @@ const SUUQ = (() => {
     catch (e) { os.err = e.message; os.pin = ""; return render(); }
     if (p.mode === "book") {
       os.bdate = (document.getElementById("sq-bdate") || {}).value || os.bdate || ""; os.btime = (document.getElementById("sq-btime") || {}).value || os.btime || "";
-      if (!os.bdate || !os.btime) { os.err = "Choose the date and time you want it."; return render(); }
+      if (!SarrifDate.iso(os.bdate) || !os.btime) { os.err = "Choose the date and time you want it."; return render(); }
     }
     try {
       const ussd = p.mode === "buy" && !asksPrice(p) && os.method && os.method !== "wallet";
-      const r = await api("/api/suuq/orders", { body: { pin: os.pin, product_id: p.id, qty: os.qty, note: os.note, ref: refFor(p.id), ...(p.mode === "book" ? { book_at: `${os.bdate} ${os.btime}` } : {}), ...(ussd ? { method: os.method, via: os.via } : {}) } });
+      const r = await api("/api/suuq/orders", { body: { pin: os.pin, product_id: p.id, qty: os.qty, note: os.note, ref: refFor(p.id), ...(p.mode === "book" ? { book_at: `${SarrifDate.iso(os.bdate)} ${os.btime}` } : {}), ...(ussd ? { method: os.method, via: os.via } : {}) } });
       os.done = r.order; if (r.balances && st.wallet) st.wallet.balances = r.balances;
       if (r.order.pay_ussd) dialNow(r.order.pay_ussd);
       try { localStorage.removeItem("sarrif.ref." + p.id); } catch {}

@@ -107,6 +107,13 @@ class MainActivity : AppCompatActivity() {
         if (web != null && System.currentTimeMillis() - lastCheck > 60_000) checkDemoUpdate()
     }
 
+    // Face photo: the phone's camera opens straight away (the page asks with capture="user").
+    private var cameraUri: Uri? = null
+    private val takePhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val u = cameraUri
+        fileCallback?.onReceiveValue(if (ok && u != null) arrayOf(u) else null)
+        fileCallback = null; cameraUri = null
+    }
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
         fileCallback = null
@@ -241,6 +248,23 @@ class MainActivity : AppCompatActivity() {
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(w, false)
         w.addJavascriptInterface(Bridge(), "SarrifAndroid")
+        // Downloads (the report as PDF or Word): saved to the phone's Downloads folder, with the login cookie.
+        w.setDownloadListener { dlUrl, ua, disposition, mime, _ ->
+            try {
+                val name = android.webkit.URLUtil.guessFileName(dlUrl, disposition, mime)
+                val req = android.app.DownloadManager.Request(Uri.parse(dlUrl))
+                    .addRequestHeader("Cookie", CookieManager.getInstance().getCookie(dlUrl) ?: "")
+                    .addRequestHeader("User-Agent", ua)
+                    .setMimeType(mime)
+                    .setTitle(name)
+                    .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, name)
+                (getSystemService(DOWNLOAD_SERVICE) as android.app.DownloadManager).enqueue(req)
+                Toast.makeText(this, "Downloading $name…", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "The file could not be downloaded.", Toast.LENGTH_LONG).show()
+            }
+        }
         w.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 if (request.url.host != assetHost) null
@@ -295,7 +319,13 @@ class MainActivity : AppCompatActivity() {
                 fileCallback?.onReceiveValue(null)
                 fileCallback = callback
                 return try {
-                    pickFiles.launch(params.createIntent())
+                    if (params.isCaptureEnabled) {
+                        val dir = File(cacheDir, "camera").apply { mkdirs() }
+                        val f = File(dir, "photo-${System.currentTimeMillis()}.jpg")
+                        val u = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "$packageName.files", f)
+                        cameraUri = u
+                        takePhoto.launch(u)
+                    } else pickFiles.launch(params.createIntent())
                     true
                 } catch (e: ActivityNotFoundException) {
                     fileCallback = null

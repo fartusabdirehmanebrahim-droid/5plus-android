@@ -1393,7 +1393,22 @@
   "or pay by phone": "أو ادفع بالهاتف",
   "Pay by phone": "ادفع بالهاتف",
   "Subscription payments": "مدفوعات الاشتراك",
-  "Top-up isn't set up yet. Contact support to add money.": "الشحن غير مُعد بعد. تواصل مع الدعم لإضافة المال."
+  "Top-up isn't set up yet. Contact support to add money.": "الشحن غير مُعد بعد. تواصل مع الدعم لإضافة المال.",
+  "Download PDF": "تنزيل PDF",
+  "Download Word": "تنزيل Word",
+  "Preparing…": "جارٍ التحضير…",
+  "Saved to Downloads.": "تم الحفظ في التنزيلات.",
+  "Downloaded.": "تم التنزيل.",
+  "The file could not be made. Try again.": "تعذر إنشاء الملف. حاول مرة أخرى.",
+  "The file could not be downloaded.": "تعذر تنزيل الملف.",
+  "This download has expired. Press Download again.": "انتهت صلاحية هذا التنزيل. اضغط تنزيل مرة أخرى.",
+  "Sales report": "تقرير المبيعات",
+  "Finance report": "التقرير المالي",
+  "Suuq products": "منتجات السوق",
+  "visas and scholarships": "التأشيرات والمنح",
+  "Technician services": "خدمات الفنيين",
+  "+ Add service": "+ أضف خدمة",
+  "Week (from Saturday)": "الأسبوع (من السبت)"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",
@@ -1592,6 +1607,7 @@
   "Business categories ({0})": "فئات النشاط التجاري ({0})",
   "Not taking calls until {0}": "لا يستقبل المكالمات حتى {0}",
   "Paused until {0}": "متوقفة حتى {0}",
-  "{0} isn't taking calls right now. Send a message instead.": "{0} لا يستقبل المكالمات الآن. أرسل رسالة بدلًا من ذلك."
+  "{0} isn't taking calls right now. Send a message instead.": "{0} لا يستقبل المكالمات الآن. أرسل رسالة بدلًا من ذلك.",
+  "Your shop is registered as {0}, so you can only add {1}.": "متجرك مسجل باسم {0}، لذا يمكنك إضافة {1} فقط."
  }
 }

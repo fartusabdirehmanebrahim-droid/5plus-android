@@ -1393,7 +1393,22 @@
   "or pay by phone": "ou payez par téléphone",
   "Pay by phone": "Payer par téléphone",
   "Subscription payments": "Paiements d'abonnement",
-  "Top-up isn't set up yet. Contact support to add money.": "La recharge n'est pas encore configurée. Contactez le support pour ajouter de l'argent."
+  "Top-up isn't set up yet. Contact support to add money.": "La recharge n'est pas encore configurée. Contactez le support pour ajouter de l'argent.",
+  "Download PDF": "Télécharger en PDF",
+  "Download Word": "Télécharger en Word",
+  "Preparing…": "Préparation…",
+  "Saved to Downloads.": "Enregistré dans Téléchargements.",
+  "Downloaded.": "Téléchargé.",
+  "The file could not be made. Try again.": "Le fichier n'a pas pu être créé. Réessayez.",
+  "The file could not be downloaded.": "Le fichier n'a pas pu être téléchargé.",
+  "This download has expired. Press Download again.": "Ce téléchargement a expiré. Appuyez à nouveau sur Télécharger.",
+  "Sales report": "Rapport des ventes",
+  "Finance report": "Rapport financier",
+  "Suuq products": "produits Suuq",
+  "visas and scholarships": "visas et bourses",
+  "Technician services": "services de technicien",
+  "+ Add service": "+ Ajouter un service",
+  "Week (from Saturday)": "Semaine (à partir du samedi)"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1592,6 +1607,7 @@
   "Business categories ({0})": "Catégories d'activité ({0})",
   "Not taking calls until {0}": "N'accepte pas d'appels jusqu'à {0}",
   "Paused until {0}": "En pause jusqu'à {0}",
-  "{0} isn't taking calls right now. Send a message instead.": "{0} n'accepte pas d'appels pour le moment. Envoyez plutôt un message."
+  "{0} isn't taking calls right now. Send a message instead.": "{0} n'accepte pas d'appels pour le moment. Envoyez plutôt un message.",
+  "Your shop is registered as {0}, so you can only add {1}.": "Votre boutique est enregistrée comme {0}, vous pouvez donc ajouter uniquement des {1}."
  }
 }

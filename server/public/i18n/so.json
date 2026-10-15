@@ -1392,7 +1392,22 @@
   "or pay by phone": "ama ku bixi taleefan",
   "Pay by phone": "Ku bixi taleefan",
   "Subscription payments": "Lacag-bixinta rukunka",
-  "Top-up isn't set up yet. Contact support to add money.": "Ku shubashadu weli lama diyaarin. La xidhiidh taageerada si aad lacag ugu darto."
+  "Top-up isn't set up yet. Contact support to add money.": "Ku shubashadu weli lama diyaarin. La xidhiidh taageerada si aad lacag ugu darto.",
+  "Download PDF": "Soo dejiso PDF",
+  "Download Word": "Soo dejiso Word",
+  "Preparing…": "Waa la diyaarinayaa…",
+  "Saved to Downloads.": "Waxaa lagu keydiyay Downloads.",
+  "Downloaded.": "Waa la soo dejiyay.",
+  "The file could not be made. Try again.": "Faylka lama samayn karin. Isku day mar kale.",
+  "The file could not be downloaded.": "Faylka lama soo dejin karin.",
+  "This download has expired. Press Download again.": "Soo dejintan way dhacday. Riix mar kale Soo dejiso.",
+  "Sales report": "Warbixinta iibka",
+  "Finance report": "Warbixinta maaliyadda",
+  "Suuq products": "alaabta Suuq",
+  "visas and scholarships": "fiisooyin iyo deeqo waxbarasho",
+  "Technician services": "adeegyada farsamada",
+  "+ Add service": "+ Ku dar adeeg",
+  "Week (from Saturday)": "Toddobaad (laga bilaabo Sabti)"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
@@ -1591,6 +1606,7 @@
   "Business categories ({0})": "Noocyada ganacsiga ({0})",
   "Not taking calls until {0}": "Wicitaan ma qaato ilaa {0}",
   "Paused until {0}": "La joojiyay ilaa {0}",
-  "{0} isn't taking calls right now. Send a message instead.": "{0} hadda wicitaan ma qaato. Fariin u dir."
+  "{0} isn't taking calls right now. Send a message instead.": "{0} hadda wicitaan ma qaato. Fariin u dir.",
+  "Your shop is registered as {0}, so you can only add {1}.": "Dukaankaagu wuxuu ka diiwaangashan yahay {0}, markaa waxaad ku dari kartaa oo keliya {1}."
  }
 }

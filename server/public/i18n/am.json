@@ -1393,7 +1393,22 @@
   "or pay by phone": "ወይም በስልክ ይክፈሉ",
   "Pay by phone": "በስልክ ይክፈሉ",
   "Subscription payments": "የምዝገባ ክፍያዎች",
-  "Top-up isn't set up yet. Contact support to add money.": "መሙላት ገና አልተዘጋጀም። ገንዘብ ለመጨመር ድጋፍን ያግኙ።"
+  "Top-up isn't set up yet. Contact support to add money.": "መሙላት ገና አልተዘጋጀም። ገንዘብ ለመጨመር ድጋፍን ያግኙ።",
+  "Download PDF": "PDF አውርድ",
+  "Download Word": "Word አውርድ",
+  "Preparing…": "በማዘጋጀት ላይ…",
+  "Saved to Downloads.": "በውርዶች ውስጥ ተቀምጧል።",
+  "Downloaded.": "ወርዷል።",
+  "The file could not be made. Try again.": "ፋይሉ ሊሰራ አልቻለም። እንደገና ይሞክሩ።",
+  "The file could not be downloaded.": "ፋይሉ ሊወርድ አልቻለም።",
+  "This download has expired. Press Download again.": "ይህ ውርድ ጊዜው አልፏል። እንደገና አውርድን ይጫኑ።",
+  "Sales report": "የሽያጭ ሪፖርት",
+  "Finance report": "የፋይናንስ ሪፖርት",
+  "Suuq products": "የSuuq ምርቶች",
+  "visas and scholarships": "ቪዛዎች እና የትምህርት ዕድሎች",
+  "Technician services": "የቴክኒሻን አገልግሎቶች",
+  "+ Add service": "+ አገልግሎት ጨምር",
+  "Week (from Saturday)": "ሳምንት (ከቅዳሜ ጀምሮ)"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1592,6 +1607,7 @@
   "Business categories ({0})": "የንግድ ዘርፎች ({0})",
   "Not taking calls until {0}": "እስከ {0} ጥሪ አይቀበልም",
   "Paused until {0}": "እስከ {0} ቆሟል",
-  "{0} isn't taking calls right now. Send a message instead.": "{0} አሁን ጥሪ አይቀበልም። በምትኩ መልእክት ይላኩ።"
+  "{0} isn't taking calls right now. Send a message instead.": "{0} አሁን ጥሪ አይቀበልም። በምትኩ መልእክት ይላኩ።",
+  "Your shop is registered as {0}, so you can only add {1}.": "ሱቅዎ እንደ {0} ተመዝግቧል፣ ስለዚህ {1} ብቻ ማከል ይችላሉ።"
  }
 }

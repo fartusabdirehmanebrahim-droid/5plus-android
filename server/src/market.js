@@ -587,6 +587,20 @@ module.exports = function market(ctx) {
     if (hasCountry(service) && !COUNTRIES.includes(country)) fail(service === "visa" ? "Choose the country this visa is for." : "Choose the country of the scholarship.");
     return { service, country, price_hidden: price_hidden ? 1 : 0, price_label, name, description: String(b.description ?? existing?.description ?? "").trim().slice(0, 600), price: round(cur, price), cur, mode, comm_type, comm_value: comm_type === "flat" ? round(cur, comm_value) : Math.round(comm_value * 100) / 100, video: video.slice(0, 500) };
   }
+  // A merchant registered under a business category sells only in that category's section:
+  // Clothes, Electronics… → Suuq; Barber, Mechanic… → Technician; Travel Agency → visas and scholarships.
+  // Shops registered before categories existed have no limit.
+  const SECTION_SVCS = { suuq: ["suuq"], technician: ["technician"], ticket: ["visa", "scholarship"] };
+  function allowedSvcs(s) {
+    let pf = {}; try { pf = JSON.parse(s?.profile || "{}"); } catch {}
+    if (!pf.category) return null;
+    return { list: SECTION_SVCS[pf.section] || ["suuq"], category: pf.category + (pf.category_sub ? ` (${pf.category_sub})` : "") };
+  }
+  function checkCategory(s, service) {
+    const a = allowedSvcs(s); if (!a || a.list.includes(service)) return;
+    const words = { suuq: "Suuq products", technician: "Technician services", visa: "visas", scholarship: "scholarships" };
+    fail(`Your shop is registered as ${a.category}, so you can only add ${a.list.map(x => words[x]).join(" and ")}.`);
+  }
   async function sellerShop(u) {
     const s = await shopOf(u.id);
     if (!s) fail("Open your shop first.");
@@ -600,6 +614,7 @@ module.exports = function market(ctx) {
     const count = (await db.get("SELECT COUNT(*) AS n FROM products WHERE shop_id = ? AND deleted = 0 AND service != 'ticket'", s.id)).n;
     if (limit && count >= limit) fail(`Your ${plan.name} plan allows ${limit} products. Upgrade your plan to post more.`);
     const d = await readProduct(b);
+    checkCategory(s, d.service);
     if (d.service === "scholarship" && !scholarAllowed(s)) fail("Only travel agencies allowed by the Scholarship admin can post scholarships.");
     const imgs = (Array.isArray(b.newImages) ? b.newImages : []).slice(0, MAX_IMAGES);
     if (!imgs.length) fail("Add at least one photo of the product.");
@@ -620,6 +635,7 @@ module.exports = function market(ctx) {
       return send(res, 200, { ok: true });
     }
     const d = await readProduct(b, p);
+    checkCategory(s, d.service);
     if (d.service === "scholarship" && !scholarAllowed(s)) fail("Only travel agencies allowed by the Scholarship admin can post scholarships.");
     const old = JSON.parse(p.images || "[]");
     const keep = (Array.isArray(b.keepImages) ? b.keepImages : old.map(f => "/media/" + f)).map(x => path.basename(String(x))).filter(f => old.includes(f));
@@ -1430,6 +1446,29 @@ module.exports = function market(ctx) {
     const s = await saveSettings({ safePay: { merchant, number, codes } });
     broadcast("settings", publicSettings(s));
     send(res, 200, { settings: s.safePay });
+  });
+
+  /* ---------- report download: PDF or Word ---------- */
+  // The app sends the report as it shows it; the server makes the file and keeps it for 10 minutes behind a link
+  // only this person can open (the phone's download manager uses that link).
+  const { makePdf, makeDocx } = require("./report");
+  const exports_ = new Map();
+  route("POST", "/api/report/export", async (req, res) => {
+    const u = await needUser(req), b = await readJson(req, 512 * 1024);
+    const fmt = b.format === "docx" ? "docx" : "pdf";
+    const data = fmt === "pdf" ? makePdf(b.report) : makeDocx(b.report);
+    const base = String(b.name || "report").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 60) || "report";
+    const token = crypto.randomUUID(), t = now();
+    for (const [k, v] of exports_) if (v.until < t) exports_.delete(k);
+    exports_.set(token, { uid: u.id, data, name: `${base}.${fmt}`, type: fmt === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document", until: t + 10 * 60e3 });
+    send(res, 200, { url: `/api/report/file/${token}`, name: `${base}.${fmt}` });
+  });
+  route("GET", "/api/report/file/:token", async (req, res, url, [token]) => {
+    const u = await needUser(req), f = exports_.get(token);
+    if (!f || f.uid !== u.id || f.until < now()) fail("This download has expired. Press Download again.", 404);
+    const buf = Buffer.from(f.data);
+    res.writeHead(200, { "Content-Type": f.type, "Content-Length": buf.length, "Content-Disposition": `attachment; filename="${f.name}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
+    res.end(buf);
   });
 
   /* ---------- seller report and expenses ---------- */
