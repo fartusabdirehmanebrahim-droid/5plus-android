@@ -1419,7 +1419,11 @@
   "Choose at least one product.": "Choisissez au moins un produit.",
   "Choose up to 20 products at a time.": "Choisissez jusqu'à 20 produits à la fois.",
   "Choose products in one currency (all USD or all SLSH).": "Choisissez des produits dans une seule devise (tout en USD ou tout en SLSH).",
-  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "Le paiement sécurisé fonctionne pour les produits d'une seule section à la fois. Payez avec votre portefeuille ou achetez-les séparément."
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "Le paiement sécurisé fonctionne pour les produits d'une seule section à la fois. Payez avec votre portefeuille ou achetez-les séparément.",
+  "Photo saved.": "Photo enregistrée.",
+  "Saving the photo…": "Enregistrement de la photo…",
+  "Save the category first, then add its photo.": "Enregistrez d'abord la catégorie, puis ajoutez sa photo.",
+  "Merchants choose one when they register. Put each category under a section. Choices after a comma become a second question (for example Clothes → Men’s Clothing, Women’s Clothing). Tick “Shop by category” to show it on the home screen, with its photo.": "Les marchands en choisissent une à l'inscription. Placez chaque catégorie dans une section. Les choix après une virgule deviennent une deuxième question (par exemple Vêtements → Hommes, Femmes). Cochez « Acheter par catégorie » pour l'afficher sur l'écran d'accueil, avec sa photo."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",

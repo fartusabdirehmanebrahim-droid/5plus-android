@@ -1419,7 +1419,11 @@
   "Choose at least one product.": "اختر منتجًا واحدًا على الأقل.",
   "Choose up to 20 products at a time.": "اختر حتى 20 منتجًا في المرة.",
   "Choose products in one currency (all USD or all SLSH).": "اختر منتجات بعملة واحدة (كلها USD أو كلها SLSH).",
-  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "الدفع الآمن يعمل لمنتجات قسم واحد في كل مرة. ادفع من محفظتك أو اشترها بشكل منفصل."
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "الدفع الآمن يعمل لمنتجات قسم واحد في كل مرة. ادفع من محفظتك أو اشترها بشكل منفصل.",
+  "Photo saved.": "تم حفظ الصورة.",
+  "Saving the photo…": "جارٍ حفظ الصورة…",
+  "Save the category first, then add its photo.": "احفظ الفئة أولًا ثم أضف صورتها.",
+  "Merchants choose one when they register. Put each category under a section. Choices after a comma become a second question (for example Clothes → Men’s Clothing, Women’s Clothing). Tick “Shop by category” to show it on the home screen, with its photo.": "يختار التجار واحدة عند التسجيل. ضع كل فئة تحت قسم. الخيارات بعد الفاصلة تصبح سؤالًا ثانيًا (مثل ملابس → ملابس رجالية، ملابس نسائية). اختر “تسوّق حسب الفئة” لإظهارها في الشاشة الرئيسية مع صورتها."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",

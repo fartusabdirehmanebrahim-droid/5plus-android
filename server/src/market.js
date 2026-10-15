@@ -1277,10 +1277,26 @@ module.exports = function market(ctx) {
       if (seen.has(name.toLowerCase())) fail(`“${name}” is in the list twice.`); seen.add(name.toLowerCase());
       if (!sv.includes(c.section)) fail(`Choose a section for “${name}”.`);
       const subs = [...new Set((Array.isArray(c.subs) ? c.subs : String(c.subs || "").split(",")).map(x => String(x).trim().slice(0, 40)).filter(Boolean))].slice(0, 10);
-      out.push({ name, section: c.section, subs });
+      const photo = typeof c.photo === "string" && /^\/(photos\/cats\/[\w-]+\.jpg|media\/svc-cat-[\w-]+\.(jpg|png|webp))$/.test(c.photo) ? c.photo : "";
+      out.push({ name, section: c.section, subs, photo, home: !!c.home });
     }
     if (!out.length) fail("Keep at least one category.");
-    const ns = await saveSettings({ bizCats: out });
+    // Photos uploaded for categories that were removed are deleted.
+    for (const c of (await getSettings()).bizCats) if (String(c.photo || "").startsWith("/media/svc-cat-") && !out.some(o => o.photo === c.photo)) { try { await db.files.del(c.photo.slice(7)); } catch {} }
+    const ns = await saveSettings({ bizCats: out }); broadcast("settings", publicSettings(ns));
+    send(res, 200, { categories: ns.bizCats });
+  });
+
+  // A real photo for a category tile (Shop by category). Replaces the built-in or earlier photo.
+  route("POST", "/api/super/biz-categories/photo", async (req, res) => {
+    await needRole(req, "super"); const b = await readJson(req, 4 * 1024 * 1024), s = await getSettings();
+    const i = s.bizCats.findIndex(c => c.name === String(b.name || "")); if (i < 0) fail("Save the category first, then add its photo.", 404);
+    let photo = "";
+    if (b.image) { const [file] = await saveImages([b.image], "svc-cat"); photo = "/media/" + file; }
+    const old = s.bizCats[i].photo || "";
+    if (old.startsWith("/media/svc-cat-")) { try { await db.files.del(old.slice(7)); } catch {} }
+    const bizCats = s.bizCats.map((c, j) => j === i ? { ...c, photo: b.image ? photo : (b.builtin ? (require("./db").DEFAULT_BIZ_CATS || []).find(d => d.name === c.name)?.photo || "" : "") } : c);
+    const ns = await saveSettings({ bizCats }); broadcast("settings", publicSettings(ns));
     send(res, 200, { categories: ns.bizCats });
   });
 

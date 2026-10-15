@@ -536,7 +536,7 @@ function vHub() {
     <h3 style="font-size:17px">Choose a service</h3>
     ${list.length ? `<div class="hub-grid">${list.map((h, i) => hubTile(h) + (i === Math.min(1, list.length - 1) ? pauseBanner() : "")).join("")}</div>`
       : `<div class="empty">No services are open right now. Please check again later.</div>`}
-    ${list.some(h => h.id === "suuq") && (settings.suuqCats || []).length ? `<h3 style="font-size:17px">Shop by category</h3><div class="hub-grid">${settings.suuqCats.map(SUUQ.catTile).join("")}</div>` : ""}
+    ${(settings.homeCats || []).length ? `<h3 style="font-size:17px">Shop by category</h3><div class="hub-grid">${settings.homeCats.map(SUUQ.catTile).join("")}</div>` : ""}
     </div>
   </div>${vDrawer()}`;
 }
@@ -1114,7 +1114,7 @@ function bind() {
   bindFace();
   appEl.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
   appEl.querySelectorAll("[data-svcgo]").forEach(b => b.onclick = () => openService(b.dataset.svcgo));
-  appEl.querySelectorAll("[data-catgo]").forEach(b => b.onclick = () => SUUQ.openCategory(b.dataset.catgo));
+  appEl.querySelectorAll("[data-catgo]").forEach(b => b.onclick = () => SUUQ.openCategory(b.dataset.catgo, b.dataset.catsec));
   bindHubSearch();
   bindEarnPay();
   if (["suuq", "visa", "scholarship", "wallet", "affiliate"].includes(S.service) && S.user?.role === "customer") SUUQ.bind(appEl);
@@ -1664,22 +1664,39 @@ async function loadBizCats() {
   const el = document.getElementById("biz-cats-panel"); if (!el) return;
   if (!bizCats) { try { bizCats = (await api("/api/super/biz-categories")).categories.map(c => ({ ...c, subs: (c.subs || []).join(", ") })); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; } }
   const secs = (overview?.services || settings.services || []).filter(x => x.id !== "ibedel");
-  el.innerHTML = `<div class="panel-head"><div><h3>Business categories (${bizCats.length})</h3><p>Merchants choose one when they register. Put each category under a section. Choices after a comma become a second question (for example Clothes → Men’s Clothing, Women’s Clothing).</p></div>
+  el.innerHTML = `<div class="panel-head"><div><h3>Business categories (${bizCats.length})</h3><p>Merchants choose one when they register. Put each category under a section. Choices after a comma become a second question (for example Clothes → Men’s Clothing, Women’s Clothing). Tick “Shop by category” to show it on the home screen, with its photo.</p></div>
       <div class="row-actions"><span class="status-msg" id="st-bc"></span><button class="btn btn-primary" id="bc-save">Save</button></div></div>
     ${secs.map(sv => { const rows = bizCats.map((c, i) => [c, i]).filter(([c]) => c.section === sv.id); return rows.length ? `<h4 class="bc-sec">${esc(sv.name)} <span class="pill">${rows.length}</span></h4>
       <div class="bc-list">${rows.map(([c, i]) => `<div class="bc-row"><input class="input" data-bc="${i}:name" value="${esc(c.name)}" aria-label="Category name" maxlength="40">
         <select class="input" data-bc="${i}:section" aria-label="Section">${secs.map(x => `<option value="${esc(x.id)}" ${x.id === c.section ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
         <input class="input" data-bc="${i}:subs" value="${esc(c.subs)}" placeholder="Second choices (optional)" aria-label="Second choices, separated by commas">
-        <button class="icon-btn" data-bcrm="${i}" aria-label="Remove ${esc(c.name)}">✕</button></div>`).join("")}</div>` : ""; }).join("")}
+        <div class="bc-extra"><label class="bc-home"><input type="checkbox" data-bc="${i}:home" ${c.home ? "checked" : ""}> Shop by category</label>
+          <span class="bc-photo">${c.photo ? `<img src="${esc(c.photo)}" alt="">` : ""}<label class="link-btn">${c.photo ? "Change photo" : "Add photo"}<input type="file" accept="image/jpeg,image/png,image/webp" data-bcph="${i}" hidden></label>${c.photo ? `<button class="link-btn" data-bcphrm="${i}">Remove photo</button>` : ""}</span>
+          <button class="icon-btn" data-bcrm="${i}" aria-label="Remove ${esc(c.name)}">✕</button></div></div>`).join("")}</div>` : ""; }).join("")}
     <div class="bc-row bc-new"><input class="input" id="bc-name" placeholder="New category" maxlength="40" aria-label="New category name">
       <select class="input" id="bc-sec" aria-label="Section">${secs.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("")}</select>
       <input class="input" id="bc-subs" placeholder="Second choices (optional)" aria-label="Second choices"><button class="btn btn-ghost" id="bc-add">Add</button></div>`;
-  const keep = () => el.querySelectorAll("[data-bc]").forEach(i => { const [ix, f] = i.dataset.bc.split(":"); bizCats[+ix][f] = i.value; });
+  const keep = () => el.querySelectorAll("[data-bc]").forEach(i => { const [ix, f] = i.dataset.bc.split(":"); bizCats[+ix][f] = i.type === "checkbox" ? i.checked : i.value; });
+  const saveList = async () => { bizCats = (await api("/api/super/biz-categories", { method: "PUT", body: { categories: bizCats.map(c => ({ ...c, subs: String(c.subs || "").split(",") })) } })).categories.map(c => ({ ...c, subs: c.subs.join(", ") })); };
+  // A photo is saved straight away (the list is saved first, so a new or renamed category is known).
+  el.querySelectorAll("[data-bcph]").forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return; keep(); const name = bizCats[+inp.dataset.bcph].name;
+    msg("#st-bc", "Saving the photo…");
+    try { await saveList(); const image = await compressImage(f, 700_000);
+      bizCats = (await api("/api/super/biz-categories/photo", { body: { name, image } })).categories.map(c => ({ ...c, subs: c.subs.join(", ") }));
+      await loadBizCats(); msg("#st-bc", "Photo saved.", "ok"); }
+    catch (e) { msg("#st-bc", e.message, "bad"); }
+  });
+  el.querySelectorAll("[data-bcphrm]").forEach(b => b.onclick = async () => {
+    keep(); const name = bizCats[+b.dataset.bcphrm].name;
+    try { await saveList(); bizCats = (await api("/api/super/biz-categories/photo", { body: { name } })).categories.map(c => ({ ...c, subs: c.subs.join(", ") })); await loadBizCats(); msg("#st-bc", "Photo removed.", "ok"); }
+    catch (e) { msg("#st-bc", e.message, "bad"); }
+  });
   el.querySelectorAll("[data-bc]").forEach(i => i.onchange = () => { keep(); if (i.dataset.bc.endsWith(":section")) loadBizCats(); });
   el.querySelectorAll("[data-bcrm]").forEach(b => b.onclick = () => { keep(); bizCats.splice(+b.dataset.bcrm, 1); loadBizCats(); });
-  $("#bc-add").onclick = () => { keep(); const n = $("#bc-name").value.trim(); if (!n) return $("#bc-name").focus(); bizCats.push({ name: n, section: $("#bc-sec").value, subs: $("#bc-subs").value }); loadBizCats().then(() => msg("#st-bc", "Added. Press Save to keep it.", "")); };
+  $("#bc-add").onclick = () => { keep(); const n = $("#bc-name").value.trim(); if (!n) return $("#bc-name").focus(); bizCats.push({ name: n, section: $("#bc-sec").value, subs: $("#bc-subs").value, home: $("#bc-sec").value === "suuq", photo: "" }); loadBizCats().then(() => msg("#st-bc", "Added. Press Save to keep it.", "")); };
   $("#bc-save").onclick = async () => { keep();
-    try { bizCats = (await api("/api/super/biz-categories", { method: "PUT", body: { categories: bizCats.map(c => ({ ...c, subs: String(c.subs || "").split(",") })) } })).categories.map(c => ({ ...c, subs: c.subs.join(", ") })); await loadBizCats(); msg("#st-bc", "Saved. New merchants see this list.", "ok"); }
+    try { await saveList(); await loadBizCats(); msg("#st-bc", "Saved. New merchants see this list.", "ok"); }
     catch (e) { msg("#st-bc", e.message, "bad"); } };
 }
 async function loadCallSettings() {

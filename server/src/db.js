@@ -364,41 +364,41 @@ const DEFAULT_SERVICES = [
 // Business categories a merchant chooses when registering. The super admin edits the list and puts each one under a
 // section (Suuq, Technician, Hotels…). "subs": a second choice (Clothes → Men’s or Women’s).
 const DEFAULT_BIZ_CATS = [
-  {"name": "Supermarket", "section": "suuq", "subs": []},
-  {"name": "Dukan", "section": "suuq", "subs": []},
-  {"name": "Clothes", "section": "suuq", "subs": ["Men’s Clothing", "Women’s Clothing"]},
-  {"name": "Electronics", "section": "suuq", "subs": []},
-  {"name": "Mobile Phones", "section": "suuq", "subs": []},
-  {"name": "Shoes", "section": "suuq", "subs": []},
-  {"name": "Bags", "section": "suuq", "subs": []},
-  {"name": "Cosmetics", "section": "suuq", "subs": []},
-  {"name": "Perfumes", "section": "suuq", "subs": []},
-  {"name": "Jewelry", "section": "suuq", "subs": []},
-  {"name": "Furniture", "section": "suuq", "subs": []},
-  {"name": "Home Appliances", "section": "suuq", "subs": []},
-  {"name": "Restaurant", "section": "restaurant", "subs": []},
-  {"name": "Cafe", "section": "restaurant", "subs": []},
-  {"name": "Bakery", "section": "restaurant", "subs": []},
-  {"name": "Car Spare Parts", "section": "suuq", "subs": []},
-  {"name": "Car Dealership", "section": "suuq", "subs": []},
-  {"name": "Hardware Store", "section": "suuq", "subs": []},
-  {"name": "Building Materials", "section": "suuq", "subs": []},
-  {"name": "Bookshop", "section": "suuq", "subs": []},
-  {"name": "Stationery", "section": "suuq", "subs": []},
-  {"name": "Barber Shop", "section": "technician", "subs": []},
-  {"name": "Beauty Salon", "section": "technician", "subs": []},
-  {"name": "Travel Agency", "section": "ticket", "subs": []},
-  {"name": "Cargo Services", "section": "suuq", "subs": []},
-  {"name": "Computer Shop", "section": "suuq", "subs": []},
-  {"name": "Car Rental", "section": "car-rent", "subs": []},
-  {"name": "Car Wash", "section": "technician", "subs": []},
-  {"name": "Mechanic & Garage", "section": "technician", "subs": []},
-  {"name": "Fuel Station", "section": "suuq", "subs": []},
-  {"name": "Real Estate", "section": "suuq", "subs": []},
-  {"name": "Hotel", "section": "hotels", "subs": []},
-  {"name": "Printing Services", "section": "technician", "subs": []},
-  {"name": "Sports & Fitness", "section": "suuq", "subs": []},
-  {"name": "Toys & Kids Products", "section": "suuq", "subs": []}
+  {"name": "Supermarket", "section": "suuq", "subs": [], "photo": "/photos/cats/supermarket.jpg", "home": true},
+  {"name": "Dukan", "section": "suuq", "subs": [], "photo": "/photos/cats/dukan.jpg", "home": true},
+  {"name": "Clothes", "section": "suuq", "subs": ["Men’s Clothing", "Women’s Clothing"], "photo": "/photos/cats/clothes.jpg", "home": true},
+  {"name": "Electronics", "section": "suuq", "subs": [], "photo": "/photos/cats/electronics.jpg", "home": true},
+  {"name": "Mobile Phones", "section": "suuq", "subs": [], "photo": "/photos/cats/mobile-phones.jpg", "home": true},
+  {"name": "Shoes", "section": "suuq", "subs": [], "photo": "/photos/cats/shoes.jpg", "home": true},
+  {"name": "Bags", "section": "suuq", "subs": [], "photo": "/photos/cats/bags.jpg", "home": true},
+  {"name": "Cosmetics", "section": "suuq", "subs": [], "photo": "", "home": true},
+  {"name": "Perfumes", "section": "suuq", "subs": [], "photo": "", "home": true},
+  {"name": "Jewelry", "section": "suuq", "subs": [], "photo": "/photos/cats/jewelry.jpg", "home": true},
+  {"name": "Furniture", "section": "suuq", "subs": [], "photo": "/photos/cats/furniture.jpg", "home": true},
+  {"name": "Home Appliances", "section": "suuq", "subs": [], "photo": "/photos/cats/home-appliances.jpg", "home": true},
+  {"name": "Restaurant", "section": "restaurant", "subs": [], "photo": "/photos/cats/restaurant.jpg", "home": false},
+  {"name": "Cafe", "section": "restaurant", "subs": [], "photo": "/photos/cats/cafe.jpg", "home": false},
+  {"name": "Bakery", "section": "restaurant", "subs": [], "photo": "/photos/cats/bakery.jpg", "home": false},
+  {"name": "Car Spare Parts", "section": "suuq", "subs": [], "photo": "/photos/cats/car-spare-parts.jpg", "home": true},
+  {"name": "Car Dealership", "section": "suuq", "subs": [], "photo": "/photos/cats/car-dealership.jpg", "home": true},
+  {"name": "Hardware Store", "section": "suuq", "subs": [], "photo": "/photos/cats/hardware-store.jpg", "home": true},
+  {"name": "Building Materials", "section": "suuq", "subs": [], "photo": "/photos/cats/building-materials.jpg", "home": true},
+  {"name": "Bookshop", "section": "suuq", "subs": [], "photo": "/photos/cats/bookshop.jpg", "home": true},
+  {"name": "Stationery", "section": "suuq", "subs": [], "photo": "/photos/cats/stationery.jpg", "home": true},
+  {"name": "Barber Shop", "section": "technician", "subs": [], "photo": "/photos/cats/barber-shop.jpg", "home": false},
+  {"name": "Beauty Salon", "section": "technician", "subs": [], "photo": "", "home": false},
+  {"name": "Travel Agency", "section": "ticket", "subs": [], "photo": "/photos/cats/travel-agency.jpg", "home": false},
+  {"name": "Cargo Services", "section": "suuq", "subs": [], "photo": "/photos/cats/cargo-services.jpg", "home": true},
+  {"name": "Computer Shop", "section": "suuq", "subs": [], "photo": "/photos/cats/computer-shop.jpg", "home": true},
+  {"name": "Car Rental", "section": "car-rent", "subs": [], "photo": "/photos/cats/car-rental.jpg", "home": false},
+  {"name": "Car Wash", "section": "technician", "subs": [], "photo": "", "home": false},
+  {"name": "Mechanic & Garage", "section": "technician", "subs": [], "photo": "/photos/cats/mechanic-garage.jpg", "home": false},
+  {"name": "Fuel Station", "section": "suuq", "subs": [], "photo": "", "home": true},
+  {"name": "Real Estate", "section": "suuq", "subs": [], "photo": "", "home": true},
+  {"name": "Hotel", "section": "hotels", "subs": [], "photo": "/photos/cats/hotel.jpg", "home": false},
+  {"name": "Printing Services", "section": "technician", "subs": [], "photo": "", "home": false},
+  {"name": "Sports & Fitness", "section": "suuq", "subs": [], "photo": "/photos/cats/sports-fitness.jpg", "home": true},
+  {"name": "Toys & Kids Products", "section": "suuq", "subs": [], "photo": "", "home": true}
 ];
 
 const DEFAULT_SETTINGS = {
@@ -472,6 +472,8 @@ async function getSettings() {
   if (!s.suuq.plans.some(p => p.id === "free")) s.suuq.plans = structuredClone(DEFAULT_SETTINGS.suuq.plans);
   if (Number(saved.earnFeePct) >= 0) s.earnFeePct = Number(saved.earnFeePct);
   if (Array.isArray(saved.bizCats)) s.bizCats = saved.bizCats;
+  // Categories saved before photos and "Shop by category" existed get the built-in photo and the default setting.
+  s.bizCats = s.bizCats.map(c => { const d = DEFAULT_BIZ_CATS.find(x => x.name === c.name); return { ...c, photo: c.photo ?? d?.photo ?? "", home: c.home ?? (c.section === "suuq") }; });
   s.ticketAdminAgency = Number(saved.ticketAdminAgency) || 0; // the Ticket admin's agency: it gets half of all ticket requests
   if (saved.safePay) s.safePay = { ...s.safePay, ...saved.safePay, codes: { SLSH: { ...s.safePay.codes.SLSH, ...(saved.safePay.codes?.SLSH || {}) }, USD: { ...s.safePay.codes.USD, ...(saved.safePay.codes?.USD || {}) } } };
   if (saved.walletTopup) s.walletTopup = { ...s.walletTopup, ...saved.walletTopup, ussd: { ...s.walletTopup.ussd, ...(saved.walletTopup.ussd || {}) }, numbers: { ...s.walletTopup.numbers, ...(saved.walletTopup.numbers || {}) } };
@@ -501,4 +503,4 @@ async function seedAdmin() {
 function cleanPhone(p) { return String(p || "").replace(/\D/g, "").replace(/^252/, "").replace(/^0/, ""); }
 function cleanNum(p) { return String(p || "").replace(/\D/g, ""); }
 
-module.exports = { init, nextShopNo, newRefCode, PROOF_WALLETS, ARTS, db, DATA_DIR, WALLETS, CURS, getSettings, saveSettings, seedAdmin, cleanPhone, cleanNum };
+module.exports = { init, nextShopNo, newRefCode, PROOF_WALLETS, ARTS, db, DATA_DIR, WALLETS, CURS, getSettings, saveSettings, seedAdmin, cleanPhone, cleanNum, DEFAULT_BIZ_CATS };

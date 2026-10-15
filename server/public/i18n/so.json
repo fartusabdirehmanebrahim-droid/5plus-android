@@ -1418,7 +1418,11 @@
   "Choose at least one product.": "Dooro ugu yaraan hal alaab.",
   "Choose up to 20 products at a time.": "Dooro ilaa 20 alaab hal mar.",
   "Choose products in one currency (all USD or all SLSH).": "Dooro alaab hal lacag ah (dhammaan USD ama dhammaan SLSH).",
-  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "Lacag-bixinta ammaanka ah waxay u shaqaysaa alaab hal qayb ah hal mar. Ku bixi boorsadaada, ama kala iibso."
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "Lacag-bixinta ammaanka ah waxay u shaqaysaa alaab hal qayb ah hal mar. Ku bixi boorsadaada, ama kala iibso.",
+  "Photo saved.": "Sawirka waa la keydiyay.",
+  "Saving the photo…": "Sawirka waa la keydinayaa…",
+  "Save the category first, then add its photo.": "Marka hore keydi qaybta, kadib ku dar sawirkeeda.",
+  "Merchants choose one when they register. Put each category under a section. Choices after a comma become a second question (for example Clothes → Men’s Clothing, Women’s Clothing). Tick “Shop by category” to show it on the home screen, with its photo.": "Ganacsatadu mid ayay doortaan marka ay is diiwaangeliyaan. Qayb walba ku hoos dhig qayb weyn. Doorashooyinka hakadka ka dambeeya waxay noqdaan su'aal labaad (tusaale Dhar → Dharka ragga, Dharka haweenka). Calaamadee “Ka iibso qaybaha” si ay uga muuqato bogga hore, sawirkeedana la socdo."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

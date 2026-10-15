@@ -876,9 +876,14 @@ const SUUQ = (() => {
     "Home Appliances": ["#00838F", "#80DEEA"], "Car Spare Parts": ["#424242", "#BDBDBD"], "Car Dealership": ["#B71C1C", "#EF9A9A"], "Hardware Store": ["#E65100", "#FFCC80"], "Building Materials": ["#8D6E63", "#EFEBE9"],
     "Bookshop": ["#283593", "#9FA8DA"], "Stationery": ["#F9A825", "#FFF59D"], "Cargo Services": ["#4E342E", "#A1887F"], "Computer Shop": ["#455A64", "#CFD8DC"], "Fuel Station": ["#1B5E20", "#A5D6A7"],
     "Real Estate": ["#00695C", "#80CBC4"], "Sports & Fitness": ["#33691E", "#C5E1A5"], "Toys & Kids Products": ["#EF6C00", "#FFE0B2"] };
-  const catTile = name => { const [a, b] = CAT_COLORS[name] || ["#0E7A55", "#8FD3B6"];
-    return `<button class="hub-tile is-ready cat-tile" data-catgo="${esc(name)}"><span class="hub-art cat-art" style="background:linear-gradient(135deg,${a},${b})"><span class="cat-emo" aria-hidden="true">${catEmoji(name)}</span></span><span class="hub-body"><b>${esc(name)}</b><small>Suuq</small></span></button>`; };
-  async function openCategory(name) { st.suuqCat = name; st.tab = "shop"; st.product = null; st.shopView = null; st.chat = null; S.service = "suuq"; await open("suuq"); window.scrollTo(0, 0); }
+  // A "Shop by category" tile: the category's real photo, or a drawn tile until the admin adds one.
+  const catTile = c => { const [a, b] = CAT_COLORS[c.name] || ["#0E7A55", "#8FD3B6"], sec = (settings.services || []).find(x => x.id === c.section);
+    return `<button class="hub-tile is-ready cat-tile" data-catgo="${esc(c.name)}" data-catsec="${esc(c.section)}"><span class="hub-art ${c.photo ? "" : "cat-art"}" ${c.photo ? "" : `style="background:linear-gradient(135deg,${a},${b})"`}>${c.photo ? `<img class="art-photo" src="${esc(c.photo)}" alt="" loading="lazy" decoding="async">` : `<span class="cat-emo" aria-hidden="true">${catEmoji(c.name)}</span>`}</span><span class="hub-body"><b>${esc(c.name)}</b><small>${esc(sec?.name || c.section)}</small></span></button>`; };
+  // Suuq categories open Suuq with that category; categories of other sections open that section.
+  async function openCategory(name, section) {
+    if (section && section !== "suuq") return openService(section);
+    st.suuqCat = name; st.tab = "shop"; st.product = null; st.shopView = null; st.chat = null; S.service = "suuq"; await open("suuq"); window.scrollTo(0, 0);
+  }
   function vSuuqBrowse() {
     const cur = st.suuqCat || "";
     if (!cur) return st.products.length ? `<div class="pgrid">${st.products.map(productCard).join("")}</div>` : `<div class="empty">${st.q ? "Nothing matches your search." : "No products yet."}</div>`;

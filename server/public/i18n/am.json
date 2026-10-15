@@ -1419,7 +1419,11 @@
   "Choose at least one product.": "ቢያንስ አንድ ምርት ይምረጡ።",
   "Choose up to 20 products at a time.": "በአንድ ጊዜ እስከ 20 ምርቶች ይምረጡ።",
   "Choose products in one currency (all USD or all SLSH).": "በአንድ ምንዛሬ ያሉ ምርቶችን ይምረጡ (ሁሉም USD ወይም ሁሉም SLSH)።",
-  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "ደህንነቱ የተጠበቀ ክፍያ በአንድ ጊዜ ከአንድ ክፍል ላሉ ምርቶች ይሰራል። በቦርሳዎ ይክፈሉ ወይም ለየብቻ ይግዙ።"
+  "Safe payment works for products from one section at a time. Pay with your wallet, or buy them separately.": "ደህንነቱ የተጠበቀ ክፍያ በአንድ ጊዜ ከአንድ ክፍል ላሉ ምርቶች ይሰራል። በቦርሳዎ ይክፈሉ ወይም ለየብቻ ይግዙ።",
+  "Photo saved.": "ፎቶው ተቀምጧል።",
+  "Saving the photo…": "ፎቶው እየተቀመጠ ነው…",
+  "Save the category first, then add its photo.": "መጀመሪያ ዘርፉን ያስቀምጡ፣ ከዚያ ፎቶውን ያክሉ።",
+  "Merchants choose one when they register. Put each category under a section. Choices after a comma become a second question (for example Clothes → Men’s Clothing, Women’s Clothing). Tick “Shop by category” to show it on the home screen, with its photo.": "ነጋዴዎች ሲመዘገቡ አንዱን ይመርጣሉ። እያንዳንዱን ዘርፍ በአንድ ክፍል ስር ያድርጉ። ከኮማ በኋላ ያሉ ምርጫዎች ሁለተኛ ጥያቄ ይሆናሉ (ለምሳሌ ልብስ → የወንዶች፣ የሴቶች)። በመነሻ ገጹ ላይ ከፎቶው ጋር ለማሳየት “በዘርፍ ይግዙ”ን ይምረጡ።"
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

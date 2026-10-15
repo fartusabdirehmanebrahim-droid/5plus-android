@@ -1179,10 +1179,16 @@ img, video, iframe{max-width:100%}
 /* Business categories editor */
 .bc-sec { margin: 10px 0 4px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
 .bc-list { display: flex; flex-direction: column; gap: 6px; }
-.bc-row { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr auto; gap: 6px; align-items: center; }
+.bc-row { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 14px; }
+.bc-row.bc-new { grid-template-columns: 1.2fr 1fr 1.4fr auto; border: 0; padding: 0; }
+.bc-extra { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.bc-home { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.bc-home input { width: 18px; height: 18px; accent-color: var(--green); }
+.bc-photo { display: inline-flex; align-items: center; gap: 10px; flex: 1; font-size: 13px; }
+.bc-photo img { width: 64px; height: 36px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 .bc-row .input { min-height: 40px; padding: 8px 10px; font-size: 14px; }
 .bc-new { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
-@media (max-width: 600px) { .bc-row { grid-template-columns: 1fr 1fr; } .bc-row > :nth-child(3) { grid-column: 1 / 2; } }
+@media (max-width: 600px) { .bc-row, .bc-row.bc-new { grid-template-columns: 1fr 1fr; } .bc-row > :nth-child(3) { grid-column: 1 / -1; } }
 .cat-tag { display: inline-block; margin: 2px 0; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--slsh-soft); color: var(--slsh); }
 
 /* Ticks on my messages: one grey tick = sent, two green ticks = read */
