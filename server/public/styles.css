@@ -1212,3 +1212,17 @@ img, video, iframe{max-width:100%}
 .pin-card b { font: 700 18px var(--display); }
 .pa-pin { font-size: 26px; letter-spacing: 14px; text-align: center; }
 .pin-card .row-actions { justify-content: flex-end; }
+
+/* Suuq by category */
+.cat-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: none; }
+.cat-bar::-webkit-scrollbar { display: none; }
+.cat-bar button { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 78px; padding: 8px 4px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); font-size: 11.5px; font-weight: 600; color: var(--ink-2); line-height: 1.2; text-align: center; }
+.cat-bar button .ce { font-size: 26px; line-height: 1; }
+.cat-bar button[aria-pressed="true"] { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+.cat-bar button.empty-cat { opacity: .55; }
+.cat-sec { display: flex; flex-direction: column; gap: 8px; }
+.cat-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cat-h h3 { font-size: 16px; margin: 0; }
+.cat-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 46%); gap: 10px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
+.cat-row > * { scroll-snap-align: start; }
+@media (min-width: 700px) { .cat-row { grid-auto-columns: minmax(170px, 23%); } }

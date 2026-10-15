@@ -396,6 +396,7 @@ module.exports = function market(ctx) {
     if (!s) fail("Open your shop first.");
     const p = readProfile(b, (await getSettings()).bizCats, false);
     await db.run("UPDATE shops SET profile = ?, name = ? WHERE id = ?", JSON.stringify(p), p.business_name, s.id);
+    if (p.category) await db.run("UPDATE products SET category = ? WHERE shop_id = ? AND service = 'suuq'", p.category, s.id);
     send(res, 200, { shop: await publicShop(await shopOf(u.id)) });
   });
   route("GET", "/api/suuq/my-shop", async (req, res) => { const u = await needUser(req); send(res, 200, { shop: await publicShop(await shopOf(u.id)) }); });
@@ -596,6 +597,7 @@ module.exports = function market(ctx) {
     if (!pf.category) return null;
     return { list: SECTION_SVCS[pf.section] || ["suuq"], category: pf.category + (pf.category_sub ? ` (${pf.category_sub})` : "") };
   }
+  const shopCategory = s => { try { return JSON.parse(s?.profile || "{}").category || ""; } catch { return ""; } };
   function checkCategory(s, service) {
     const a = allowedSvcs(s); if (!a || a.list.includes(service)) return;
     const words = { suuq: "Suuq products", technician: "Technician services", visa: "visas", scholarship: "scholarships" };
@@ -623,6 +625,8 @@ module.exports = function market(ctx) {
     // Every new product waits for the admin's approval before customers can see it.
     await db.run(`INSERT INTO products (id, shop_id, name, description, price, cur, mode, images, video, comm_type, comm_value, service, price_hidden, price_label, country, approval, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`, id, s.id, d.name, d.description, d.price, d.cur, d.mode, JSON.stringify(files), d.video, d.comm_type, d.comm_value, d.service, d.price_hidden, d.price_label, d.country, now(), now());
+    // Suuq products take the shop's business category (Clothes, Supermarket…), so buyers can browse by category.
+    const shopCat = shopCategory(s); if (d.service === "suuq" && shopCat) await db.run("UPDATE products SET category = ? WHERE id = ?", shopCat, id);
     await announceReview(id);
     send(res, 200, { id, approval: "pending" });
   });

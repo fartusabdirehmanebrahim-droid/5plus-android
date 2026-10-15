@@ -187,6 +187,7 @@ const SUUQ = (() => {
   /* ---------- data ---------- */
   async function loadWallet() { try { st.wallet = await api("/api/wallet"); } catch {} }
   async function loadProducts() {
+    if (st.market === "suuq" && !st.bizCats) { try { st.bizCats = (await api("/api/suuq/plans")).categories || []; } catch { st.bizCats = []; } }
     try {
       const country = hasCountry(st.market) && st.visaCountry ? "&country=" + encodeURIComponent(st.visaCountry) : "";
       const r = await api(`/api/suuq/products?service=${st.market}&q=` + encodeURIComponent(st.q) + country);
@@ -787,8 +788,34 @@ const SUUQ = (() => {
         ${earnFor(p) ? `<span class="earn">${esc(earnFor(p))}</span>` : ""}</span>
       <span class="hcard-go" aria-hidden="true">›</span></button>${ttButton(p)}</div>`;
   }
+  // Suuq by business category: a bar of categories, then a row of products for each one.
+  const CAT_EMOJI = { "Supermarket": "🛒", "Dukan": "🏪", "Clothes": "👕", "Electronics": "📺", "Mobile Phones": "📱", "Shoes": "👟", "Bags": "👜", "Cosmetics": "💄",
+    "Perfumes": "🌸", "Jewelry": "💍", "Furniture": "🛋️", "Home Appliances": "🔌", "Car Spare Parts": "⚙️", "Car Dealership": "🚗", "Hardware Store": "🔨",
+    "Building Materials": "🧱", "Bookshop": "📚", "Stationery": "✏️", "Cargo Services": "📦", "Computer Shop": "💻", "Fuel Station": "⛽", "Real Estate": "🏠",
+    "Sports & Fitness": "⚽", "Toys & Kids Products": "🧸" };
+  const catEmoji = n => CAT_EMOJI[n] || "🏷️";
+  function suuqCats() {
+    const cats = (st.bizCats || []).filter(c => c.section === "suuq").map(c => c.name);
+    for (const p of st.products) if (p.category && !cats.includes(p.category)) cats.push(p.category);
+    return cats;
+  }
+  function vSuuqBrowse() {
+    const cats = suuqCats(), cur = st.suuqCat || "", count = c => st.products.filter(p => p.category === c).length;
+    const bar = `<div class="cat-bar" role="group" aria-label="Categories"><button data-scat="" aria-pressed="${!cur}"><span class="ce">🛍️</span><span>All</span></button>
+      ${cats.map(c => `<button data-scat="${esc(c)}" aria-pressed="${cur === c}" class="${count(c) ? "" : "empty-cat"}"><span class="ce">${catEmoji(c)}</span><span>${esc(c)}</span></button>`).join("")}</div>`;
+    if (st.q || cur) {
+      const list = cur ? st.products.filter(p => p.category === cur) : st.products;
+      return bar + (list.length ? `<div class="pgrid">${list.map(productCard).join("")}</div>` : `<div class="empty">${st.q ? "Nothing matches your search." : "No products in this category yet."}</div>`);
+    }
+    const rows = cats.filter(c => count(c)).map(c => `<section class="cat-sec"><div class="cat-h"><h3><span aria-hidden="true">${catEmoji(c)}</span> ${esc(c)}</h3><button class="link-btn" data-scat="${esc(c)}">See all (${count(c)})</button></div>
+      <div class="cat-row">${st.products.filter(p => p.category === c).slice(0, 10).map(productCard).join("")}</div></section>`).join("");
+    const other = st.products.filter(p => !p.category || !cats.includes(p.category));
+    return bar + rows + (other.length ? `<section class="cat-sec"><div class="cat-h"><h3>More products</h3></div><div class="pgrid">${other.map(productCard).join("")}</div></section>` : "")
+      + (st.products.length ? "" : `<div class="empty">No products yet. Merchants can add theirs from My shop.</div>`);
+  }
   function vShop() {
     const visa = st.market === "visa", scholar = st.market === "scholarship";
+    if (st.market === "suuq") return `<div class="sq-search"><input class="input" id="sq-q" placeholder="Search products or shops" value="${esc(st.q)}" aria-label="Search"></div>${vSuuqBrowse()}`;
     const cs = hasCountry(st.market) ? st.visaCountries || [] : [];
     return `${visa ? visaFeature() : ""}<div class="sq-search"><input class="input" id="sq-q" placeholder="${visa ? "Search visas, countries or agencies" : scholar ? "Search scholarships, countries or agencies" : "Search products or shops"}" value="${esc(st.q)}" aria-label="Search"></div>
       ${cs.length ? `<div class="country-chips" role="group" aria-label="Countries"><button data-vcountry="" aria-pressed="${!st.visaCountry}">🌍 All countries</button>${cs.map(c => `<button data-vcountry="${esc(c.name)}" aria-pressed="${st.visaCountry === c.name}">${countryTag(c.name)} <span>${c.n}</span></button>`).join("")}</div>` : ""}
@@ -1542,6 +1569,7 @@ const SUUQ = (() => {
     bindMsgs(one("msgs"));
     // product editor
     q("[data-pemode]").forEach(b => b.onclick = () => { keepEdit(); st.edit.mode = b.dataset.pemode; render(); });
+    q("[data-scat]").forEach(b => b.onclick = () => { st.suuqCat = b.dataset.scat; render(); const a = document.querySelector(`.cat-bar [data-scat="${CSS.escape(st.suuqCat)}"]`); if (a) a.scrollIntoView({ inline: "center", block: "nearest" }); window.scrollTo(0, 0); });
     q("[data-pesvc]").forEach(b => b.onclick = () => { keepEdit(); st.edit.service = b.dataset.pesvc; render(); });
     q("[data-pehide]").forEach(b => b.onclick = () => { keepEdit(); st.edit.price_hidden = b.dataset.pehide === "1"; if (!st.edit.price_label) st.edit.price_label = priceWords()[0]; render(); });
     q("[data-payorder]").forEach(b => b.onclick = async () => { await loadWallet(); const o = st.orders.find(x => x.id === b.dataset.payorder); let pay_shop = null;

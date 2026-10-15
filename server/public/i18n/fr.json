@@ -1408,7 +1408,10 @@
   "visas and scholarships": "visas et bourses",
   "Technician services": "services de technicien",
   "+ Add service": "+ Ajouter un service",
-  "Week (from Saturday)": "Semaine (à partir du samedi)"
+  "Week (from Saturday)": "Semaine (à partir du samedi)",
+  "More products": "Autres produits",
+  "No products in this category yet.": "Pas encore de produits dans cette catégorie.",
+  "No products yet. Merchants can add theirs from My shop.": "Pas encore de produits. Les marchands peuvent ajouter les leurs depuis Ma boutique."
  },
  "patterns": {
   "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1608,6 +1611,7 @@
   "Not taking calls until {0}": "N'accepte pas d'appels jusqu'à {0}",
   "Paused until {0}": "En pause jusqu'à {0}",
   "{0} isn't taking calls right now. Send a message instead.": "{0} n'accepte pas d'appels pour le moment. Envoyez plutôt un message.",
-  "Your shop is registered as {0}, so you can only add {1}.": "Votre boutique est enregistrée comme {0}, vous pouvez donc ajouter uniquement des {1}."
+  "Your shop is registered as {0}, so you can only add {1}.": "Votre boutique est enregistrée comme {0}, vous pouvez donc ajouter uniquement des {1}.",
+  "See all ({0})": "Tout voir ({0})"
  }
 }
