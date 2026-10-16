@@ -20,7 +20,7 @@ module.exports = function market(ctx) {
     if (userId != null) broadcast("wallet", { balances: await balances(userId) }, u => u.id === userId);
   }
   const KIND_LABEL = { topup: "Top-up", withdraw: "Withdrawal", subscription: "Suuq subscription", order_payment: "Order payment",
-    refund: "Refund", sale: "Sale", affiliate: "Affiliate earning", subscription_income: "Subscription income", earnings: "Earnings withdrawn to wallet", affiliate_fee: "Affiliate earning (paid to your shop)" };
+    refund: "Refund", sale: "Sale", affiliate: "Affiliate earning", subscription_income: "Subscription income", earnings: "Earnings withdrawn to wallet", affiliate_fee: "Affiliate earning (paid to your shop)", shop_charge: "5PLUS charge (Pay to shop)", shop_charge_income: "Pay to shop charge" };
   /* ---------- affiliate earnings ---------- */
   async function earnBalance(uid, cur) { return round(cur, (await db.get("SELECT COALESCE(SUM(amount),0) AS b FROM earnings WHERE user_id = ? AND cur = ?", uid, cur)).b); }
   const earnBalances = async uid => Object.fromEntries(await Promise.all(CURS.map(async c => [c, await earnBalance(uid, c)])));
@@ -177,7 +177,15 @@ module.exports = function market(ctx) {
     await needRole(req, "super");
     const rows = await db.all("SELECT * FROM wallet_tx WHERE user_id IS NULL ORDER BY id DESC LIMIT 200");
     const held = Object.fromEntries(await Promise.all(CURS.map(async c => [c, round(c, (await db.get("SELECT COALESCE(SUM(amount),0) AS b FROM wallet_tx WHERE user_id IS NOT NULL AND cur = ?", c)).b)])));
-    send(res, 200, { balances: await balances(null), customerMoney: held, tx: rows.map(txRow) });
+    send(res, 200, { balances: await balances(null), customerMoney: held, tx: rows.map(txRow), shopChargePct: (await getSettings()).shopChargePct || 0 });
+  });
+  // The Pay to shop charge: a percent of the price, taken from the merchant's wallet when each Pay to shop order is finished.
+  route("PUT", "/api/super/shop-charge", async (req, res) => {
+    await needRole(req, "super");
+    const b = await readJson(req), pct = Math.round(Number(b.pct) * 100) / 100;
+    if (!(pct >= 0 && pct <= 50)) fail("Enter a percent between 0 and 50.");
+    broadcast("settings", publicSettings(await saveSettings({ shopChargePct: pct })));
+    send(res, 200, { shopChargePct: pct });
   });
 
   /* ---------- media (product pictures) ---------- */
@@ -557,10 +565,11 @@ module.exports = function market(ctx) {
     if (live && u.role === "customer") await rememberRef(u.id, p, url.searchParams.get("ref"));
     const code = await shareCode(u, p);
     // Pay to shop: how many items the merchant's wallet can cover the earning for, and whether this buyer earns it.
-    const per = p.mode === "buy" && !p.price_hidden ? COMMISSION(p, 1) : 0, bal = per > 0 ? await balance(p.owner_id, p.cur) : 0;
+    const per = p.mode === "buy" && !p.price_hidden ? COMMISSION(p, 1) : 0, ch = p.mode === "buy" && !p.price_hidden ? await shopChargeOf(p.cur, p.price) : 0;
+    const bal = per + ch > 0 ? await balance(p.owner_id, p.cur) : 0, cover = x => x > 0 ? Math.min(100, Math.floor(bal / x + 1e-9)) : 100;
     const fav = !!(await db.get("SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?", u.id, p.id));
     send(res, 200, { product: shopperRow(p, u, { share_code: code, first_sender: !!code && code !== u.ref_code,
-      earn_mine: u.role === "customer" && p.owner_id !== u.id && !!code && code === u.ref_code, shop_cover: per > 0 ? Math.min(100, Math.floor(bal / per + 1e-9)) : 100, fav }) });
+      earn_mine: u.role === "customer" && p.owner_id !== u.id && !!code && code === u.ref_code, shop_cover: cover(per + ch), shop_cover_charge: cover(ch), fav }) });
   });
 
   async function readProduct(b, existing) {
@@ -730,11 +739,14 @@ module.exports = function market(ctx) {
   //  "wallet":   the merchant's 5PLUS wallet covers it (taken when the order is finished)
   //  "discount": the buyer earns it themselves, so they simply pay the price minus their earning
   //  "none":     someone else would earn it and the merchant's wallet can't cover it: Pay to shop isn't offered
-  async function shopPayMode(sellerId, cur, commission, affId, buyerId) {
-    if (!(commission > 0) || !affId) return "wallet";
-    if (await balance(sellerId, cur) >= commission) return "wallet";
-    return affId === buyerId ? "discount" : "none";
+  // The 5PLUS charge (set by the super admin) is also taken from the merchant's wallet, so the wallet must cover it too.
+  async function shopPayMode(sellerId, cur, commission, affId, buyerId, charge = 0) {
+    const bal = await balance(sellerId, cur);
+    if (!(commission > 0) || !affId) return bal >= charge ? "wallet" : "none";
+    if (bal >= commission + charge) return "wallet";
+    return affId === buyerId && bal >= charge ? "discount" : "none";
   }
+  const shopChargeOf = async (cur, total) => round(cur, total * (Number((await getSettings()).shopChargePct) || 0) / 100);
   const NO_SHOP_PAY = "Pay to shop isn't available for this item right now. Choose another way to pay.";
 
   /* ---------- orders ---------- */
@@ -753,7 +765,7 @@ module.exports = function market(ctx) {
     if (o.kind === "buy" && (o.status === "requested" || o.status === "accepted")) r.needs_price = true;
     r.offer_desc = o.offer_desc || ""; r.forwarded = !!o.forwarded_to; r.from_order = !!o.from_order;
     if (forSeller && r.needs_price) r.suggested = round(o.cur, o.p_price * o.qty);
-    if (forSeller) Object.assign(r, { buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, commission: o.commission, net: round(o.cur, o.total - o.commission), has_affiliate: !!o.affiliate_id });
+    if (forSeller) Object.assign(r, { buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, commission: o.commission, shop_charge: o.shop_charge || 0, net: round(o.cur, o.total - o.commission - (o.shop_charge || 0)), has_affiliate: !!o.affiliate_id });
     return r;
   }
   /* ---------- Push notifications (Firebase Cloud Messaging) ---------- */
@@ -877,9 +889,10 @@ module.exports = function market(ctx) {
     if (!aff) { const me = await earner(u.ref_code); if (me && me.id === u.id && me.id !== p.owner_id) aff = me.id; }
     const method = PAY_METHODS.includes(b.method) ? b.method : "wallet";
     const commission = p.mode === "buy" && aff && !ask ? COMMISSION(p, qty) : 0;
-    let discount = 0;
+    let discount = 0, charge = 0;
     if (p.mode === "buy" && !ask && method === "shop") {
-      const mode = await shopPayMode(p.owner_id, p.cur, commission, aff, u.id);
+      charge = await shopChargeOf(p.cur, total);
+      const mode = await shopPayMode(p.owner_id, p.cur, commission, aff, u.id, charge);
       if (mode === "none") fail(NO_SHOP_PAY);
       if (mode === "discount") discount = commission;
     }
@@ -911,6 +924,7 @@ module.exports = function market(ctx) {
                   p.mode === "buy" && !ask ? (plan ? "awaiting_payment" : "paid") : "requested", note, now(), now(), plan ? method : "wallet", plan ? plan.fee : 0, plan ? plan.ussd : "");
       if (limited) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
       if (discount) await db.run("UPDATE orders SET pay_discount = ? WHERE id = ?", discount, id);
+      if (charge) await db.run("UPDATE orders SET shop_charge = ? WHERE id = ?", charge, id);
       if (bookAt) await db.run("UPDATE orders SET book_at = ? WHERE id = ?", bookAt, id);
       if (plan?.section) await db.run("UPDATE orders SET safe_svc = ? WHERE id = ?", plan.section, id);
     });
@@ -980,7 +994,7 @@ module.exports = function market(ctx) {
     const rows = await db.all(`${ORDER_SELECT} WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, u.id), out = [];
     for (const o of rows) {
       const r = orderRow(o, false);
-      if (o.status === "quoted") r.shop_mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id);
+      if (o.status === "quoted") r.shop_mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id, await shopChargeOf(o.cur, o.total));
       if (o.status === "quoted" && r.shop_mode === "discount") r.shop_discount = o.commission;
       out.push(r);
     }
@@ -1009,6 +1023,12 @@ module.exports = function market(ctx) {
       // Paid to the shop: the seller already has all the money, so the affiliate earning comes from the seller's wallet.
       await ledger(o.seller_id, o.cur, -o.commission, "affiliate_fee", o.ref, `${o.product_name} × ${o.qty}`);
       await addEarning(o.affiliate_id, o.cur, o.commission, "affiliate", o.ref, `${o.product_name} × ${o.qty}`);
+    }
+    // Pay to shop: the 5PLUS charge comes from the merchant's wallet and goes to the super admin's income.
+    if (o.kind === "buy" && o.pay_method === "shop" && o.shop_charge > 0) {
+      await ledger(o.seller_id, o.cur, -o.shop_charge, "shop_charge", o.ref, `${o.product_name} × ${o.qty}`);
+      const shopName = o.shop_name || (await db.get("SELECT name FROM shops WHERE id = ?", o.shop_id))?.name || "Shop";
+      await ledger(null, o.cur, o.shop_charge, "shop_charge_income", o.ref, `${shopName} · ${o.product_name} × ${o.qty}`);
     }
     await db.run("UPDATE orders SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?", now(), now(), o.id);
   }
@@ -1065,15 +1085,16 @@ module.exports = function market(ctx) {
           return;
         }
         if (action === "pay" && !seller && o.status === "quoted" && PAY_METHODS.includes(b.method) && b.method !== "wallet") {
-          let discount = 0;
+          let discount = 0, charge = 0;
           if (b.method === "shop") {
-            const mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id);
+            charge = await shopChargeOf(o.cur, o.total);
+            const mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id, charge);
             if (mode === "none") fail(NO_SHOP_PAY);
             if (mode === "discount") discount = o.commission;
           }
           const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(b.method, b.via, o.cur, round(o.cur, o.total - discount), shop?.profile, svcOf);
-          await db.run("UPDATE orders SET status = 'awaiting_payment', pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, safe_svc = ?, updated_at = ? WHERE id = ?",
-            b.method, plan.fee, plan.ussd, o.commission, discount, plan.section, now(), o.id);
+          await db.run("UPDATE orders SET status = 'awaiting_payment', pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, safe_svc = ?, shop_charge = ?, updated_at = ? WHERE id = ?",
+            b.method, plan.fee, plan.ussd, o.commission, discount, plan.section, charge, now(), o.id);
           if (b.method === "safe") safeNote = [plan.section, o.product_name, round(o.cur, o.total - discount + plan.fee), o.cur];
           return;
         }
@@ -1572,7 +1593,7 @@ module.exports = function market(ctx) {
     if (!(fromMs >= 0) || !(toMs >= fromMs) || !isYmd(fromDate) || !isYmd(toDate)) fail("Choose a valid date range.");
     if (!s) return send(res, 200, { revenue: [], expenses: [] });
     // Revenue for a seller = what they keep from completed buy orders (price minus affiliate earnings).
-    const revenue = await db.all("SELECT completed_at AS at, cur, total - commission AS fee FROM orders WHERE seller_id = ? AND kind = 'buy' AND status = 'completed' AND completed_at BETWEEN ? AND ?", u.id, fromMs, toMs);
+    const revenue = await db.all("SELECT completed_at AS at, cur, total - commission - shop_charge AS fee FROM orders WHERE seller_id = ? AND kind = 'buy' AND status = 'completed' AND completed_at BETWEEN ? AND ?", u.id, fromMs, toMs);
     const expenses = await db.all("SELECT id, date, cur, amount, category, note FROM shop_expenses WHERE shop_id = ? AND date BETWEEN ? AND ? ORDER BY date DESC", s.id, fromDate, toDate);
     send(res, 200, { revenue, expenses });
   });

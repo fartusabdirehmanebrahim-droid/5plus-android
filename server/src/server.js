@@ -119,7 +119,7 @@ function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
   return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "", gallery: galleryOut(x) })),
     premierPayTo: s.agentNums.premier || "", minUsd: MIN_USD_RECEIVE,
-    safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct,
+    safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct, shopChargePct: s.shopChargePct || 0,
     // "Shop by category" on the home screen: the categories the super admin chose, with their photos.
     homeCats: (s.bizCats || []).filter(c => c.home && s.services.some(v => v.id === c.section && v.visible)).map(c => ({ name: c.name, section: c.section, photo: c.photo || "" })),
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };

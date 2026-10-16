@@ -418,3 +418,4 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS calls_off_until BIGINT NOT NUL
 
 -- Products bought together with one Safe payment.
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS pay_group TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shop_charge DOUBLE PRECISION NOT NULL DEFAULT 0;

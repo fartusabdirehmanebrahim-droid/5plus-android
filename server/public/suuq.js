@@ -936,9 +936,12 @@ const SUUQ = (() => {
   // earning of the person who shared the link, so Pay to shop isn't offered. "discount": the buyer earns it, so they
   // pay the price minus their earning.
   function shopInfoOf(p, qty) {
-    const per = Number(p.earn) || 0;
-    if (!(per > 0) || p.price == null || qty <= (p.shop_cover ?? 100)) return { mode: "wallet", discount: 0 };
-    return p.earn_mine ? { mode: "discount", discount: Math.round(per * qty * 100) / 100 } : { mode: "none", discount: 0 };
+    // The merchant's wallet must cover the affiliate earning and the 5PLUS charge for Pay to shop.
+    const per = Number(p.earn) || 0, chOk = qty <= (p.shop_cover_charge ?? 100);
+    if (p.price == null) return { mode: "wallet", discount: 0 };
+    if (!(per > 0)) return { mode: chOk ? "wallet" : "none", discount: 0 };
+    if (qty <= (p.shop_cover ?? 100)) return { mode: "wallet", discount: 0 };
+    return p.earn_mine && chOk ? { mode: "discount", discount: Math.round(per * qty * 100) / 100 } : { mode: "none", discount: 0 };
   }
   const dialBase = (box, total, shop) => box.method === "shop" && shop?.mode === "discount" ? Math.max(0, total - shop.discount) : total;
   function payOptions(payShop, shop) {
@@ -1432,7 +1435,8 @@ const SUUQ = (() => {
       ${f("phone", signup ? "Phone (you log in with this)" : "Phone", 'inputmode="tel" maxlength="15" placeholder="63 4123456"')}
       ${f("zaad_merchant", "Merchant number ZAAD", 'inputmode="numeric" maxlength="15"')}
       ${f("edahab_merchant", "Merchant number eDahab", 'inputmode="numeric" maxlength="15"', "Add at least one merchant number.")}
-      ${f("shop_phone", `Normal ${biz} number`, 'inputmode="tel" maxlength="15"', "Optional.")}`,
+      ${f("shop_phone", `Normal ${biz} number`, 'inputmode="tel" maxlength="15"', "Optional.")}
+      ${settings.shopChargePct > 0 ? `<p class="note" style="margin:0">When a buyer pays you directly (Pay to shop), 5PLUS takes ${settings.shopChargePct}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.</p>` : ""}`,
     ];
     return `<div class="pf">${(step ? [parts[step - 1]] : parts).map(x => x()).join("")}</div>`;
   }
@@ -1577,7 +1581,7 @@ const SUUQ = (() => {
           <small class="note">Total for ${o.qty}. The buyer then pays it${o.has_affiliate ? "; the affiliate earning comes out of it" : ""}.</small>
           <div class="req-actions"><button class="btn btn-ghost" data-chat-seller="${esc(o.product_id)}" data-buyer="${esc(o.buyer_name)}">Chat with buyer</button><button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button></div></div>` : ""}
         ${o.status === "quoted" ? `<small class="note">Waiting for the buyer to pay. You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}.</small>` : ""}
-        ${o.kind === "buy" && !o.needs_price && o.status !== "quoted" ? `<small class="note">You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}</small>` : ""}
+        ${o.kind === "buy" && !o.needs_price && o.status !== "quoted" ? `<small class="note">You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}${o.shop_charge ? ` · 5PLUS charge ${money(o.shop_charge, o.cur)} (from your wallet when finished)` : ""}</small>` : ""}
         ${o.kind === "buy" && o.pay_method !== "wallet" ? `<small class="note">${esc(PAY_NAME[o.pay_method])}${o.pay_ussd ? ` · <span class="num">${esc(o.pay_ussd)}</span> (${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))})` : ""}${o.pay_method === "shop" ? " · paid to you directly" : ""}</small>` : ""}
         ${o.status === "awaiting_payment" && o.pay_method === "safe" ? `<small class="note">Waiting for Sarrif to confirm the buyer's payment. Don't deliver yet.</small>` : ""}
         <div class="req-actions">
@@ -2186,10 +2190,18 @@ const SUUQ = (() => {
           <div class="row-actions"><button class="btn btn-primary" id="wl-go">Save</button><span class="status-msg" id="st-wl2"></span></div>
           <div class="hist">${found.tx.map(t => `<div class="hist-item"><div class="t"><b>${esc(t.label)}</b><small>${new Date(t.created_at).toLocaleString()}${t.note ? " · " + esc(t.note) : ""}</small></div><div class="a num" style="color:${t.amount < 0 ? "var(--danger)" : "var(--green)"}">${t.amount < 0 ? "−" : "+"}${money(Math.abs(t.amount), t.cur)}</div></div>`).join("") || `<div class="empty">No activity yet.</div>`}</div></div>` : ""}
       </div>
-      <div class="panel"><div class="panel-head"><div><h3>Super admin income</h3><p>Suuq seller subscriptions.</p></div></div>
+      <div class="panel"><div class="panel-head"><div><h3>Super admin income</h3><p>Seller subscriptions and Pay to shop charges.</p></div></div>
+        <div class="field"><label for="shopch-pct">Pay to shop charge</label>
+          <div class="inline-form"><div class="suffix" style="max-width:140px"><input id="shopch-pct" inputmode="decimal" value="${esc(String(income.shopChargePct ?? 0))}" aria-describedby="shopch-help"><span>%</span></div><button class="btn btn-primary" id="shopch-save">Save</button><span class="status-msg" id="st-shopch"></span></div>
+          <small class="note" id="shopch-help">When a buyer pays a seller directly, this percent of the price is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. 0 = no charge. Pay to shop is only offered when the seller's wallet can cover it.</small></div>
         <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${CURS.map(c => `<div class="kpi"><span class="label">Income ${c}</span><b>${money(income.balances[c] || 0, c)}</b></div>`).join("")}
           ${CURS.map(c => `<div class="kpi"><span class="label">In customer wallets ${c}</span><b>${money(income.customerMoney[c] || 0, c)}</b></div>`).join("")}</div>
         <div class="hist">${income.tx.map(t => `<div class="hist-item"><div class="t"><b>${esc(t.label)}</b><small>${new Date(t.created_at).toLocaleString()} · ${esc(t.note)}</small></div><div class="a num" style="color:var(--green)">+${money(t.amount, t.cur)}</div></div>`).join("") || `<div class="empty">No income yet.</div>`}</div></div>`;
+    const shSave = document.getElementById("shopch-save");
+    if (shSave) shSave.onclick = async () => {
+      try { const r = await api("/api/super/shop-charge", { method: "PUT", body: { pct: Number(document.getElementById("shopch-pct").value.replace(",", ".")) } }); income.shopChargePct = r.shopChargePct; settings.shopChargePct = r.shopChargePct; msg("#st-shopch", r.shopChargePct > 0 ? `Saved. You get ${r.shopChargePct}% of every Pay to shop sale.` : "Saved. No charge on Pay to shop.", "ok"); }
+      catch (e) { msg("#st-shopch", e.message, "bad"); }
+    };
     el.insertAdjacentHTML("afterbegin", safePanel()); bindSafePanel();
     el.insertAdjacentHTML("afterbegin", heldPanel()); bindHeldPanel();
     el.querySelectorAll("[data-tpt]").forEach(b => b.onclick = () => { topupsTab = b.dataset.tpt; topups = null; renderSuperWallets(); });

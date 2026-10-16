@@ -306,6 +306,7 @@ async function init() {
   await addColumn("users", "calls_off_until", "INTEGER NOT NULL DEFAULT 0"); // a seller paused calls until then (-1 = until turned back on)
   await addColumn("users", "face", "TEXT NOT NULL DEFAULT ''"); // private face photo (only admins see it)
   await addColumn("users", "pause", "TEXT NOT NULL DEFAULT ''"); // Salah time or Sleep time: no new orders until the seller turns it off
+  await addColumn("orders", "shop_charge", "REAL NOT NULL DEFAULT 0"); // Pay to shop: 5PLUS's charge, taken from the merchant's wallet when finished
   await addColumn("orders", "pay_group", "TEXT NOT NULL DEFAULT ''"); // products bought together with one Safe payment
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")
   await addColumn("messages", "att", "TEXT NOT NULL DEFAULT ''"); // chat attachment: picture, voice message or file (JSON)
@@ -408,6 +409,9 @@ const DEFAULT_SETTINGS = {
   // Where customers send money to top up their wallet: *880*<number>*<amount># (codes per currency, set by the super admin).
   // The charge (percent) when people send their affiliate earnings out with iBedel. Set by the iBedel admin.
   earnFeePct: 0,
+  // Pay to shop: the buyer pays the merchant directly, so 5PLUS takes this percent of the price from the merchant's
+  // wallet when the order is finished (super admin income). 0 = no charge. Set by the super admin.
+  shopChargePct: 0,
   walletTopup: { number: "", numbers: { USD: "", SLSH: "" }, ussd: { USD: "*880*", SLSH: "*220*" } },
   // Safe payment: the buyer pays the money processor agent; Sarrif holds it until the buyer confirms they received the item.
   // merchant = the processor's merchant number (*223* SLSH, *883* USD); number = its normal number (*220* SLSH, *880* USD).
@@ -471,6 +475,7 @@ async function getSettings() {
   // Older installs had "1 month / 12 months" plans with no tiers: switch to the tiered plans.
   if (!s.suuq.plans.some(p => p.id === "free")) s.suuq.plans = structuredClone(DEFAULT_SETTINGS.suuq.plans);
   if (Number(saved.earnFeePct) >= 0) s.earnFeePct = Number(saved.earnFeePct);
+  if (Number(saved.shopChargePct) >= 0) s.shopChargePct = Number(saved.shopChargePct);
   if (Array.isArray(saved.bizCats)) s.bizCats = saved.bizCats;
   // Categories saved before photos and "Shop by category" existed get the built-in photo and the default setting.
   s.bizCats = s.bizCats.map(c => { const d = DEFAULT_BIZ_CATS.find(x => x.name === c.name); return { ...c, photo: c.photo ?? d?.photo ?? "", home: c.home ?? (c.section === "suuq") }; });
