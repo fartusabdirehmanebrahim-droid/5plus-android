@@ -1437,7 +1437,9 @@
     "Add a country": "Ajouter un pays",
     "Choose a country from the list.": "Choisissez un pays dans la liste.",
     "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "Quand un acheteur paie directement un vendeur, ces frais sont prélevés sur le portefeuille 5PLUS du vendeur à la fin de la commande et ajoutés à vos revenus. Choisissez un pourcentage du prix ou un montant fixe par commande, pour chaque pays de vendeur. Payer la boutique n'est proposé que si le portefeuille du vendeur peut le couvrir.",
-    "Add the charges again.": "Ajoutez à nouveau les frais."
+    "Add the charges again.": "Ajoutez à nouveau les frais.",
+    "If your phone didn't dial, press:": "Si votre téléphone n'a pas composé, appuyez :",
+    "Dial to pay for everything": "Composer pour tout payer"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1653,6 +1655,7 @@
     "{0} is in the list twice.": "{0} figure deux fois dans la liste.",
     "{0}: enter a percent between 0 and 50.": "{0} : entrez un pourcentage entre 0 et 50.",
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0} : entrez un montant fixe de 0 ou plus (jusqu'à 1000 USD / 10 000 000 SLSH).",
-    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Quand un acheteur vous paie directement (Payer la boutique), 5PLUS prélève {0} par commande sur votre portefeuille 5PLUS à la fin de la commande. Gardez de l'argent dans votre portefeuille pour que les acheteurs puissent utiliser Payer la boutique."
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Quand un acheteur vous paie directement (Payer la boutique), 5PLUS prélève {0} par commande sur votre portefeuille 5PLUS à la fin de la commande. Gardez de l'argent dans votre portefeuille pour que les acheteurs puissent utiliser Payer la boutique.",
+    "Dial to pay {0}": "Composer pour payer {0}"
   }
 }

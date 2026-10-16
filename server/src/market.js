@@ -1015,9 +1015,12 @@ module.exports = function market(ctx) {
   });
   route("GET", "/api/suuq/orders/mine", async (req, res) => {
     const u = await needUser(req);
-    const rows = await db.all(`${ORDER_SELECT} WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, u.id), out = [];
+    const rows = await db.all(`${ORDER_SELECT} WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, u.id), out = [], groups = new Set();
     for (const o of rows) {
       const r = orderRow(o, false);
+      // Products bought together are paid with one dial: offer "Dial to pay" on one of them only, for the whole amount.
+      r.dial = !!o.pay_ussd && o.status === "awaiting_payment" && !(o.pay_group && groups.has(o.pay_group));
+      if (o.pay_group) { r.pay_group = true; groups.add(o.pay_group); }
       if (o.status === "quoted") r.shop_mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id, await shopChargeOf(o.cur, o.total, o.shop_id));
       if (o.status === "quoted" && r.shop_mode === "discount") r.shop_discount = o.commission;
       out.push(r);

@@ -1437,7 +1437,9 @@
     "Add a country": "አገር ያክሉ",
     "Choose a country from the list.": "ከዝርዝሩ አገር ይምረጡ።",
     "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "ገዢ ለሻጩ በቀጥታ ሲከፍል፣ ትዕዛዙ ሲጠናቀቅ ይህ ክፍያ ከሻጩ 5PLUS ቦርሳ ተቀንሶ ወደ ገቢዎ ይጨመራል። ለእያንዳንዱ የሻጭ አገር የዋጋውን መቶኛ ወይም በትዕዛዝ ቋሚ መጠን ይምረጡ። ለሱቅ ይክፈሉ የሚቀርበው የሻጩ ቦርሳ ሊሸፍነው ሲችል ብቻ ነው።",
-    "Add the charges again.": "ክፍያዎቹን እንደገና ያክሉ።"
+    "Add the charges again.": "ክፍያዎቹን እንደገና ያክሉ።",
+    "If your phone didn't dial, press:": "ስልክዎ ካልደወለ፣ ይጫኑ፦",
+    "Dial to pay for everything": "ለሁሉም ለመክፈል ይደውሉ"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1653,6 +1655,7 @@
     "{0} is in the list twice.": "{0} በዝርዝሩ ውስጥ ሁለት ጊዜ አለ።",
     "{0}: enter a percent between 0 and 50.": "{0}: ከ0 እስከ 50 ያለ መቶኛ ያስገቡ።",
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: 0 ወይም ከዚያ በላይ ቋሚ መጠን ያስገቡ (እስከ 1000 USD / 10,000,000 SLSH)።",
-    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "ገዢ በቀጥታ ሲከፍልዎ (ለሱቅ ይክፈሉ)፣ ትዕዛዙ ሲጠናቀቅ 5PLUS ከ5PLUS ቦርሳዎ በትዕዛዝ {0} ይወስዳል። ገዢዎች ለሱቅ ይክፈሉን እንዲጠቀሙ በቦርሳዎ ገንዘብ ያስቀምጡ።"
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "ገዢ በቀጥታ ሲከፍልዎ (ለሱቅ ይክፈሉ)፣ ትዕዛዙ ሲጠናቀቅ 5PLUS ከ5PLUS ቦርሳዎ በትዕዛዝ {0} ይወስዳል። ገዢዎች ለሱቅ ይክፈሉን እንዲጠቀሙ በቦርሳዎ ገንዘብ ያስቀምጡ።",
+    "Dial to pay {0}": "{0} ለመክፈል ይደውሉ"
   }
 }

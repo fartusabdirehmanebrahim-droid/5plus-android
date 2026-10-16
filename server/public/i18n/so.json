@@ -1436,7 +1436,9 @@
     "Add a country": "Ku dar dal",
     "Choose a country from the list.": "Liiska ka dooro dal.",
     "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "Marka iibsaduhu si toos ah u siiyo iibiyaha, khidmaddan waxaa laga jarayaa boorsada 5PLUS ee iibiyaha marka dalabku dhammaado, waxaana lagu darayaa dakhligaaga. Dal kasta oo iibiye ka yimaado u dooro boqolley qiimaha ah ama lacag go'an dalab kasta. Ku bixi dukaanka waxaa la bixiyaa oo keliya marka boorsada iibiyuhu daboosho.",
-    "Add the charges again.": "Khidmadaha mar kale ku dar."
+    "Add the charges again.": "Khidmadaha mar kale ku dar.",
+    "If your phone didn't dial, press:": "Haddii taleefankaagu uusan garaacin, riix:",
+    "Dial to pay for everything": "Garaac si aad u bixiso dhammaan"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
@@ -1652,6 +1654,7 @@
     "{0} is in the list twice.": "{0} laba jeer ayuu liiska ku jiraa.",
     "{0}: enter a percent between 0 and 50.": "{0}: geli boqolley u dhexeysa 0 iyo 50.",
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: geli lacag go'an oo 0 ama ka badan (ilaa 1000 USD / 10,000,000 SLSH).",
-    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Marka iibsaduhu si toos ah kuu siiyo (Ku bixi dukaanka), 5PLUS waxay boorsadaada 5PLUS ka qaadaysaa {0} dalab kasta marka dalabku dhammaado. Lacag ku hay boorsadaada si iibsadayaashu u isticmaali karaan Ku bixi dukaanka."
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Marka iibsaduhu si toos ah kuu siiyo (Ku bixi dukaanka), 5PLUS waxay boorsadaada 5PLUS ka qaadaysaa {0} dalab kasta marka dalabku dhammaado. Lacag ku hay boorsadaada si iibsadayaashu u isticmaali karaan Ku bixi dukaanka.",
+    "Dial to pay {0}": "Garaac si aad u bixiso {0}"
   }
 }
