@@ -1440,7 +1440,10 @@
     "If your phone didn't dial, press:": "ስልክዎ ካልደወለ፣ ይጫኑ፦",
     "Dial to pay for everything": "ለሁሉም ለመክፈል ይደውሉ",
     "Please take a photo of your face. Thank you.": "እባክዎ የፊትዎን ፎቶ ያንሱ። እናመሰግናለን።",
-    "Saved. Thank you.": "ተቀምጧል። እናመሰግናለን።"
+    "Saved. Thank you.": "ተቀምጧል። እናመሰግናለን።",
+    "Enter your PIN. Your phone dials straight away": "PINዎን ያስገቡ። ስልክዎ ወዲያውኑ ይደውላል",
+    "The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.": "የገዢው ስልክ ለመክፈል ቁጥርዎን ደውሏል። ከማድረስዎ በፊት ገንዘቡ መድረሱን ያረጋግጡ (የZAAD / eDahab መልእክት)።",
+    "Check the money arrived before you deliver.": "ከማድረስዎ በፊት ገንዘቡ መድረሱን ያረጋግጡ።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1657,6 +1660,7 @@
     "{0}: enter a percent between 0 and 50.": "{0}: ከ0 እስከ 50 ያለ መቶኛ ያስገቡ።",
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: 0 ወይም ከዚያ በላይ ቋሚ መጠን ያስገቡ (እስከ 1000 USD / 10,000,000 SLSH)።",
     "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "ገዢ በቀጥታ ሲከፍልዎ (ለሱቅ ይክፈሉ)፣ ትዕዛዙ ሲጠናቀቅ 5PLUS ከ5PLUS ቦርሳዎ በትዕዛዝ {0} ይወስዳል። ገዢዎች ለሱቅ ይክፈሉን እንዲጠቀሙ በቦርሳዎ ገንዘብ ያስቀምጡ።",
-    "Dial to pay {0}": "{0} ለመክፈል ይደውሉ"
+    "Dial to pay {0}": "{0} ለመክፈል ይደውሉ",
+    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። ሻጩ ክፍያዎን ያያል፣ ገንዘቡ ሲደርስም ያደርሳል።"
   }
 }

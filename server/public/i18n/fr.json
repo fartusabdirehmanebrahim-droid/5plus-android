@@ -1440,7 +1440,10 @@
     "If your phone didn't dial, press:": "Si votre téléphone n'a pas composé, appuyez :",
     "Dial to pay for everything": "Composer pour tout payer",
     "Please take a photo of your face. Thank you.": "Prenez une photo de votre visage, s'il vous plaît. Merci.",
-    "Saved. Thank you.": "Enregistré. Merci."
+    "Saved. Thank you.": "Enregistré. Merci.",
+    "Enter your PIN. Your phone dials straight away": "Entrez votre PIN. Votre téléphone compose aussitôt",
+    "The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.": "Le téléphone de l'acheteur a composé votre numéro pour payer. Vérifiez que l'argent est arrivé (message ZAAD / eDahab) avant de livrer.",
+    "Check the money arrived before you deliver.": "Vérifiez que l'argent est arrivé avant de livrer."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1657,6 +1660,7 @@
     "{0}: enter a percent between 0 and 50.": "{0} : entrez un pourcentage entre 0 et 50.",
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0} : entrez un montant fixe de 0 ou plus (jusqu'à 1000 USD / 10 000 000 SLSH).",
     "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Quand un acheteur vous paie directement (Payer la boutique), 5PLUS prélève {0} par commande sur votre portefeuille 5PLUS à la fin de la commande. Gardez de l'argent dans votre portefeuille pour que les acheteurs puissent utiliser Payer la boutique.",
-    "Dial to pay {0}": "Composer pour payer {0}"
+    "Dial to pay {0}": "Composer pour payer {0}",
+    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "Votre téléphone compose pour payer {0}. Le vendeur voit votre paiement et livre quand l'argent arrive."
   }
 }

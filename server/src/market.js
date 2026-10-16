@@ -945,7 +945,7 @@ module.exports = function market(ctx) {
       }
       await db.run(`INSERT INTO orders (id, ref, product_id, shop_id, buyer_id, seller_id, kind, product_name, qty, unit_price, total, cur, commission, affiliate_id, status, note, created_at, updated_at, pay_method, pay_fee, pay_ussd)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, ref, p.id, p.shop_id, u.id, p.owner_id, p.mode, p.name, qty, ask ? 0 : p.price, ask ? 0 : total, p.cur, commission, aff,
-                  p.mode === "buy" && !ask ? (plan ? "awaiting_payment" : "paid") : "requested", note, now(), now(), plan ? method : "wallet", plan ? plan.fee : 0, plan ? plan.ussd : "");
+                  p.mode === "buy" && !ask ? (plan && method !== "shop" ? "awaiting_payment" : "paid") : "requested", note, now(), now(), plan ? method : "wallet", plan ? plan.fee : 0, plan ? plan.ussd : "");
       if (limited) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
       if (discount) await db.run("UPDATE orders SET pay_discount = ? WHERE id = ?", discount, id);
       if (charge) await db.run("UPDATE orders SET shop_charge = ? WHERE id = ?", charge, id);
@@ -1120,14 +1120,17 @@ module.exports = function market(ctx) {
             if (mode === "discount") discount = o.commission;
           }
           const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(b.method, b.via, o.cur, round(o.cur, o.total - discount), shop?.profile, svcOf);
-          await db.run("UPDATE orders SET status = 'awaiting_payment', pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, safe_svc = ?, shop_charge = ?, updated_at = ? WHERE id = ?",
-            b.method, plan.fee, plan.ussd, o.commission, discount, plan.section, charge, now(), o.id);
+          // Pay to shop: the phone dials the merchant's number with the amount, so the order counts as paid straight away
+          // (the merchant can still say "Not received" before delivering). Safe payment waits for the admin.
+          await db.run("UPDATE orders SET status = ?, pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, safe_svc = ?, shop_charge = ?, updated_at = ? WHERE id = ?",
+            b.method === "shop" ? "paid" : "awaiting_payment", b.method, plan.fee, plan.ussd, o.commission, discount, plan.section, charge, now(), o.id);
           if (b.method === "safe") safeNote = [plan.section, o.product_name, round(o.cur, o.total - discount + plan.fee), o.cur];
           return;
         }
-        // Paid to the shop: the seller confirms the money arrived (or declines if it never came).
+        // Paid to the shop: new orders are paid when the phone dials; older ones wait for the seller to confirm. The seller
+        // says "Not received" if the money never came (before delivering).
         if (action === "money_received" && seller && o.status === "awaiting_payment" && o.pay_method === "shop") return await set("paid");
-        if (action === "decline" && seller && o.status === "awaiting_payment" && o.pay_method === "shop") return await set("payment_rejected");
+        if (action === "decline" && seller && (o.status === "awaiting_payment" || o.status === "paid") && o.pay_method === "shop") return await set("payment_rejected");
         if (action === "cancel" && !seller && o.status === "awaiting_payment") return await set("cancelled");
         // Try again: dial once more, with the merchant number or the normal number.
         if (action === "retry" && !seller && o.status === "awaiting_payment" && o.pay_group) {

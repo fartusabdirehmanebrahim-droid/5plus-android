@@ -432,7 +432,7 @@ const SUUQ = (() => {
       actions: [{ label: "Accept", cls: "btn-primary", fn: async () => { await act("accept"); await goSellerOrders(); } },
         { label: "Reject", cls: "btn-danger", fn: async () => { await act("decline"); await goSellerOrders(); } }] });
     else if (o.status === "paid") alarm.show({ key: o.id + o.status, secs: 10, tone: "paid", title: "Order paid successfully",
-      body: `${what}<br>${esc(money(o.total, o.cur))}${o.pay_method && o.pay_method !== "wallet" ? ` · ${esc(PAY_NAME[o.pay_method])}` : ""}`,
+      body: `${what}<br>${esc(money(o.total, o.cur))}${o.pay_method && o.pay_method !== "wallet" ? ` · ${esc(PAY_NAME[o.pay_method])}` : ""}${o.pay_method === "shop" ? "<br>Check the money arrived before you deliver." : ""}`,
       actions: [{ label: "See order", cls: "btn-primary", fn: goSellerOrders }] });
     else if (o.status === "awaiting_payment" && o.pay_method === "shop") alarm.show({ key: o.id + o.status, secs: 10, tone: "paid", title: "A buyer is paying you",
       body: `${what}<br>${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))} · ${esc(PAY_NAME.shop)}. Confirm when the money arrives.`,
@@ -552,7 +552,7 @@ const SUUQ = (() => {
           <button class="btn btn-danger" data-dact="decline" data-did="${o.id}">Reject</button></div>` : ""}
         ${o.status === "awaiting_payment" && o.pay_method === "shop" ? `<button class="btn btn-primary" data-dact="money_received" data-did="${o.id}">Money received</button><button class="btn btn-ghost" data-dact="decline" data-did="${o.id}">Not received</button>` : ""}
         ${o.status === "awaiting_payment" && o.pay_method === "safe" ? `<small class="note">The super admin confirms the safe payment. Don't start yet.</small>` : ""}
-        ${o.status === "paid" ? `<button class="btn btn-primary" data-dact="deliver" data-did="${o.id}">Work done</button>` : ""}
+        ${o.status === "paid" ? `<button class="btn btn-primary" data-dact="deliver" data-did="${o.id}">Work done</button>${o.pay_method === "shop" ? `<button class="btn btn-ghost" data-dact="decline" data-did="${o.id}">Not received</button>` : ""}` : ""}
         ${o.status === "delivered" ? `<small class="note">Waiting for the customer to confirm the work is finished. The money is held until then.</small>` : ""}
       </div></div>`;
     return `<div class="panel-head"><div><h3>${esc(name)} orders</h3><p>Customers ask for ${esc(name)}. Accept, agree the price with them (call or WhatsApp), then send the price. They pay by wallet, safe payment or straight to your numbers; the money is held until they confirm the work is finished.</p></div></div>
@@ -576,7 +576,7 @@ const SUUQ = (() => {
     const what = `<b>${esc(o.product_name)} × ${o.qty}</b> · ${esc(o.buyer_name)}${o.book_at ? `<br>📅 ${esc(o.book_at)}` : ""}${o.note ? `<br><span class="ring-note">“${esc(o.note)}”</span>` : ""}`;
     if (o.status === "requested") alarm.show({ key: "d" + o.id + o.status, secs: 25, tone: "staff", title: "New service request", body: what,
       actions: [{ label: "Accept", cls: "btn-primary", fn: () => deskAction(o.desk, o.id, "accept") }, { label: "Reject", cls: "btn-danger", fn: () => deskAction(o.desk, o.id, "decline") }] });
-    else if (o.status === "paid") alarm.show({ key: "d" + o.id + o.status, secs: 10, tone: "staff", title: "Service order paid", body: `${what}<br>${esc(money(o.total, o.cur))} · money held`, actions: [{ label: "OK", cls: "btn-primary", fn: null }] });
+    else if (o.status === "paid") alarm.show({ key: "d" + o.id + o.status, secs: 10, tone: "staff", title: "Service order paid", body: `${what}<br>${esc(money(o.total, o.cur))} · ${o.pay_method === "shop" ? "paid to you directly. Check the money arrived." : "money held"}`, actions: [{ label: "OK", cls: "btn-primary", fn: null }] });
     else if (o.status === "awaiting_payment" && o.pay_method === "shop") alarm.show({ key: "d" + o.id + o.status, secs: 10, tone: "staff", title: "A customer is paying you", body: `${what}<br>${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))}. Confirm when the money arrives.`, actions: [{ label: "OK", cls: "btn-primary", fn: null }] });
   }
 
@@ -994,11 +994,11 @@ const SUUQ = (() => {
 
 
   // Every order is placed with the PIN (the server checks it).
-  const orderPin = os => `<div class="field"><label for="sq-pin">Enter your PIN to place the order</label>${pinInput("sq-pin", os.pin)}</div>`;
+  const orderPin = os => `<div class="field"><label for="sq-pin">${os.method === "shop" || os.method === "safe" ? "Enter your PIN. Your phone dials straight away" : "Enter your PIN to place the order"}</label>${pinInput("sq-pin", os.pin)}</div>`;
   function vOrderSheet(p, os) {
-    if (os.done && os.done.status === "awaiting_payment") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
+    if (os.done && os.done.pay_ussd && os.done.pay_method !== "wallet") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
       <h3 style="font-size:20px">Order placed</h3>
-      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it." : "When the seller confirms the money arrived, they deliver."}</p>
+      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it." : "The seller can see your payment and delivers when the money arrives."}</p>
       <p class="note" style="margin:0">Ref <span class="num">${esc(os.done.ref)}</span></p></div>
       <p class="note" style="margin:0">If your phone didn't dial, press:</p>
       ${dialLink(os.done.pay_ussd, os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur)}
@@ -1603,7 +1603,8 @@ const SUUQ = (() => {
         ${o.status === "awaiting_payment" && o.pay_method === "safe" ? `<small class="note">Waiting for Sarrif to confirm the buyer's payment. Don't deliver yet.</small>` : ""}
         <div class="req-actions">
           ${o.status === "awaiting_payment" && o.pay_method === "shop" ? `<button class="btn btn-primary" data-oact="money_received" data-oid="${o.id}">Money received</button><button class="btn btn-ghost" data-oact="decline" data-oid="${o.id}">Not received</button>` : ""}
-          ${o.kind === "buy" && o.status === "paid" ? `<button class="btn btn-primary" data-oact="deliver" data-oid="${o.id}">Mark delivered</button><button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">${o.pay_method === "shop" ? "Cancel" : "Cancel and refund"}</button>` : ""}
+          ${o.kind === "buy" && o.status === "paid" && o.pay_method === "shop" ? `<small class="note" style="flex-basis:100%">The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.</small>` : ""}
+          ${o.kind === "buy" && o.status === "paid" ? `<button class="btn btn-primary" data-oact="deliver" data-oid="${o.id}">Mark delivered</button>${o.pay_method === "shop" ? `<button class="btn btn-ghost" data-oact="decline" data-oid="${o.id}">Not received</button>` : ""}<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">${o.pay_method === "shop" ? "Cancel" : "Cancel and refund"}</button>` : ""}
           ${o.kind === "book" && o.status === "accepted" ? `<button class="btn btn-primary" data-oact="complete" data-oid="${o.id}">Mark done</button>` : ""}
           ${o.status === "delivered" ? `<small class="note">${o.pay_method === "shop" ? "Waiting for the buyer to confirm they received it." : "Waiting for the buyer to confirm. Then the money reaches your wallet."}</small>` : ""}
           <button class="btn btn-ghost" data-chat-seller="${esc(o.product_id)}" data-buyer="${esc(o.buyer_name)}">Chats</button>
@@ -1663,7 +1664,15 @@ const SUUQ = (() => {
     if (st.orderSheet || st.paySheet) bindTopupInline(st.paySheet || st.orderSheet);
     q("[data-paym]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.method = b.dataset.paym; box.err = ""; render(); });
     q("[data-payvia]").forEach(b => b.onclick = () => { const box = st.paySheet || st.orderSheet; if (!box) return; box.via = b.dataset.payvia; render(); });
-    pinOn("sq-pin", v => { st.orderSheet.pin = v; st.orderSheet.err = ""; }, v => root.querySelectorAll("[data-needpin]").forEach(b => b.disabled = v.length !== 4), () => { if ((st.orderSheet.pin || "").length === 4) placeOrder(); });
+    pinOn("sq-pin", v => { st.orderSheet.pin = v; st.orderSheet.err = ""; }, v => {
+      root.querySelectorAll("[data-needpin]").forEach(b => b.disabled = v.length !== 4);
+      // Safe payment and Pay to shop: the 4th digit places the order and the phone dials at once (no button to press).
+      const os = st.orderSheet, p = st.product;
+      if (v.length === 4 && os && p && p.mode === "buy" && !asksPrice(p) && (os.method === "shop" || os.method === "safe") && !os.busy) {
+        os.busy = true; root.querySelectorAll("[data-needpin]").forEach(b => b.disabled = true);
+        placeOrder().finally(() => { if (st.orderSheet) st.orderSheet.busy = false; });
+      }
+    }, () => { if ((st.orderSheet.pin || "").length === 4 && !st.orderSheet.busy) placeOrder(); });
     if (st.multi && !st.multi.done) {
       const m = st.multi, keepNote = () => { const n = one("ms-note"); if (n) m.note = n.value; };
       q("[data-mpaym]").forEach(b => b.onclick = () => { keepNote(); m.method = b.dataset.mpaym; m.err = ""; render(); });
