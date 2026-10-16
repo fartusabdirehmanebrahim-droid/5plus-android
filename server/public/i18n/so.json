@@ -1288,7 +1288,6 @@
     "Take a new photo": "Sawir cusub qaad",
     "Choose from gallery": "Ka dooro sawirada",
     "Saved. Only the administration can see it.": "Waa la keydiyay. Maamulka oo keliya ayaa arki kara.",
-    "Take a photo of your face. Only the administration can see it.": "Qaad sawirka wejigaaga. Maamulka oo keliya ayaa arki kara.",
     "Take a photo of your face (JPG, PNG or WebP).": "Qaad sawirka wejigaaga (JPG, PNG ama WebP).",
     "That file is not a photo. Take a photo of your face.": "Faylkaasi sawir maaha. Qaad sawirka wejigaaga.",
     "The face photo is too small. Take it again.": "Sawirka wejigu aad buu u yar yahay. Mar kale qaad.",
@@ -1438,7 +1437,9 @@
     "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "Marka iibsaduhu si toos ah u siiyo iibiyaha, khidmaddan waxaa laga jarayaa boorsada 5PLUS ee iibiyaha marka dalabku dhammaado, waxaana lagu darayaa dakhligaaga. Dal kasta oo iibiye ka yimaado u dooro boqolley qiimaha ah ama lacag go'an dalab kasta. Ku bixi dukaanka waxaa la bixiyaa oo keliya marka boorsada iibiyuhu daboosho.",
     "Add the charges again.": "Khidmadaha mar kale ku dar.",
     "If your phone didn't dial, press:": "Haddii taleefankaagu uusan garaacin, riix:",
-    "Dial to pay for everything": "Garaac si aad u bixiso dhammaan"
+    "Dial to pay for everything": "Garaac si aad u bixiso dhammaan",
+    "Please take a photo of your face. Thank you.": "Iska qaad sawir weji, mahadsanid.",
+    "Saved. Thank you.": "Waa la keydiyay. Mahadsanid."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

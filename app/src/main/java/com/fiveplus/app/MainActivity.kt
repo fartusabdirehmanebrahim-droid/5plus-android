@@ -108,11 +108,41 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Face photo: the phone's camera opens straight away (the page asks with capture="user").
+    // On phones with little memory Android may close 5PLUS while the camera is open. The app then starts again and the
+    // page that asked for the photo is gone, so the photo is kept here and the page collects it when it starts
+    // (SarrifAndroid.pendingPhoto), together with the registration it saved before the camera opened.
     private var cameraUri: Uri? = null
+    @Volatile private var pendingPhoto: Uri? = null
     private val takePhoto = registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val u = cameraUri
-        fileCallback?.onReceiveValue(if (ok && u != null) arrayOf(u) else null)
+        val cb = fileCallback
+        if (cb != null) cb.onReceiveValue(if (ok && u != null) arrayOf(u) else null)
+        else if (ok && u != null) {
+            pendingPhoto = u
+            web?.evaluateJavascript("window.__cameraPhoto && window.__cameraPhoto()", null)
+        }
         fileCallback = null; cameraUri = null
+    }
+    // The photo as a small JPEG (data: address) for the page; "" when there is none.
+    private fun readPendingPhoto(): String {
+        val u = pendingPhoto ?: return ""
+        pendingPhoto = null
+        return try {
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1280) sample *= 2
+            val bmp = contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) } ?: return ""
+            val out = java.io.ByteArrayOutputStream()
+            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+            bmp.recycle()
+            try { contentResolver.delete(u, null, null) } catch (e: Exception) { }
+            "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+        } catch (e: Exception) { "" }
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        cameraUri?.let { outState.putString("cameraUri", it.toString()) }
     }
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
@@ -161,6 +191,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedInstanceState?.getString("cameraUri")?.let { cameraUri = Uri.parse(it) }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 val w = web
@@ -373,6 +404,10 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun isApp(): Boolean = true
+
+        // A photo taken while Android had closed the app (see takePhoto); "" when there is none.
+        @JavascriptInterface
+        fun pendingPhoto(): String = readPendingPhoto()
 
         // Internet calls: the loudspeaker on or off, and back to normal when the call ends.
         @JavascriptInterface

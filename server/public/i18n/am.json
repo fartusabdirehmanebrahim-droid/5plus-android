@@ -1289,7 +1289,6 @@
     "Take a new photo": "አዲስ ፎቶ አንሳ",
     "Choose from gallery": "ከጋለሪ ይምረጡ",
     "Saved. Only the administration can see it.": "ተቀምጧል። የሚያየው አስተዳደሩ ብቻ ነው።",
-    "Take a photo of your face. Only the administration can see it.": "የፊትዎን ፎቶ ያንሱ። የሚያየው አስተዳደሩ ብቻ ነው።",
     "Take a photo of your face (JPG, PNG or WebP).": "የፊትዎን ፎቶ ያንሱ (JPG፣ PNG ወይም WebP)።",
     "That file is not a photo. Take a photo of your face.": "ያ ፋይል ፎቶ አይደለም። የፊትዎን ፎቶ ያንሱ።",
     "The face photo is too small. Take it again.": "የፊቱ ፎቶ በጣም ትንሽ ነው። እንደገና ያንሱ።",
@@ -1439,7 +1438,9 @@
     "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "ገዢ ለሻጩ በቀጥታ ሲከፍል፣ ትዕዛዙ ሲጠናቀቅ ይህ ክፍያ ከሻጩ 5PLUS ቦርሳ ተቀንሶ ወደ ገቢዎ ይጨመራል። ለእያንዳንዱ የሻጭ አገር የዋጋውን መቶኛ ወይም በትዕዛዝ ቋሚ መጠን ይምረጡ። ለሱቅ ይክፈሉ የሚቀርበው የሻጩ ቦርሳ ሊሸፍነው ሲችል ብቻ ነው።",
     "Add the charges again.": "ክፍያዎቹን እንደገና ያክሉ።",
     "If your phone didn't dial, press:": "ስልክዎ ካልደወለ፣ ይጫኑ፦",
-    "Dial to pay for everything": "ለሁሉም ለመክፈል ይደውሉ"
+    "Dial to pay for everything": "ለሁሉም ለመክፈል ይደውሉ",
+    "Please take a photo of your face. Thank you.": "እባክዎ የፊትዎን ፎቶ ያንሱ። እናመሰግናለን።",
+    "Saved. Thank you.": "ተቀምጧል። እናመሰግናለን።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

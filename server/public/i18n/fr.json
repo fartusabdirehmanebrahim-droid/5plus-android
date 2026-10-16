@@ -1289,7 +1289,6 @@
     "Take a new photo": "Prendre une nouvelle photo",
     "Choose from gallery": "Choisir dans la galerie",
     "Saved. Only the administration can see it.": "Enregistrée. Seule l'administration peut la voir.",
-    "Take a photo of your face. Only the administration can see it.": "Prenez une photo de votre visage. Seule l'administration peut la voir.",
     "Take a photo of your face (JPG, PNG or WebP).": "Prenez une photo de votre visage (JPG, PNG ou WebP).",
     "That file is not a photo. Take a photo of your face.": "Ce fichier n'est pas une photo. Prenez une photo de votre visage.",
     "The face photo is too small. Take it again.": "La photo du visage est trop petite. Reprenez-la.",
@@ -1439,7 +1438,9 @@
     "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "Quand un acheteur paie directement un vendeur, ces frais sont prélevés sur le portefeuille 5PLUS du vendeur à la fin de la commande et ajoutés à vos revenus. Choisissez un pourcentage du prix ou un montant fixe par commande, pour chaque pays de vendeur. Payer la boutique n'est proposé que si le portefeuille du vendeur peut le couvrir.",
     "Add the charges again.": "Ajoutez à nouveau les frais.",
     "If your phone didn't dial, press:": "Si votre téléphone n'a pas composé, appuyez :",
-    "Dial to pay for everything": "Composer pour tout payer"
+    "Dial to pay for everything": "Composer pour tout payer",
+    "Please take a photo of your face. Thank you.": "Prenez une photo de votre visage, s'il vous plaît. Merci.",
+    "Saved. Thank you.": "Enregistré. Merci."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",

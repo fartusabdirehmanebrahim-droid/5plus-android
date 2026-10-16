@@ -214,14 +214,53 @@ function faceField(account) {
         <span class="status-msg" id="st-face" role="status"></span>
       </div></div></div>`;
 }
+// Android may close the app while the camera is open (phones with little memory). Before the camera opens, the
+// registration filled in so far is saved on the phone (never the PIN); when the app starts again it opens the same
+// form and the photo the app kept is put in (SarrifAndroid.pendingPhoto).
+const REG_KEY = "sarrif.regDraft";
+function saveRegDraft(kind) {
+  try {
+    if (kind === "account") { localStorage.setItem(REG_KEY, JSON.stringify({ kind, at: Date.now() })); return; }
+    if (S.screen !== "signup" && S.screen !== "merchant") return;
+    if (S.screen === "merchant") SUUQ.keepPf();
+    const { name, phone, wallets } = S.signup;
+    localStorage.setItem(REG_KEY, JSON.stringify({ kind: S.screen, at: Date.now(), signup: { name, phone, wallets }, step: S.merchant?.step || 1,
+      pf: S.screen === "merchant" ? SUUQ.pfDraft() : null, face: S.face || null }));
+  } catch {}
+}
+const clearRegDraft = () => { try { localStorage.removeItem(REG_KEY); } catch {} };
+function readRegDraft() { try { const d = JSON.parse(localStorage.getItem(REG_KEY) || "null"); return d && Date.now() - d.at < 2 * 3600e3 ? d : null; } catch { return null; } }
+async function cameraPhoto() {
+  let data = ""; try { data = window.SarrifAndroid?.pendingPhoto?.() || ""; } catch {}
+  return data ? await compressImage(await (await fetch(data)).blob(), 300_000) : "";
+}
+// After the app was closed and opened again: back to the registration (or the Account page) with the photo.
+async function resumeAfterCamera() {
+  const d = readRegDraft(), photo = await cameraPhoto().catch(() => "");
+  if (!d) return;
+  if (d.kind === "account") {
+    clearRegDraft();
+    if (S.user && photo) { try { const r = await api("/api/me/face", { body: { image: photo } }); S.user = r.user; } catch {} }
+    return;
+  }
+  if (S.user) { clearRegDraft(); return; }
+  S.signup = { ...S.signup, ...(d.signup || {}), wallets: { ...(d.signup?.wallets || {}) } };
+  if (d.kind === "merchant") { S.merchant = { pin: "", pin2: "", step: d.step || 1 }; if (d.pf) SUUQ.setPf(d.pf); }
+  S.face = photo || d.face || null; S.err = ""; S.screen = d.kind;
+  saveRegDraft();
+}
+window.__cameraPhoto = async () => { const p = await cameraPhoto().catch(() => ""); if (p && !S.user && (S.screen === "signup" || S.screen === "merchant")) { S.face = p; saveRegDraft(); render(); } };
 function bindFace() {
-  document.querySelectorAll("[data-face]").forEach(i => i.onchange = async () => {
-    const f = i.files[0]; if (!f) return;
-    try {
-      const url = await compressImage(f, 300_000);
-      if (i.dataset.face === "account") { msg("#st-face", "Saving…"); const r = await api("/api/me/face", { body: { image: url } }); S.user = r.user; render(); msg("#st-face", "Saved. Only the administration can see it.", "ok"); }
-      else { if (S.screen === "merchant") SUUQ.keepPf(); S.face = url; S.err = ""; render(); }
-    } catch (e) { msg("#st-face", e.message || "That photo could not be used.", "bad"); }
+  document.querySelectorAll("[data-face]").forEach(i => {
+    i.onclick = () => saveRegDraft(i.dataset.face === "account" ? "account" : undefined);
+    i.onchange = async () => {
+      const f = i.files[0]; if (!f) return;
+      try {
+        const url = await compressImage(f, 300_000);
+        if (i.dataset.face === "account") { clearRegDraft(); msg("#st-face", "Saving…"); const r = await api("/api/me/face", { body: { image: url } }); S.user = r.user; render(); msg("#st-face", "Saved. Thank you.", "ok"); }
+        else { if (S.screen === "merchant") SUUQ.keepPf(); S.face = url; S.err = ""; saveRegDraft(); render(); }
+      } catch (e) { msg("#st-face", e.message || "That photo could not be used.", "bad"); }
+    };
   });
 }
 function walletFields(prefix, vals, list) {
@@ -261,7 +300,7 @@ function vMerchantSignup() {
 }
 function merchantStep(to) {
   const m = S.merchant; SUUQ.keepPf();
-  if (to > m.step) { const e = SUUQ.pfCheck(m.step) || (m.step === 1 && !S.face ? "Take a photo of your face. Only the administration can see it." : ""); if (e) { S.err = e; render(); return; } }
+  if (to > m.step) { const e = SUUQ.pfCheck(m.step) || (m.step === 1 && !S.face ? "Please take a photo of your face. Thank you." : ""); if (e) { S.err = e; render(); return; } }
   S.err = ""; m.step = to; render();
   const v = document.querySelector("#app .view"); if (v) v.scrollTop = 0; window.scrollTo(0, 0);
   const first = document.querySelector("#app input:not([type=hidden]), #app select"); if (first && to < M_STEPS().length) first.focus();
@@ -271,12 +310,12 @@ async function doMerchantSignup() {
   const fail = t => { S.err = t; render(); const e = document.getElementById("m-err"); if (e) e.scrollIntoView({ block: "center" }); };
   // Send the person back to any step that still has a problem.
   for (let s = 1; s < M_STEPS().length; s++) { const e = SUUQ.pfCheck(s); if (e) { m.step = s; return fail(e); } }
-  if (!S.face) { m.step = 1; return fail("Take a photo of your face. Only the administration can see it."); }
+  if (!S.face) { m.step = 1; return fail("Please take a photo of your face. Thank you."); }
   if (m.pin.length !== 4 || m.pin !== m.pin2) return fail("Enter the same 4-digit PIN in both PIN fields.");
   const b = document.getElementById("do-merchant"); if (b) b.disabled = true;
   try {
     const r = await api("/api/auth/signup-merchant", { body: { profile: SUUQ.pfDraft(), pin: m.pin, face: S.face } });
-    S.merchant = null; S.face = null; SUUQ.resetPf(); await loggedIn(r.user); S.service = "suuq"; SUUQ.state.tab = "sell"; await SUUQ.open("suuq");
+    S.merchant = null; S.face = null; SUUQ.resetPf(); clearRegDraft(); await loggedIn(r.user); S.service = "suuq"; SUUQ.state.tab = "sell"; await SUUQ.open("suuq");
   } catch (e) { m.pin = ""; m.pin2 = ""; fail(e.message); }
 }
 function vSignup() {
@@ -1105,7 +1144,7 @@ function vSheet() {
 }
 
 /* ---------- customer events ---------- */
-function go(screen) { S.screen = screen; S.err = ""; render(); }
+function go(screen) { if (screen === "welcome" || screen === "login") clearRegDraft(); S.screen = screen; S.err = ""; render(); }
 const padKey = (v, k) => k === "del" ? v.slice(0, -1) : k === "clear" ? "" : v.length < 4 ? v + k : v;
 function bindPad(id, fn) { const p = document.getElementById(id); if (p) p.querySelectorAll("[data-k]").forEach(b => b.onclick = () => fn(b.dataset.k)); }
 function bind() {
@@ -1218,9 +1257,9 @@ async function doAdminPw() {
 async function doSignup() {
   const s = S.signup;
   if (s.pin !== s.pin2) { S.err = "The two PINs don't match. Choose your PIN again."; s.pin = ""; s.pin2 = ""; return render(); }
-  if (!S.face) { S.err = "Take a photo of your face. Only the administration can see it."; return render(); }
+  if (!S.face) { S.err = "Please take a photo of your face. Thank you."; return render(); }
   S.busy = true; render();
-  try { const r = await api("/api/auth/signup", { body: { name: s.name, phone: s.phone, pin: s.pin, wallets: s.wallets, face: S.face } }); S.signup = { name: "", phone: "", pin: "", pin2: "", wallets: {} }; S.face = null; await loggedIn(r.user); }
+  try { const r = await api("/api/auth/signup", { body: { name: s.name, phone: s.phone, pin: s.pin, wallets: s.wallets, face: S.face } }); S.signup = { name: "", phone: "", pin: "", pin2: "", wallets: {} }; S.face = null; clearRegDraft(); await loggedIn(r.user); }
   catch (e) { S.err = e.message; s.pin = ""; s.pin2 = ""; }
   S.busy = false; render();
 }
@@ -2091,5 +2130,6 @@ function renderSvcDash(fromLoad) {
   if (linkP) { try { if (linkRef) localStorage.setItem("sarrif.ref." + linkP, linkRef.toUpperCase()); localStorage.setItem("sarrif.open", linkP); } catch {} history.replaceState(null, "", location.pathname); }
   try { settings = await api("/api/settings"); } catch {}
   try { const me = await api("/api/me"); if (me.user) await loggedIn(me.user); } catch {}
+  try { await resumeAfterCamera(); } catch {}
   render();
 })();

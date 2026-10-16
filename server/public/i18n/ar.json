@@ -1289,7 +1289,6 @@
     "Take a new photo": "التقط صورة جديدة",
     "Choose from gallery": "اختر من المعرض",
     "Saved. Only the administration can see it.": "تم الحفظ. فقط الإدارة يمكنها رؤيتها.",
-    "Take a photo of your face. Only the administration can see it.": "التقط صورة لوجهك. فقط الإدارة يمكنها رؤيتها.",
     "Take a photo of your face (JPG, PNG or WebP).": "التقط صورة لوجهك (JPG أو PNG أو WebP).",
     "That file is not a photo. Take a photo of your face.": "هذا الملف ليس صورة. التقط صورة لوجهك.",
     "The face photo is too small. Take it again.": "صورة الوجه صغيرة جدًا. التقطها مرة أخرى.",
@@ -1439,7 +1438,9 @@
     "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "عندما يدفع المشتري للبائع مباشرة، تُخصم هذه الرسوم من محفظة البائع في 5PLUS عند إتمام الطلب وتُضاف إلى دخلك. اختر نسبة من السعر أو مبلغًا ثابتًا لكل طلب، لكل دولة بائع. لا يُعرض الدفع للمتجر إلا إذا كانت محفظة البائع تغطيها.",
     "Add the charges again.": "أضف الرسوم مرة أخرى.",
     "If your phone didn't dial, press:": "إذا لم يتصل هاتفك، اضغط:",
-    "Dial to pay for everything": "اتصل لدفع كل شيء"
+    "Dial to pay for everything": "اتصل لدفع كل شيء",
+    "Please take a photo of your face. Thank you.": "التقط صورة لوجهك من فضلك، شكرًا لك.",
+    "Saved. Thank you.": "تم الحفظ. شكرًا لك."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",
