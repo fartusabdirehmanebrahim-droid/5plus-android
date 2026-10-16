@@ -177,15 +177,29 @@ module.exports = function market(ctx) {
     await needRole(req, "super");
     const rows = await db.all("SELECT * FROM wallet_tx WHERE user_id IS NULL ORDER BY id DESC LIMIT 200");
     const held = Object.fromEntries(await Promise.all(CURS.map(async c => [c, round(c, (await db.get("SELECT COALESCE(SUM(amount),0) AS b FROM wallet_tx WHERE user_id IS NOT NULL AND cur = ?", c)).b)])));
-    send(res, 200, { balances: await balances(null), customerMoney: held, tx: rows.map(txRow), shopChargePct: (await getSettings()).shopChargePct || 0 });
+    send(res, 200, { balances: await balances(null), customerMoney: held, tx: rows.map(txRow), shopCharge: (await getSettings()).shopCharge });
   });
-  // The Pay to shop charge: a percent of the price, taken from the merchant's wallet when each Pay to shop order is finished.
+  // The Pay to shop charge, taken from the merchant's wallet when each Pay to shop order is finished: one rule per
+  // merchant country ("*" = every other country), each a percent of the price or a flat amount per order.
   route("PUT", "/api/super/shop-charge", async (req, res) => {
     await needRole(req, "super");
-    const b = await readJson(req), pct = Math.round(Number(b.pct) * 100) / 100;
-    if (!(pct >= 0 && pct <= 50)) fail("Enter a percent between 0 and 50.");
-    broadcast("settings", publicSettings(await saveSettings({ shopChargePct: pct })));
-    send(res, 200, { shopChargePct: pct });
+    const b = await readJson(req, 64 * 1024), seen = new Set();
+    if (!Array.isArray(b.rules) || b.rules.length > 250) fail("Add the charges again.");
+    const rules = b.rules.map(r => {
+      const country = String(r.country || ""), type = r.type === "flat" ? "flat" : "pct";
+      if (country !== "*" && !COUNTRIES.includes(country)) fail("Choose a country from the list.");
+      if (seen.has(country)) fail(`${country === "*" ? "Every other country" : country} is in the list twice.`);
+      seen.add(country);
+      const name = country === "*" ? "Every other country" : country;
+      const pct = Math.round(Number(r.pct || 0) * 100) / 100, usd = round("USD", Number(r.USD || 0)), slsh = round("SLSH", Number(r.SLSH || 0));
+      if (type === "pct" && !(pct >= 0 && pct <= 50)) fail(`${name}: enter a percent between 0 and 50.`);
+      if (type === "flat" && !(usd >= 0 && usd <= 1000 && slsh >= 0 && slsh <= 10000000)) fail(`${name}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).`);
+      return { country, type, pct: type === "pct" ? pct : 0, USD: type === "flat" ? usd : 0, SLSH: type === "flat" ? slsh : 0 };
+    });
+    if (!seen.has("*")) rules.unshift({ country: "*", type: "pct", pct: 0, USD: 0, SLSH: 0 });
+    rules.sort((a, b) => (a.country === "*" ? -1 : b.country === "*" ? 1 : a.country.localeCompare(b.country)));
+    broadcast("settings", publicSettings(await saveSettings({ shopCharge: rules })));
+    send(res, 200, { shopCharge: rules });
   });
 
   /* ---------- media (product pictures) ---------- */
@@ -565,11 +579,14 @@ module.exports = function market(ctx) {
     if (live && u.role === "customer") await rememberRef(u.id, p, url.searchParams.get("ref"));
     const code = await shareCode(u, p);
     // Pay to shop: how many items the merchant's wallet can cover the earning for, and whether this buyer earns it.
-    const per = p.mode === "buy" && !p.price_hidden ? COMMISSION(p, 1) : 0, ch = p.mode === "buy" && !p.price_hidden ? await shopChargeOf(p.cur, p.price) : 0;
-    const bal = per + ch > 0 ? await balance(p.owner_id, p.cur) : 0, cover = x => x > 0 ? Math.min(100, Math.floor(bal / x + 1e-9)) : 100;
+    // The charge is a percent per item (grows with the quantity) or a flat amount per order (fixed).
+    const sells = p.mode === "buy" && !p.price_hidden, per = sells ? COMMISSION(p, 1) : 0, rule = sells ? await chargeRule(p.shop_id) : { type: "pct", pct: 0 };
+    const chItem = rule.type === "flat" ? 0 : chargeFor(rule, p.cur, p.price), chFixed = rule.type === "flat" ? chargeFor(rule, p.cur, p.price) : 0;
+    const bal = per + chItem + chFixed > 0 ? await balance(p.owner_id, p.cur) : 0;
+    const cover = (each, fixed) => bal + 1e-9 < fixed ? 0 : each > 0 ? Math.min(100, Math.floor((bal - fixed) / each + 1e-9)) : 100;
     const fav = !!(await db.get("SELECT 1 AS x FROM favorites WHERE user_id = ? AND product_id = ?", u.id, p.id));
     send(res, 200, { product: shopperRow(p, u, { share_code: code, first_sender: !!code && code !== u.ref_code,
-      earn_mine: u.role === "customer" && p.owner_id !== u.id && !!code && code === u.ref_code, shop_cover: cover(per + ch), shop_cover_charge: cover(ch), fav }) });
+      earn_mine: u.role === "customer" && p.owner_id !== u.id && !!code && code === u.ref_code, shop_cover: cover(per + chItem, chFixed), shop_cover_charge: cover(chItem, chFixed), fav }) });
   });
 
   async function readProduct(b, existing) {
@@ -746,7 +763,14 @@ module.exports = function market(ctx) {
     if (bal >= commission + charge) return "wallet";
     return affId === buyerId && bal >= charge ? "discount" : "none";
   }
-  const shopChargeOf = async (cur, total) => round(cur, total * (Number((await getSettings()).shopChargePct) || 0) / 100);
+  // The rule for the merchant's country (from their shop details), or the one for every other country.
+  async function chargeRule(shopId) {
+    const rules = (await getSettings()).shopCharge || [], shop = await db.get("SELECT profile FROM shops WHERE id = ?", shopId);
+    let country = ""; try { country = JSON.parse(shop?.profile || "{}").country || ""; } catch {}
+    return rules.find(r => r.country === country) || rules.find(r => r.country === "*") || { type: "pct", pct: 0 };
+  }
+  const chargeFor = (rule, cur, total) => round(cur, rule.type === "flat" ? Math.min(total, Number(rule[cur]) || 0) : total * (Number(rule.pct) || 0) / 100);
+  const shopChargeOf = async (cur, total, shopId) => chargeFor(await chargeRule(shopId), cur, total);
   const NO_SHOP_PAY = "Pay to shop isn't available for this item right now. Choose another way to pay.";
 
   /* ---------- orders ---------- */
@@ -891,7 +915,7 @@ module.exports = function market(ctx) {
     const commission = p.mode === "buy" && aff && !ask ? COMMISSION(p, qty) : 0;
     let discount = 0, charge = 0;
     if (p.mode === "buy" && !ask && method === "shop") {
-      charge = await shopChargeOf(p.cur, total);
+      charge = await shopChargeOf(p.cur, total, p.shop_id);
       const mode = await shopPayMode(p.owner_id, p.cur, commission, aff, u.id, charge);
       if (mode === "none") fail(NO_SHOP_PAY);
       if (mode === "discount") discount = commission;
@@ -994,7 +1018,7 @@ module.exports = function market(ctx) {
     const rows = await db.all(`${ORDER_SELECT} WHERE o.buyer_id = ? ORDER BY o.created_at DESC LIMIT 200`, u.id), out = [];
     for (const o of rows) {
       const r = orderRow(o, false);
-      if (o.status === "quoted") r.shop_mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id, await shopChargeOf(o.cur, o.total));
+      if (o.status === "quoted") r.shop_mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id, await shopChargeOf(o.cur, o.total, o.shop_id));
       if (o.status === "quoted" && r.shop_mode === "discount") r.shop_discount = o.commission;
       out.push(r);
     }
@@ -1087,7 +1111,7 @@ module.exports = function market(ctx) {
         if (action === "pay" && !seller && o.status === "quoted" && PAY_METHODS.includes(b.method) && b.method !== "wallet") {
           let discount = 0, charge = 0;
           if (b.method === "shop") {
-            charge = await shopChargeOf(o.cur, o.total);
+            charge = await shopChargeOf(o.cur, o.total, o.shop_id);
             const mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id, charge);
             if (mode === "none") fail(NO_SHOP_PAY);
             if (mode === "discount") discount = o.commission;

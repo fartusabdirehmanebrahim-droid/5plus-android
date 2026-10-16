@@ -1250,3 +1250,9 @@ img, video, iframe{max-width:100%}
 .mi .qty.mini .icon-btn { width: 30px; height: 30px; min-height: 30px; padding: 0; }
 .mi-rm { width: 30px; height: 30px; flex: none; }
 .multi-done { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-2); text-align: left; width: 100%; }
+
+/* Pay to shop charges (super admin): one row per seller country */
+.chg-list { display: grid; gap: 10px; margin: 10px 0; }
+.chg-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.chg-row .chg-all { display: flex; align-items: center; color: var(--ink-3); }
+.chg-row .chg-del { align-self: end; margin-bottom: 4px; }

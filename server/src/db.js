@@ -409,9 +409,10 @@ const DEFAULT_SETTINGS = {
   // Where customers send money to top up their wallet: *880*<number>*<amount># (codes per currency, set by the super admin).
   // The charge (percent) when people send their affiliate earnings out with iBedel. Set by the iBedel admin.
   earnFeePct: 0,
-  // Pay to shop: the buyer pays the merchant directly, so 5PLUS takes this percent of the price from the merchant's
-  // wallet when the order is finished (super admin income). 0 = no charge. Set by the super admin.
-  shopChargePct: 0,
+  // Pay to shop: the buyer pays the merchant directly, so 5PLUS takes a charge from the merchant's wallet when the order
+  // is finished (super admin income). One rule per merchant country; "*" is every other country. Each rule is a percent
+  // of the price (pct) or a flat amount per order (USD and SLSH). Set by the super admin.
+  shopCharge: [{ country: "*", type: "pct", pct: 0, USD: 0, SLSH: 0 }],
   walletTopup: { number: "", numbers: { USD: "", SLSH: "" }, ussd: { USD: "*880*", SLSH: "*220*" } },
   // Safe payment: the buyer pays the money processor agent; Sarrif holds it until the buyer confirms they received the item.
   // merchant = the processor's merchant number (*223* SLSH, *883* USD); number = its normal number (*220* SLSH, *880* USD).
@@ -475,7 +476,8 @@ async function getSettings() {
   // Older installs had "1 month / 12 months" plans with no tiers: switch to the tiered plans.
   if (!s.suuq.plans.some(p => p.id === "free")) s.suuq.plans = structuredClone(DEFAULT_SETTINGS.suuq.plans);
   if (Number(saved.earnFeePct) >= 0) s.earnFeePct = Number(saved.earnFeePct);
-  if (Number(saved.shopChargePct) >= 0) s.shopChargePct = Number(saved.shopChargePct);
+  if (Array.isArray(saved.shopCharge) && saved.shopCharge.length) s.shopCharge = saved.shopCharge;
+  else if (Number(saved.shopChargePct) > 0) s.shopCharge = [{ country: "*", type: "pct", pct: Number(saved.shopChargePct), USD: 0, SLSH: 0 }]; // the first version: one percent
   if (Array.isArray(saved.bizCats)) s.bizCats = saved.bizCats;
   // Categories saved before photos and "Shop by category" existed get the built-in photo and the default setting.
   s.bizCats = s.bizCats.map(c => { const d = DEFAULT_BIZ_CATS.find(x => x.name === c.name); return { ...c, photo: c.photo ?? d?.photo ?? "", home: c.home ?? (c.section === "suuq") }; });

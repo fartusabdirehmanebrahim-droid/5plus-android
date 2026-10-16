@@ -1429,7 +1429,15 @@
     "Seller subscriptions and Pay to shop charges.": "اشتراكات البائعين ورسوم الدفع للمتجر.",
     "When a buyer pays a seller directly, this percent of the price is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. 0 = no charge. Pay to shop is only offered when the seller's wallet can cover it.": "عندما يدفع المشتري للبائع مباشرة، تُخصم هذه النسبة من السعر من محفظة البائع في 5PLUS عند إتمام الطلب، وتُضاف إلى دخلك. 0 = بلا رسوم. لا يُعرض الدفع للمتجر إلا إذا كانت محفظة البائع تغطيها.",
     "Saved. No charge on Pay to shop.": "تم الحفظ. لا رسوم على الدفع للمتجر.",
-    "Enter a percent between 0 and 50.": "أدخل نسبة بين 0 و50."
+    "Enter a percent between 0 and 50.": "أدخل نسبة بين 0 و50.",
+    "Every other country": "كل الدول الأخرى",
+    "Percent": "نسبة مئوية",
+    "USD per order": "دولار لكل طلب",
+    "SLSH per order": "شلن لكل طلب",
+    "Add a country": "أضف دولة",
+    "Choose a country from the list.": "اختر دولة من القائمة.",
+    "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "عندما يدفع المشتري للبائع مباشرة، تُخصم هذه الرسوم من محفظة البائع في 5PLUS عند إتمام الطلب وتُضاف إلى دخلك. اختر نسبة من السعر أو مبلغًا ثابتًا لكل طلب، لكل دولة بائع. لا يُعرض الدفع للمتجر إلا إذا كانت محفظة البائع تغطيها.",
+    "Add the charges again.": "أضف الرسوم مرة أخرى."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",
@@ -1641,6 +1649,10 @@
     "Your phone is dialling to pay {0} for everything. The money is held safely and each seller gets paid after you confirm you received their product.": "هاتفك يتصل لدفع {0} عن كل شيء. يُحفظ المال بأمان ويحصل كل بائع على ماله بعد تأكيدك استلام منتجه.",
     "We took {0} from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.": "أخذنا {0} من محفظتك ونحتفظ به بأمان. يحصل كل بائع على ماله بعد تأكيدك استلام منتجه.",
     "Saved. You get {0}% of every Pay to shop sale.": "تم الحفظ. تحصل على {0}% من كل بيع بالدفع للمتجر.",
-    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "عندما يدفع لك المشتري مباشرة (الدفع للمتجر)، تأخذ 5PLUS نسبة {0}% من السعر من محفظتك في 5PLUS عند إتمام الطلب. احتفظ بمال في محفظتك ليتمكن المشترون من استخدام الدفع للمتجر."
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "عندما يدفع لك المشتري مباشرة (الدفع للمتجر)، تأخذ 5PLUS نسبة {0}% من السعر من محفظتك في 5PLUS عند إتمام الطلب. احتفظ بمال في محفظتك ليتمكن المشترون من استخدام الدفع للمتجر.",
+    "{0} is in the list twice.": "{0} موجودة في القائمة مرتين.",
+    "{0}: enter a percent between 0 and 50.": "{0}: أدخل نسبة بين 0 و50.",
+    "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: أدخل مبلغًا ثابتًا 0 أو أكثر (حتى 1000 دولار / 10,000,000 شلن).",
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "عندما يدفع لك المشتري مباشرة (الدفع للمتجر)، تأخذ 5PLUS مبلغ {0} لكل طلب من محفظتك في 5PLUS عند إتمام الطلب. احتفظ بمال في محفظتك ليتمكن المشترون من استخدام الدفع للمتجر."
   }
 }

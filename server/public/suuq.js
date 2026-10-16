@@ -944,6 +944,15 @@ const SUUQ = (() => {
     return p.earn_mine && chOk ? { mode: "discount", discount: Math.round(per * qty * 100) / 100 } : { mode: "none", discount: 0 };
   }
   const dialBase = (box, total, shop) => box.method === "shop" && shop?.mode === "discount" ? Math.max(0, total - shop.discount) : total;
+  // Pay to shop charge for a merchant in this country (the super admin's rule for it, or for every other country).
+  function chargeNote(country) {
+    const rules = settings.shopCharge || [], r = rules.find(x => x.country === country) || rules.find(x => x.country === "*");
+    if (!r || (r.type === "flat" ? !(r.USD > 0 || r.SLSH > 0) : !(r.pct > 0))) return "";
+    const flat = [r.USD > 0 ? money(r.USD, "USD") : "", r.SLSH > 0 ? money(r.SLSH, "SLSH") : ""].filter(Boolean).join(" / ");
+    return `<p class="note" style="margin:0">${r.type === "flat"
+      ? `When a buyer pays you directly (Pay to shop), 5PLUS takes ${flat} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.`
+      : `When a buyer pays you directly (Pay to shop), 5PLUS takes ${r.pct}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.`}</p>`;
+  }
   function payOptions(payShop, shop) {
     const sp = settings.safePay || {}, ps = payShop || {};
     return { wallet: { merchant: false, number: false, ok: true }, safe: { merchant: !!sp.merchant, number: !!sp.number, ok: !!(sp.merchant || sp.number) }, shop: { merchant: !!ps.merchant, number: !!ps.number, ok: !!(ps.merchant || ps.number) && shop?.mode !== "none" } };
@@ -1436,7 +1445,7 @@ const SUUQ = (() => {
       ${f("zaad_merchant", "Merchant number ZAAD", 'inputmode="numeric" maxlength="15"')}
       ${f("edahab_merchant", "Merchant number eDahab", 'inputmode="numeric" maxlength="15"', "Add at least one merchant number.")}
       ${f("shop_phone", `Normal ${biz} number`, 'inputmode="tel" maxlength="15"', "Optional.")}
-      ${settings.shopChargePct > 0 ? `<p class="note" style="margin:0">When a buyer pays you directly (Pay to shop), 5PLUS takes ${settings.shopChargePct}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.</p>` : ""}`,
+      ${chargeNote(d.country)}`,
     ];
     return `<div class="pf">${(step ? [parts[step - 1]] : parts).map(x => x()).join("")}</div>`;
   }
@@ -2154,7 +2163,29 @@ const SUUQ = (() => {
     // On a phone the tab row scrolls: keep the chosen tab in view.
     document.querySelectorAll(".agent-tabs").forEach(nav => { const t = nav.querySelector('[aria-pressed="true"]'); if (t && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, t.offsetLeft - nav.offsetLeft - 16); });
   }
+  // Pay to shop charges being edited (kept while the page redraws, until saved).
+  let chgEdit = null;
+  const chargeRows = () => chgEdit || (chgEdit = structuredClone(income?.shopCharge?.length ? income.shopCharge : [{ country: "*", type: "pct", pct: 0, USD: 0, SLSH: 0 }]));
+  function bindCharges() {
+    const box = document.getElementById("shopch"); if (!box) return;
+    const num = v => Number(String(v).replace(",", ".")) || 0;
+    box.querySelectorAll("[data-chgf]").forEach(inp => {
+      const i = +inp.closest("[data-chg]").dataset.chg, f = inp.dataset.chgf;
+      inp.onchange = () => { const r = chgEdit[i]; r[f] = f === "country" || f === "type" ? inp.value : num(inp.value); if (f === "type") renderSuperWallets(); };
+    });
+    box.querySelectorAll("[data-chgdel]").forEach(b => b.onclick = () => { chgEdit.splice(+b.dataset.chgdel, 1); renderSuperWallets(); });
+    document.getElementById("shopch-add").onclick = () => {
+      const free = (st.countries || []).find(c => !chgEdit.some(r => r.country === c));
+      if (!free) return; chgEdit.push({ country: free, type: "pct", pct: 0, USD: 0, SLSH: 0 }); renderSuperWallets().then(() => { const s = document.getElementById(`chg-c-${chgEdit.length - 1}`); if (s) s.focus(); });
+    };
+    document.getElementById("shopch-save").onclick = async () => {
+      box.querySelectorAll("[data-chgf]").forEach(inp => { const f = inp.dataset.chgf; chgEdit[+inp.closest("[data-chg]").dataset.chg][f] = f === "country" || f === "type" ? inp.value : num(inp.value); });
+      try { const r = await api("/api/super/shop-charge", { method: "PUT", body: { rules: chgEdit } }); income.shopCharge = r.shopCharge; settings.shopCharge = r.shopCharge; chgEdit = null; await renderSuperWallets(); msg("#st-shopch", "Saved.", "ok"); }
+      catch (e) { msg("#st-shopch", e.message, "bad"); }
+    };
+  }
   async function renderSuperWallets() {
+    if (!st.countries?.length) { try { st.countries = (await api("/api/suuq/plans")).countries; } catch {} }
     const el = document.getElementById("sup-wallets"); if (!el) return;
     safeHost = null;
     if (!safeList) { try { const r = await api("/api/super/safepay?status=" + safeTab); safeList = r.orders; spCfg = r.settings; } catch { safeList = []; } }
@@ -2191,17 +2222,20 @@ const SUUQ = (() => {
           <div class="hist">${found.tx.map(t => `<div class="hist-item"><div class="t"><b>${esc(t.label)}</b><small>${new Date(t.created_at).toLocaleString()}${t.note ? " · " + esc(t.note) : ""}</small></div><div class="a num" style="color:${t.amount < 0 ? "var(--danger)" : "var(--green)"}">${t.amount < 0 ? "−" : "+"}${money(Math.abs(t.amount), t.cur)}</div></div>`).join("") || `<div class="empty">No activity yet.</div>`}</div></div>` : ""}
       </div>
       <div class="panel"><div class="panel-head"><div><h3>Super admin income</h3><p>Seller subscriptions and Pay to shop charges.</p></div></div>
-        <div class="field"><label for="shopch-pct">Pay to shop charge</label>
-          <div class="inline-form"><div class="suffix" style="max-width:140px"><input id="shopch-pct" inputmode="decimal" value="${esc(String(income.shopChargePct ?? 0))}" aria-describedby="shopch-help"><span>%</span></div><button class="btn btn-primary" id="shopch-save">Save</button><span class="status-msg" id="st-shopch"></span></div>
-          <small class="note" id="shopch-help">When a buyer pays a seller directly, this percent of the price is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. 0 = no charge. Pay to shop is only offered when the seller's wallet can cover it.</small></div>
+        <div class="field" id="shopch"><b style="font-size:15px">Pay to shop charge</b>
+          <small class="note">When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.</small>
+          <div class="chg-list">${chargeRows().map((r, i) => `<div class="chg-row" data-chg="${i}">
+            <div class="mini"><label for="chg-c-${i}">Country</label>${r.country === "*" ? `<div class="input chg-all" id="chg-c-${i}">Every other country</div>` : `<select class="input" id="chg-c-${i}" data-chgf="country">${(st.countries || []).map(c => `<option ${c === r.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`}</div>
+            <div class="mini"><label for="chg-t-${i}">Type</label><select class="input" id="chg-t-${i}" data-chgf="type"><option value="pct" ${r.type !== "flat" ? "selected" : ""}>Percent</option><option value="flat" ${r.type === "flat" ? "selected" : ""}>Flat amount</option></select></div>
+            ${r.type === "flat" ? `<div class="mini"><label for="chg-u-${i}">USD per order</label><div class="suffix"><span>$</span><input id="chg-u-${i}" data-chgf="USD" inputmode="decimal" value="${esc(String(r.USD || 0))}"></div></div>
+            <div class="mini"><label for="chg-s-${i}">SLSH per order</label><div class="suffix"><span>SLSH</span><input id="chg-s-${i}" data-chgf="SLSH" inputmode="numeric" value="${esc(String(r.SLSH || 0))}"></div></div>`
+            : `<div class="mini"><label for="chg-p-${i}">Percent</label><div class="suffix"><span>%</span><input id="chg-p-${i}" data-chgf="pct" inputmode="decimal" value="${esc(String(r.pct || 0))}"></div></div>`}
+            ${r.country === "*" ? "" : `<button class="icon-btn chg-del" data-chgdel="${i}" aria-label="Remove ${esc(r.country)}">✕</button>`}</div>`).join("")}</div>
+          <div class="row-actions"><button class="btn btn-ghost" id="shopch-add">Add a country</button><button class="btn btn-primary" id="shopch-save">Save</button><span class="status-msg" id="st-shopch"></span></div></div>
         <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${CURS.map(c => `<div class="kpi"><span class="label">Income ${c}</span><b>${money(income.balances[c] || 0, c)}</b></div>`).join("")}
           ${CURS.map(c => `<div class="kpi"><span class="label">In customer wallets ${c}</span><b>${money(income.customerMoney[c] || 0, c)}</b></div>`).join("")}</div>
         <div class="hist">${income.tx.map(t => `<div class="hist-item"><div class="t"><b>${esc(t.label)}</b><small>${new Date(t.created_at).toLocaleString()} · ${esc(t.note)}</small></div><div class="a num" style="color:var(--green)">+${money(t.amount, t.cur)}</div></div>`).join("") || `<div class="empty">No income yet.</div>`}</div></div>`;
-    const shSave = document.getElementById("shopch-save");
-    if (shSave) shSave.onclick = async () => {
-      try { const r = await api("/api/super/shop-charge", { method: "PUT", body: { pct: Number(document.getElementById("shopch-pct").value.replace(",", ".")) } }); income.shopChargePct = r.shopChargePct; settings.shopChargePct = r.shopChargePct; msg("#st-shopch", r.shopChargePct > 0 ? `Saved. You get ${r.shopChargePct}% of every Pay to shop sale.` : "Saved. No charge on Pay to shop.", "ok"); }
-      catch (e) { msg("#st-shopch", e.message, "bad"); }
-    };
+    bindCharges();
     el.insertAdjacentHTML("afterbegin", safePanel()); bindSafePanel();
     el.insertAdjacentHTML("afterbegin", heldPanel()); bindHeldPanel();
     el.querySelectorAll("[data-tpt]").forEach(b => b.onclick = () => { topupsTab = b.dataset.tpt; topups = null; renderSuperWallets(); });

@@ -1428,7 +1428,15 @@
     "Seller subscriptions and Pay to shop charges.": "Rukummada iibiyayaasha iyo khidmadaha Ku bixi dukaanka.",
     "When a buyer pays a seller directly, this percent of the price is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. 0 = no charge. Pay to shop is only offered when the seller's wallet can cover it.": "Marka iibsaduhu si toos ah u siiyo iibiyaha, boqolleygan qiimaha ayaa laga jarayaa boorsada 5PLUS ee iibiyaha marka dalabku dhammaado, waxaana lagu darayaa dakhligaaga. 0 = khidmad ma jirto. Ku bixi dukaanka waxaa la bixiyaa oo keliya marka boorsada iibiyuhu daboosho.",
     "Saved. No charge on Pay to shop.": "Waa la keydiyay. Khidmad kuma jirto Ku bixi dukaanka.",
-    "Enter a percent between 0 and 50.": "Geli boqolley u dhexeysa 0 iyo 50."
+    "Enter a percent between 0 and 50.": "Geli boqolley u dhexeysa 0 iyo 50.",
+    "Every other country": "Dalal kale oo dhan",
+    "Percent": "Boqolley",
+    "USD per order": "USD dalab kasta",
+    "SLSH per order": "SLSH dalab kasta",
+    "Add a country": "Ku dar dal",
+    "Choose a country from the list.": "Liiska ka dooro dal.",
+    "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "Marka iibsaduhu si toos ah u siiyo iibiyaha, khidmaddan waxaa laga jarayaa boorsada 5PLUS ee iibiyaha marka dalabku dhammaado, waxaana lagu darayaa dakhligaaga. Dal kasta oo iibiye ka yimaado u dooro boqolley qiimaha ah ama lacag go'an dalab kasta. Ku bixi dukaanka waxaa la bixiyaa oo keliya marka boorsada iibiyuhu daboosho.",
+    "Add the charges again.": "Khidmadaha mar kale ku dar."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
@@ -1640,6 +1648,10 @@
     "Your phone is dialling to pay {0} for everything. The money is held safely and each seller gets paid after you confirm you received their product.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0} dhammaan. Lacagta si ammaan ah ayaa loo hayaa, iibiye walbana waa la siinayaa marka aad xaqiijiso inaad heshay alaabtiisa.",
     "We took {0} from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.": "Waxaan boorsadaada ka qaadnay {0} oo si ammaan ah ayaan u haynaa. Iibiye walba waa la siinayaa marka aad xaqiijiso inaad heshay alaabtiisa.",
     "Saved. You get {0}% of every Pay to shop sale.": "Waa la keydiyay. Waxaad helaysaa {0}% iib kasta oo Ku bixi dukaanka ah.",
-    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Marka iibsaduhu si toos ah kuu siiyo (Ku bixi dukaanka), 5PLUS waxay boorsadaada 5PLUS ka qaadaysaa {0}% qiimaha marka dalabku dhammaado. Lacag ku hay boorsadaada si iibsadayaashu u isticmaali karaan Ku bixi dukaanka."
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Marka iibsaduhu si toos ah kuu siiyo (Ku bixi dukaanka), 5PLUS waxay boorsadaada 5PLUS ka qaadaysaa {0}% qiimaha marka dalabku dhammaado. Lacag ku hay boorsadaada si iibsadayaashu u isticmaali karaan Ku bixi dukaanka.",
+    "{0} is in the list twice.": "{0} laba jeer ayuu liiska ku jiraa.",
+    "{0}: enter a percent between 0 and 50.": "{0}: geli boqolley u dhexeysa 0 iyo 50.",
+    "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: geli lacag go'an oo 0 ama ka badan (ilaa 1000 USD / 10,000,000 SLSH).",
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Marka iibsaduhu si toos ah kuu siiyo (Ku bixi dukaanka), 5PLUS waxay boorsadaada 5PLUS ka qaadaysaa {0} dalab kasta marka dalabku dhammaado. Lacag ku hay boorsadaada si iibsadayaashu u isticmaali karaan Ku bixi dukaanka."
   }
 }

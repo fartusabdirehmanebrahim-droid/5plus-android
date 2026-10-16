@@ -1429,7 +1429,15 @@
     "Seller subscriptions and Pay to shop charges.": "የሻጮች ምዝገባዎች እና የለሱቅ ይክፈሉ ክፍያዎች።",
     "When a buyer pays a seller directly, this percent of the price is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. 0 = no charge. Pay to shop is only offered when the seller's wallet can cover it.": "ገዢ ለሻጩ በቀጥታ ሲከፍል፣ ትዕዛዙ ሲጠናቀቅ ይህ የዋጋው መቶኛ ከሻጩ 5PLUS ቦርሳ ተቀንሶ ወደ ገቢዎ ይጨመራል። 0 = ክፍያ የለም። ለሱቅ ይክፈሉ የሚቀርበው የሻጩ ቦርሳ ሊሸፍነው ሲችል ብቻ ነው።",
     "Saved. No charge on Pay to shop.": "ተቀምጧል። በለሱቅ ይክፈሉ ላይ ክፍያ የለም።",
-    "Enter a percent between 0 and 50.": "ከ0 እስከ 50 ያለ መቶኛ ያስገቡ።"
+    "Enter a percent between 0 and 50.": "ከ0 እስከ 50 ያለ መቶኛ ያስገቡ።",
+    "Every other country": "ሌሎች ሁሉም አገሮች",
+    "Percent": "መቶኛ",
+    "USD per order": "USD በትዕዛዝ",
+    "SLSH per order": "SLSH በትዕዛዝ",
+    "Add a country": "አገር ያክሉ",
+    "Choose a country from the list.": "ከዝርዝሩ አገር ይምረጡ።",
+    "When a buyer pays a seller directly, this charge is taken from the seller's 5PLUS wallet when the order is finished, and added to your income. Choose a percent of the price or a flat amount per order, for each seller country. Pay to shop is only offered when the seller's wallet can cover it.": "ገዢ ለሻጩ በቀጥታ ሲከፍል፣ ትዕዛዙ ሲጠናቀቅ ይህ ክፍያ ከሻጩ 5PLUS ቦርሳ ተቀንሶ ወደ ገቢዎ ይጨመራል። ለእያንዳንዱ የሻጭ አገር የዋጋውን መቶኛ ወይም በትዕዛዝ ቋሚ መጠን ይምረጡ። ለሱቅ ይክፈሉ የሚቀርበው የሻጩ ቦርሳ ሊሸፍነው ሲችል ብቻ ነው።",
+    "Add the charges again.": "ክፍያዎቹን እንደገና ያክሉ።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1641,6 +1649,10 @@
     "Your phone is dialling to pay {0} for everything. The money is held safely and each seller gets paid after you confirm you received their product.": "ስልክዎ ለሁሉም {0} ለመክፈል እየደወለ ነው። ገንዘቡ በደህና ይያዛል፣ እያንዳንዱ ሻጭ ምርቱ እንደደረሰዎ ሲያረጋግጡ ይከፈለዋል።",
     "We took {0} from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.": "{0} ከቦርሳዎ ወስደን በደህና እንይዘዋለን። እያንዳንዱ ሻጭ ምርቱ እንደደረሰዎ ሲያረጋግጡ ይከፈለዋል።",
     "Saved. You get {0}% of every Pay to shop sale.": "ተቀምጧል። ከእያንዳንዱ የለሱቅ ይክፈሉ ሽያጭ {0}% ያገኛሉ።",
-    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "ገዢ በቀጥታ ሲከፍልዎ (ለሱቅ ይክፈሉ)፣ ትዕዛዙ ሲጠናቀቅ 5PLUS ከ5PLUS ቦርሳዎ የዋጋውን {0}% ይወስዳል። ገዢዎች ለሱቅ ይክፈሉን እንዲጠቀሙ በቦርሳዎ ገንዘብ ያስቀምጡ።"
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0}% of the price from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "ገዢ በቀጥታ ሲከፍልዎ (ለሱቅ ይክፈሉ)፣ ትዕዛዙ ሲጠናቀቅ 5PLUS ከ5PLUS ቦርሳዎ የዋጋውን {0}% ይወስዳል። ገዢዎች ለሱቅ ይክፈሉን እንዲጠቀሙ በቦርሳዎ ገንዘብ ያስቀምጡ።",
+    "{0} is in the list twice.": "{0} በዝርዝሩ ውስጥ ሁለት ጊዜ አለ።",
+    "{0}: enter a percent between 0 and 50.": "{0}: ከ0 እስከ 50 ያለ መቶኛ ያስገቡ።",
+    "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: 0 ወይም ከዚያ በላይ ቋሚ መጠን ያስገቡ (እስከ 1000 USD / 10,000,000 SLSH)።",
+    "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "ገዢ በቀጥታ ሲከፍልዎ (ለሱቅ ይክፈሉ)፣ ትዕዛዙ ሲጠናቀቅ 5PLUS ከ5PLUS ቦርሳዎ በትዕዛዝ {0} ይወስዳል። ገዢዎች ለሱቅ ይክፈሉን እንዲጠቀሙ በቦርሳዎ ገንዘብ ያስቀምጡ።"
   }
 }
