@@ -168,6 +168,7 @@ function vWelcome() {
 // PIN is typed in a normal field (hidden digits, number keyboard on phones).
 const pinInput = (id, value, auto = "current-password", placeholder = "4-digit PIN") =>
   `<input class="input pin-input" id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="${auto}" placeholder="${placeholder}" value="${esc(value || "")}">`;
+const EASY_PINS = ["1234", "1111", "0000"]; // not allowed for a new PIN (the server checks too)
 function pinOn(id, set, onChange, onEnter) {
   const el = document.getElementById(id); if (!el) return;
   el.oninput = () => { const v = el.value.replace(/\D/g, "").slice(0, 4); if (v !== el.value) el.value = v; set(v); if (onChange) onChange(v); };
@@ -312,6 +313,7 @@ async function doMerchantSignup() {
   for (let s = 1; s < M_STEPS().length; s++) { const e = SUUQ.pfCheck(s); if (e) { m.step = s; return fail(e); } }
   if (!S.face) { m.step = 1; return fail("Please take a photo of your face. Thank you."); }
   if (m.pin.length !== 4 || m.pin !== m.pin2) return fail("Enter the same 4-digit PIN in both PIN fields.");
+  if (EASY_PINS.includes(m.pin)) { m.pin = ""; m.pin2 = ""; return fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN."); }
   const b = document.getElementById("do-merchant"); if (b) b.disabled = true;
   try {
     const r = await api("/api/auth/signup-merchant", { body: { profile: SUUQ.pfDraft(), pin: m.pin, face: S.face } });
@@ -1257,6 +1259,7 @@ async function doAdminPw() {
 async function doSignup() {
   const s = S.signup;
   if (s.pin !== s.pin2) { S.err = "The two PINs don't match. Choose your PIN again."; s.pin = ""; s.pin2 = ""; return render(); }
+  if (EASY_PINS.includes(s.pin)) { S.err = "1234, 1111 and 0000 are too easy to guess. Choose another PIN."; s.pin = ""; s.pin2 = ""; return render(); }
   if (!S.face) { S.err = "Please take a photo of your face. Thank you."; return render(); }
   S.busy = true; render();
   try { const r = await api("/api/auth/signup", { body: { name: s.name, phone: s.phone, pin: s.pin, wallets: s.wallets, face: S.face } }); S.signup = { name: "", phone: "", pin: "", pin2: "", wallets: {} }; S.face = null; clearRegDraft(); await loggedIn(r.user); }

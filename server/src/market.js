@@ -388,7 +388,7 @@ module.exports = function market(ctx) {
     const b = await readJson(req, 1024 * 1024), p = readProfile(b.profile || {}, (await getSettings()).bizCats, true), pin = String(b.pin || "");
     const phone = cleanPhone(p.phone);
     if (phone.length < 7 || phone.length > 12) fail("Enter a valid phone number.");
-    if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
+    if (!isPin(pin)) fail("Choose a 4-digit PIN."); if (weakPin(pin)) fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN.");
     if (await db.get("SELECT 1 FROM users WHERE phone = ?", phone)) fail("This phone number already has an account. Log in, then choose “Become a merchant” in Account.");
     p.phone = phone;
     const face = b.face ? readFace(b.face) : null;

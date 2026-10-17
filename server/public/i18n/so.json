@@ -1448,7 +1448,8 @@
     "No safe payments to check.": "Ma jiraan lacag bixin ammaan ah oo la hubinayo.",
     "Money received. It is held until the customer has the item.": "Lacagtii waa timid. Waa la hayaa ilaa macmiilku alaabta helo.",
     "Marked not received. The order was stopped.": "Waxaa la calaamadeeyay lama helin. Dalabka waa la joojiyay.",
-    "Money not checked yet. Check your account before you release.": "Lacagta weli lama hubin. Hubi akoonkaaga ka hor intaadan sii dayn."
+    "Money not checked yet. Check your account before you release.": "Lacagta weli lama hubin. Hubi akoonkaaga ka hor intaadan sii dayn.",
+    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234, 1111 iyo 0000 aad bay u fudud yihiin. Dooro PIN kale."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

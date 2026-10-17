@@ -1449,7 +1449,8 @@
     "No safe payments to check.": "የሚረጋገጡ ደህንነቱ የተጠበቀ ክፍያዎች የሉም።",
     "Money received. It is held until the customer has the item.": "ገንዘቡ ደርሷል። ደንበኛው እቃውን እስኪያገኝ ይያዛል።",
     "Marked not received. The order was stopped.": "አልደረሰም ተብሎ ምልክት ተደርጓል። ትዕዛዙ ቆሟል።",
-    "Money not checked yet. Check your account before you release.": "ገንዘቡ ገና አልተረጋገጠም። ከመልቀቅዎ በፊት ሂሳብዎን ያረጋግጡ።"
+    "Money not checked yet. Check your account before you release.": "ገንዘቡ ገና አልተረጋገጠም። ከመልቀቅዎ በፊት ሂሳብዎን ያረጋግጡ።",
+    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234፣ 1111 እና 0000 በቀላሉ ይገመታሉ። ሌላ PIN ይምረጡ።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

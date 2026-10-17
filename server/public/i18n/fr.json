@@ -1449,7 +1449,8 @@
     "No safe payments to check.": "Aucun paiement sécurisé à vérifier.",
     "Money received. It is held until the customer has the item.": "Argent reçu. Il est conservé jusqu'à ce que le client ait l'article.",
     "Marked not received. The order was stopped.": "Marqué non reçu. La commande a été arrêtée.",
-    "Money not checked yet. Check your account before you release.": "Argent pas encore vérifié. Vérifiez votre compte avant de libérer."
+    "Money not checked yet. Check your account before you release.": "Argent pas encore vérifié. Vérifiez votre compte avant de libérer.",
+    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234, 1111 et 0000 sont trop faciles à deviner. Choisissez un autre PIN."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",

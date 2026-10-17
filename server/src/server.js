@@ -36,7 +36,9 @@ const PUBLIC_DIR = path.join(__dirname, "..", "public");
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 const fail = (msg, status = 400) => { throw new HttpError(status, msg); };
 const isPin = p => /^\d{4}$/.test(String(p || ""));
-const weakPin = () => false; // any 4-digit PIN is allowed (the owner chose this; 5 wrong tries still lock the account for 15 minutes)
+// New PINs can be anything except the three easiest to guess (the owner chose these). Existing accounts keep their PIN;
+// 5 wrong tries still lock an account for 15 minutes.
+const weakPin = pin => ["1234", "1111", "0000"].includes(String(pin));
 const now = () => Date.now();
 
 function send(res, status, body, headers = {}) {
@@ -220,7 +222,7 @@ route("POST", "/api/auth/signup", async (req, res) => {
   if (phone.length < 7 || phone.length > 12) fail("Enter a valid phone number.");
   if (Object.keys(wallets).length < 2) fail("Add at least two wallet numbers so you can send between them.");
   if (Object.values(wallets).some(n => n.length < 7 || n.length > 12)) fail("Check your wallet numbers.");
-  if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
+  if (!isPin(pin)) fail("Choose a 4-digit PIN."); if (weakPin(pin)) fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN.");
   if (await db.get("SELECT 1 FROM users WHERE phone = ?", phone)) fail("This number already has an account. Log in instead.");
   const face = b.face ? readFace(b.face) : null;
   const info = await db.run("INSERT INTO users (name, phone, role, pin_hash, wallets, created_at, ref_code) VALUES (?, ?, 'customer', ?, ?, ?, ?)", name, phone, hashSecret(pin), JSON.stringify(wallets), now(), await newRefCode());
@@ -543,7 +545,7 @@ route("POST", "/api/admin/agents", async (req, res) => {
   const name = String(b.name || "").trim().slice(0, 80), phone = cleanPhone(b.phone), pin = String(b.pin || "");
   if (name.length < 2) fail("Enter the agent's full name.");
   if (phone.length < 7 || phone.length > 12) fail("Enter a valid phone number.");
-  if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
+  if (!isPin(pin)) fail("Choose a 4-digit PIN."); if (weakPin(pin)) fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN.");
   if (await db.get("SELECT 1 FROM users WHERE phone = ?", phone)) fail("This number already has an account.");
   await db.run("INSERT INTO users (name, phone, role, service, pin_hash, created_at, ref_code) VALUES (?, ?, 'agent', ?, ?, ?, ?)", name, phone, service, hashSecret(pin), now(), await newRefCode());
   send(res, 200, { ok: true });
@@ -551,7 +553,7 @@ route("POST", "/api/admin/agents", async (req, res) => {
 route("POST", "/api/admin/users/:id/reset-pin", async (req, res, url, [id]) => {
   const me = await needRole(req, "admin", "super");
   const pin = String((await readJson(req)).pin || "");
-  if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
+  if (!isPin(pin)) fail("Choose a 4-digit PIN."); if (weakPin(pin)) fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN.");
   const u = await db.get("SELECT * FROM users WHERE id = ?", id);
   if (!canManage(me, u)) fail("User not found.", 404);
   // Bumping token_version logs the person out everywhere.
@@ -678,7 +680,7 @@ route("POST", "/api/super/admins", async (req, res) => {
   if (!(await getSettings()).services.some(x => x.id === service)) fail("Choose which service this admin runs.");
   if (name.length < 2) fail("Enter the admin's full name.");
   if (phone.length < 7 || phone.length > 12) fail("Enter a valid phone number.");
-  if (!isPin(pin) || weakPin(pin)) fail("Choose a 4-digit PIN.");
+  if (!isPin(pin)) fail("Choose a 4-digit PIN."); if (weakPin(pin)) fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN.");
   if (pw.length < 8) fail("The password needs at least 8 characters.");
   if (await db.get("SELECT 1 FROM users WHERE phone = ?", phone)) fail("This number already has an account.");
   await db.run("INSERT INTO users (name, phone, role, service, pin_hash, pw_hash, created_at, ref_code) VALUES (?, ?, 'admin', ?, ?, ?, ?, ?)", name, phone, service, hashSecret(pin), hashSecret(pw), now(), await newRefCode());
