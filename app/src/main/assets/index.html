@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so" data-theme="light">
 <head>
-<meta name="sarrif-build" content="1792209043">
+<meta name="sarrif-build" content="1792209649">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -8248,8 +8248,7 @@ const SUUQ = (() => {
         <h3 style="font-size:20px">${d.orders.length > 1 ? `${d.orders.length} orders placed` : "Order placed"}</h3>
         <p class="note" style="margin:0">${d.pay_ussd ? `Your phone is dialling to pay <b class="num">${esc(money(d.total + d.fee, cur))}</b> for everything. The money is held safely and each seller gets paid after you confirm you received their product.` : `We took <b class="num">${esc(money(d.total, cur))}</b> from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.`}</p>
         <div class="multi-done">${d.orders.map(o => `<span>${esc(o.product_name)} × ${o.qty} · <span class="num">${esc(o.ref)}</span></span>`).join("")}</div></div>
-        ${d.pay_ussd ? `<p class="note" style="margin:0">If your phone didn't dial, press:</p>${dialLink(d.pay_ussd, d.total + d.fee, cur)}` : ""}
-        <button class="btn ${d.pay_ussd ? "btn-ghost" : "btn-primary"} btn-block" data-sq="multiorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closemulti">Keep shopping</button></div></div>`;
+        <button class="btn btn-primary btn-block" data-sq="multiorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closemulti">Keep shopping</button></div></div>`;
     }
     const cur = m.items[0]?.p.cur || "USD", total = m.items.reduce((a, x) => a + x.p.price * x.qty, 0), bal = st.wallet?.balances?.[cur] ?? 0;
     const safeOk = payOptions({}, null).safe.ok; if (!safeOk) m.method = "wallet";
@@ -8424,10 +8423,8 @@ const SUUQ = (() => {
     }
     return `<button class="btn btn-primary btn-block" data-sq="${act}">${SVC_TOPUP}Pay ${money(total + payFeeOf(cur, total), cur)}</button>`;
   }
-  const dialNow = code => { if (code) dialUssd(code); };
-  // A real button the buyer taps to dial (a phone browser only opens the dialer right after a tap, so the automatic
-  // dial can be blocked when the server is slow). The code itself isn't shown.
-  const dialLink = (code, amount, cur) => code ? `<a class="btn btn-primary btn-block" href="${esc(telHref(code))}" data-dialcode="${esc(code)}">${SVC_TOPUP}Dial to pay ${esc(money(amount, cur))}</a>` : "";
+  // The "Order placed" screen shows first, then the phone dials by itself (no button to press).
+  const dialNow = code => { if (code) setTimeout(() => dialUssd(code), 1200); };
   if (!window.__dialBound) { window.__dialBound = true; document.addEventListener("click", e => { const a = e.target.closest?.("[data-dialcode]"); if (a) dialCode(e, a.dataset.dialcode); }, true); }
 
 
@@ -8438,9 +8435,7 @@ const SUUQ = (() => {
       <h3 style="font-size:20px">Order placed</h3>
       <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it." : "The seller can see your payment and delivers when the money arrives."}</p>
       <p class="note" style="margin:0">Ref <span class="num">${esc(os.done.ref)}</span></p></div>
-      <p class="note" style="margin:0">If your phone didn't dial, press:</p>
-      ${dialLink(os.done.pay_ussd, os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur)}
-      <button class="btn btn-ghost btn-block" data-sq="myorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closesheet">Keep shopping</button></div></div>`;
+      <button class="btn btn-primary btn-block" data-sq="myorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closesheet">Keep shopping</button></div></div>`;
     if (os.done) return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
       <h3 style="font-size:20px">${asksPrice(p) ? "Request sent" : p.mode === "buy" ? "Order placed" : "Booking sent"}</h3>
       <p class="note" style="margin:0">${asksPrice(p) ? "The seller will send you the price. You pay from your wallet only after that. Follow it in My orders." : p.mode === "buy" ? `We took ${money(os.done.total, os.done.cur)} from your wallet and hold it safely. The seller gets it after you confirm you received the product.` : "The seller will accept or decline your booking. Follow it in My orders."}</p>
@@ -8487,7 +8482,6 @@ const SUUQ = (() => {
         ${o.status === "awaiting_payment" ? `<small class="note">${o.pay_method === "safe" ? "Sarrif confirms the money arrived, then the seller delivers." : "The seller confirms the money arrived, then delivers."}</small>` : ""}
         ${o.status === "payment_rejected" ? `<small class="note" style="color:var(--danger)">${o.pay_method === "safe" ? "Sarrif didn't receive this payment. Contact support if you paid." : "The seller didn't receive this payment. Chat with them if you paid."}</small>` : ""}
         <div class="req-actions">
-          ${o.dial ? (o.pay_group ? `<a class="btn btn-primary" href="${esc(telHref(o.pay_ussd))}" data-dialcode="${esc(o.pay_ussd)}">${SVC_TOPUP}Dial to pay for everything</a>` : dialLink(o.pay_ussd, o.total - (o.pay_discount || 0) + o.pay_fee, o.cur).replace(" btn-block", "")) : ""}
           ${o.status === "awaiting_payment" ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">Cancel</button>` : ""}
           ${o.status === "quoted" ? `<button class="btn btn-primary" data-payorder="${o.id}">Pay ${money(o.total, o.cur)}</button>` : ""}
           ${o.kind === "buy" && ["requested", "accepted", "quoted"].includes(o.status) ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">${o.status === "requested" ? "Cancel" : "Reject"}</button>` : ""}
