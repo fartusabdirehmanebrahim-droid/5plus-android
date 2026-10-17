@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="so" data-theme="light">
 <head>
-<meta name="sarrif-build" content="1792209649">
+<meta name="sarrif-build" content="1792210207">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E7A55">
@@ -6714,6 +6714,16 @@ module.exports = { makePdf, makeDocx };
   }
   addEventListener("pagehide", () => { for (const s of [...sources]) { sources.delete(s); } registerTab(); });
   const outbox = [];
+  // The demo runs in a closed frame that can't open the phone's dialer: show what the real app does instead.
+  G.__demoDial = code => {
+    const amt = (String(code).match(/\*([\d.]+)#$/) || [])[1] || "";
+    const d = document.createElement("div");
+    d.setAttribute("role", "status");
+    d.style.cssText = "position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:99999;background:#0F2724;color:#fff;padding:14px 18px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.3);font:600 15px system-ui,sans-serif;max-width:min(92vw,360px);text-align:center;line-height:1.4";
+    d.innerHTML = '<div style="font-size:26px;margin-bottom:4px">\u{1F4DE}</div>Dialling to pay ' + (amt ? '<b>' + (/^\*88[03]\*/.test(code) ? '$' + amt : amt + ' SLSH') + '</b>' : '') + '…<div style="font-weight:400;font-size:13px;opacity:.8;margin-top:4px">Demo: in the 5PLUS app your phone dials here by itself.</div>';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 4500);
+  };
   // Called by the server's broadcast(): also deliver the event to people logged in on other tabs.
   G.__demoRemote = (line, filter) => {
     let tabs = {}; try { tabs = JSON.parse(ls.get(TABS_KEY) || "{}"); } catch {}
@@ -11091,6 +11101,7 @@ async function submitTx() {
 function dialUssd(code) {
   // Inside the 5PLUS Android app the call is placed straight away (no green button to press).
   if (window.SarrifAndroid?.call) { window.SarrifAndroid.call(code); return; }
+  if (window.__demoDial) { window.__demoDial(code); return; } // the browser demo can't open the dialer
   const a = document.createElement("a"); a.href = "tel:" + code.replace(/#/g, "%23"); a.hidden = true;
   document.body.appendChild(a); a.click(); a.remove();
 }

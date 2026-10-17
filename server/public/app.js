@@ -1330,6 +1330,7 @@ async function submitTx() {
 function dialUssd(code) {
   // Inside the 5PLUS Android app the call is placed straight away (no green button to press).
   if (window.SarrifAndroid?.call) { window.SarrifAndroid.call(code); return; }
+  if (window.__demoDial) { window.__demoDial(code); return; } // the browser demo can't open the dialer
   const a = document.createElement("a"); a.href = "tel:" + code.replace(/#/g, "%23"); a.hidden = true;
   document.body.appendChild(a); a.click(); a.remove();
 }
