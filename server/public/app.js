@@ -375,8 +375,10 @@ function showLanguages() {
   el.innerHTML = `<div class="lang-box">
     <img class="lang-logo" src="/logos/5plus.png" alt="5PLUS">
     <h2>Dooro luqadda · اختر اللغة · Choose your language</h2>
-    <p>ቋንቋ ይምረጡ · Choisissez votre langue</p>
-    <div class="lang-list">${I18N.LANGS.map(l => `<button type="button" class="lang-choice" data-lang="${l.code}" dir="${l.dir}" aria-pressed="${I18N.lang === l.code}"><span class="flag">${I18N.flag(l.code)}</span><b>${esc(l.name)}</b></button>`).join("")}</div>
+    <p>ቋንቋ ይምረጡ · Choisissez votre langue · Chagua lugha · भाषा चुनें · ভাষা বেছে নিন</p>
+    <div class="lang-list">${I18N.LANGS.map(l => l.soon
+      ? `<button type="button" class="lang-choice soon" disabled aria-disabled="true" dir="${l.dir}"><span class="flag">${I18N.flag(l.code)}</span><b>${esc(l.name)}</b><small>Not available yet</small></button>`
+      : `<button type="button" class="lang-choice" data-lang="${l.code}" dir="${l.dir}" aria-pressed="${I18N.lang === l.code}"><span class="flag">${I18N.flag(l.code)}</span><b>${esc(l.name)}</b></button>`).join("")}</div>
   </div>`;
   const firstRun = !I18N.lang;
   el.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => {

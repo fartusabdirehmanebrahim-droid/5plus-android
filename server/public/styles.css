@@ -1256,3 +1256,10 @@ img, video, iframe{max-width:100%}
 .chg-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
 .chg-row .chg-all { display: flex; align-items: center; color: var(--ink-3); }
 .chg-row .chg-del { align-self: end; margin-bottom: 4px; }
+/* A language listed but not available yet (Turkish) */
+.lang-choice.soon{opacity:.55;cursor:not-allowed}
+.lang-choice.soon small{margin-inline-start:auto;font-size:12.5px;color:var(--ink-3)}
+/* More languages than fit on a small phone: the list scrolls from the top instead of being cut off. */
+.lang-screen{align-items:flex-start}
+.lang-screen > .lang-box{margin:auto}
+.lang-choice{min-height:54px}

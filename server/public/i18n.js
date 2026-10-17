@@ -1,5 +1,5 @@
 "use strict";
-/* Languages: Somali, Arabic, English, Amharic, French.
+/* Languages: Somali, Arabic, English, Amharic, French, Swahili, Hindi, Bengali (Turkish is listed as not available yet).
    The app is written in English. This file swaps every English text on screen for the chosen language as the
    screen is drawn: text, placeholders, button labels, messages and error texts from the server. Texts that contain
    names or numbers are matched by patterns ("Earn {0} by sharing"). Country names come from the phone itself.
@@ -11,6 +11,11 @@
     { code: "en", name: "English", dir: "ltr", flag: "us", country: "United States" },
     { code: "am", name: "አማርኛ", dir: "ltr", flag: "et", country: "Ethiopia" },
     { code: "fr", name: "Français", dir: "ltr", flag: "fr", country: "France" },
+    { code: "sw", name: "Kiswahili", dir: "ltr", flag: "ke", country: "Kenya" },
+    { code: "hi", name: "हिन्दी", dir: "ltr", flag: "in", country: "India" },
+    { code: "bn", name: "বাংলা", dir: "ltr", flag: "bd", country: "Bangladesh" },
+    // Shown in the list but not chosen yet (no translation).
+    { code: "tr", name: "Türkçe", dir: "ltr", flag: "tr", country: "Türkiye", soon: true },
   ];
   const SHAHADA = "لا إله إلا الله محمد رسول الله";
   // Flags drawn in SVG, so they look the same on every phone (Somaliland has no flag emoji).
@@ -25,11 +30,18 @@
     et: `<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="6.67" fill="#078930"/><rect y="6.67" width="30" height="6.67" fill="#fcdd09"/><rect y="13.33" width="30" height="6.67" fill="#da121a"/>
       <circle cx="15" cy="10" r="4.4" fill="#0f47af"/><path d="M15 6.9l.9 2.75h2.9l-2.35 1.7.9 2.75L15 12.4l-2.35 1.7.9-2.75-2.35-1.7h2.9z" fill="none" stroke="#fcdd09" stroke-width=".55"/></svg>`,
     fr: `<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="10" height="20" fill="#002395"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ed2939"/></svg>`,
+    ke: `<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#fff"/><rect width="30" height="6" fill="#000"/><rect y="7" width="30" height="6" fill="#bb0000"/><rect y="14" width="30" height="6" fill="#006600"/>
+      <ellipse cx="15" cy="10" rx="2.6" ry="5.2" fill="#bb0000" stroke="#fff" stroke-width=".5"/><path d="M15 5.2v9.6" stroke="#fff" stroke-width=".5"/></svg>`,
+    in: `<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="6.67" fill="#ff9933"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><rect y="13.33" width="30" height="6.67" fill="#138808"/>
+      <circle cx="15" cy="10" r="2.6" fill="none" stroke="#000080" stroke-width=".6"/><circle cx="15" cy="10" r=".55" fill="#000080"/></svg>`,
+    bd: `<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#006a4e"/><circle cx="13.5" cy="10" r="5.5" fill="#f42a41"/></svg>`,
+    tr: `<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#e30a17"/><circle cx="11" cy="10" r="5" fill="#fff"/><circle cx="12.3" cy="10" r="4" fill="#e30a17"/>
+      <path d="M17.6 10l3.3-1.07-2.04 2.81V8.26l2.04 2.81z" fill="#fff"/></svg>`,
   };
   const KEY = "sarrif.lang";
   let lang = null;
   try { lang = localStorage.getItem(KEY); } catch {}
-  if (!LANGS.some(l => l.code === lang)) lang = null;
+  if (!LANGS.some(l => l.code === lang && !l.soon)) lang = null;
 
   // Dictionaries: exact texts, and patterns turned into regular expressions.
   const DATA = window.__I18N || {};
@@ -157,7 +169,7 @@
     get lang() { return lang; },
     flag: code => FLAGS[(LANGS.find(l => l.code === code) || {}).flag] || "",
     set(code) {
-      if (!LANGS.some(l => l.code === code)) return;
+      if (!LANGS.some(l => l.code === code && !l.soon)) return;
       lang = code;
       try { localStorage.setItem(KEY, code); } catch {}
       setDir();
