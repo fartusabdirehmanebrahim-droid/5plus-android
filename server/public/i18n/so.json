@@ -1451,7 +1451,15 @@
     "Money not checked yet. Check your account before you release.": "Lacagta weli lama hubin. Hubi akoonkaaga ka hor intaadan sii dayn.",
     "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234, 1111 iyo 0000 aad bay u fudud yihiin. Dooro PIN kale.",
     "You already have an account with this number. Enter your PIN to log in.": "Lambarkan akoon baad ku leedahay. Geli PIN-kaaga si aad u gasho.",
-    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "Lambarkan akoon baad ku leedahay. Gal, kadib Akoonka ka dooro “Noqo ganacsade”."
+    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "Lambarkan akoon baad ku leedahay. Gal, kadib Akoonka ka dooro “Noqo ganacsade”.",
+    "Your phone is dialling to pay": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo",
+    "The seller can see your payment and delivers when the money arrives.": "Iibiyuhu wuu arkayaa lacag bixintaada, wuuna keenayaa marka lacagtu timaado.",
+    "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "Iibiyuhu hadda wuu keeni karaa. Sarrif ayaa lacagta haysa, waxayna siinaysaa iibiyaha marka aad xaqiijiso inaad heshay.",
+    "The money is held safely and each seller gets paid after you confirm you received their product.": "Lacagta si ammaan ah ayaa loo hayaa, iibiye walbana waa la siinayaa marka aad xaqiijiso inaad heshay alaabtiisa.",
+    "Buyers' phones dial": "Taleefannada iibsadayaashu waxay garaacaan",
+    "Merchant number (*883* USD, *223* SLSH)": "Lambarka ganacsiga (*883* USD, *223* SLSH)",
+    "Normal number (*880* USD, *220* SLSH)": "Lambarka caadiga ah (*880* USD, *220* SLSH)",
+    "This payment code could not be dialled.": "Koodhkan lacag bixinta lama garaaci karin."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

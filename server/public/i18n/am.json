@@ -1452,7 +1452,15 @@
     "Money not checked yet. Check your account before you release.": "ገንዘቡ ገና አልተረጋገጠም። ከመልቀቅዎ በፊት ሂሳብዎን ያረጋግጡ።",
     "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234፣ 1111 እና 0000 በቀላሉ ይገመታሉ። ሌላ PIN ይምረጡ።",
     "You already have an account with this number. Enter your PIN to log in.": "በዚህ ቁጥር መለያ አለዎት። ለመግባት PINዎን ያስገቡ።",
-    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "በዚህ ቁጥር መለያ አለዎት። ይግቡ፣ ከዚያ በመለያ ውስጥ “ነጋዴ ይሁኑ” የሚለውን ይምረጡ።"
+    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "በዚህ ቁጥር መለያ አለዎት። ይግቡ፣ ከዚያ በመለያ ውስጥ “ነጋዴ ይሁኑ” የሚለውን ይምረጡ።",
+    "Your phone is dialling to pay": "ስልክዎ ለመክፈል እየደወለ ነው፦",
+    "The seller can see your payment and delivers when the money arrives.": "ሻጩ ክፍያዎን ያያል፣ ገንዘቡ ሲደርስም ያደርሳል።",
+    "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "ሻጩ አሁን ማድረስ ይችላል። Sarrif ገንዘቡን ይይዛል፣ እንደደረሰዎ ሲያረጋግጡ ለሻጩ ይከፍላል።",
+    "The money is held safely and each seller gets paid after you confirm you received their product.": "ገንዘቡ በደህንነት ይያዛል፣ ምርቱን እንደደረሰዎ ሲያረጋግጡ እያንዳንዱ ሻጭ ይከፈለዋል።",
+    "Buyers' phones dial": "የገዢዎች ስልኮች የሚደውሉት",
+    "Merchant number (*883* USD, *223* SLSH)": "የነጋዴ ቁጥር (*883* USD፣ *223* SLSH)",
+    "Normal number (*880* USD, *220* SLSH)": "መደበኛ ቁጥር (*880* USD፣ *220* SLSH)",
+    "This payment code could not be dialled.": "ይህ የክፍያ ኮድ ሊደወል አልቻለም።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

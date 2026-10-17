@@ -732,15 +732,19 @@ module.exports = function market(ctx) {
   const sectionOf = service => { const v = String(service || "suuq"); return v.startsWith("svc:") ? v.slice(4) : v; };
   async function safeNums(section) {
     const s = await getSettings(), x = s.services.find(y => y.id === section), own = { merchant: digits(x?.safe_merchant), number: digits(x?.safe_number) };
-    if (section && (own.merchant || own.number)) return { ...own, section };
-    return { merchant: digits(s.safePay.merchant), number: digits(s.safePay.number), section: "" };
+    if (section && (own.merchant || own.number)) return { ...own, section, via: x?.safe_via || "" };
+    return { merchant: digits(s.safePay.merchant), number: digits(s.safePay.number), section: "", via: s.safePay.via || "" };
   }
   async function payPlan(method, via, cur, total, shopProfile, service) {
     const s = await getSettings(), codes = s.safePay.codes[cur];
     const nums = method === "safe" ? await safeNums(sectionOf(service)) : shopPayNums(shopProfile);
     if (!nums.merchant && !nums.number) fail(method === "safe" ? "Safe payment isn't set up yet. Choose another way to pay." : "This shop hasn't added its payment numbers. Choose another way to pay.");
-    const useMerchant = via === "normal" ? !nums.number : !!nums.merchant;
-    const fee = round(cur, feeOf(s.tiers[cur], total));
+    // Safe payment: the number the admin chose (merchant *883*/*223* or normal *880*/*220*); if that one isn't set, the
+    // other. Pay to shop: the shop's merchant number, or its normal number when it has none. The buyer doesn't choose.
+    const want = method === "safe" ? (nums.via === "normal" ? "normal" : "merchant") : "merchant";
+    const useMerchant = want === "merchant" ? !!nums.merchant : !nums.number;
+    // Pay to shop has no charge (the merchant number is paid directly); Safe payment adds the charge.
+    const fee = method === "shop" ? 0 : round(cur, feeOf(s.tiers[cur], total));
     return { fee, section: method === "safe" ? nums.section : "", ussd: ussdOf(useMerchant ? codes.merchant : codes.normal, useMerchant ? nums.merchant : nums.number, total + fee, cur) };
   }
   // Who sees a safe payment: the super admin, and the admin of the part it was paid to.
@@ -757,11 +761,13 @@ module.exports = function market(ctx) {
   //  "discount": the buyer earns it themselves, so they simply pay the price minus their earning
   //  "none":     someone else would earn it and the merchant's wallet can't cover it: Pay to shop isn't offered
   // The 5PLUS charge (set by the super admin) is also taken from the merchant's wallet, so the wallet must cover it too.
+  // Pay to shop: when the buyer earns it themselves, the earning simply comes off the price they pay (always). When
+  // someone else shared the link, the buyer pays the full price and the earning comes from the merchant's wallet.
   async function shopPayMode(sellerId, cur, commission, affId, buyerId, charge = 0) {
     const bal = await balance(sellerId, cur);
     if (!(commission > 0) || !affId) return bal >= charge ? "wallet" : "none";
-    if (bal >= commission + charge) return "wallet";
-    return affId === buyerId && bal >= charge ? "discount" : "none";
+    if (affId === buyerId) return bal >= charge ? "discount" : "none";
+    return bal >= commission + charge ? "wallet" : "none";
   }
   // The rule for the merchant's country (from their shop details), or the one for every other country.
   async function chargeRule(shopId) {
@@ -1521,16 +1527,16 @@ module.exports = function market(ctx) {
     const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND ${sc.sql} AND ${pend ? "(o.status = 'awaiting_payment' OR (o.status IN ('paid', 'delivered') AND o.money_ok = 0))" : "NOT (o.status = 'awaiting_payment' OR (o.status IN ('paid', 'delivered') AND o.money_ok = 0))"} ORDER BY o.updated_at DESC LIMIT 100`, ...sc.args);
     const out = []; for (const o of rows) out.push(await safeRow(o));
     const s = await getSettings(), mine = !isSuper(u) && s.services.find(x => x.id === u.service);
-    send(res, 200, { orders: out, settings: isSuper(u) ? s.safePay : null, own: mine ? { merchant: mine.safe_merchant || "", number: mine.safe_number || "", name: mine.name } : null });
+    send(res, 200, { orders: out, settings: isSuper(u) ? s.safePay : null, own: mine ? { merchant: mine.safe_merchant || "", number: mine.safe_number || "", via: mine.safe_via || "merchant", name: mine.name } : null });
   });
   // The admin of a part sets the numbers their safe payments go to.
   route("PUT", "/api/admin/safepay-numbers", async (req, res) => {
-    const u = await needRole(req, "admin"), b = await readJson(req), merchant = digits(b.merchant).slice(0, 15), number = digits(b.number).slice(0, 15);
+    const u = await needRole(req, "admin"), b = await readJson(req), merchant = digits(b.merchant).slice(0, 15), number = digits(b.number).slice(0, 15), via = b.via === "normal" ? "normal" : "merchant";
     for (const n of [merchant, number]) if (n && (n.length < 4 || n.length > 15)) fail("Check the numbers.");
     const s = await getSettings();
     if (!s.services.some(x => x.id === u.service)) fail("Your service was not found.", 404);
-    await saveSettings({ services: s.services.map(x => x.id === u.service ? { ...x, safe_merchant: merchant, safe_number: number } : x) });
-    send(res, 200, { own: { merchant, number } });
+    await saveSettings({ services: s.services.map(x => x.id === u.service ? { ...x, safe_merchant: merchant, safe_number: number, safe_via: via } : x) });
+    send(res, 200, { own: { merchant, number, via } });
   });
   route("POST", "/api/super/safepay/:id/:decision", async (req, res, url, [id, decision]) => {
     const u = await needSafeAdmin(req);
@@ -1595,7 +1601,8 @@ module.exports = function market(ctx) {
         codes[c][k] = v;
       }
     }
-    const s = await saveSettings({ safePay: { merchant, number, codes } });
+    const via = b.via === "normal" ? "normal" : "merchant"; // which number buyers' phones dial
+    const s = await saveSettings({ safePay: { merchant, number, codes, via } });
     broadcast("settings", publicSettings(s));
     send(res, 200, { settings: s.safePay });
   });

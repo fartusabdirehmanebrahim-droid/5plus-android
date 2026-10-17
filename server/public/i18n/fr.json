@@ -1452,7 +1452,15 @@
     "Money not checked yet. Check your account before you release.": "Argent pas encore vérifié. Vérifiez votre compte avant de libérer.",
     "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234, 1111 et 0000 sont trop faciles à deviner. Choisissez un autre PIN.",
     "You already have an account with this number. Enter your PIN to log in.": "Vous avez déjà un compte avec ce numéro. Entrez votre PIN pour vous connecter.",
-    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "Vous avez déjà un compte avec ce numéro. Connectez-vous, puis choisissez « Devenir marchand » dans Compte."
+    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "Vous avez déjà un compte avec ce numéro. Connectez-vous, puis choisissez « Devenir marchand » dans Compte.",
+    "Your phone is dialling to pay": "Votre téléphone compose pour payer",
+    "The seller can see your payment and delivers when the money arrives.": "Le vendeur voit votre paiement et livre quand l'argent arrive.",
+    "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "Le vendeur peut livrer maintenant. Sarrif garde l'argent et paie le vendeur après votre confirmation de réception.",
+    "The money is held safely and each seller gets paid after you confirm you received their product.": "L'argent est gardé en sécurité et chaque vendeur est payé après votre confirmation de réception.",
+    "Buyers' phones dial": "Les téléphones des acheteurs composent",
+    "Merchant number (*883* USD, *223* SLSH)": "Numéro marchand (*883* USD, *223* SLSH)",
+    "Normal number (*880* USD, *220* SLSH)": "Numéro normal (*880* USD, *220* SLSH)",
+    "This payment code could not be dialled.": "Ce code de paiement n'a pas pu être composé."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",

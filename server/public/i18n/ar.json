@@ -1452,7 +1452,15 @@
     "Money not checked yet. Check your account before you release.": "لم يُتحقق من المال بعد. تحقق من حسابك قبل الإفراج.",
     "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "الأرقام 1234 و1111 و0000 سهلة التخمين جدًا. اختر رمز PIN آخر.",
     "You already have an account with this number. Enter your PIN to log in.": "لديك حساب بهذا الرقم. أدخل رمز PIN لتسجيل الدخول.",
-    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "لديك حساب بهذا الرقم. سجّل الدخول، ثم اختر “كن تاجرًا” في الحساب."
+    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "لديك حساب بهذا الرقم. سجّل الدخول، ثم اختر “كن تاجرًا” في الحساب.",
+    "Your phone is dialling to pay": "هاتفك يتصل لدفع",
+    "The seller can see your payment and delivers when the money arrives.": "يرى البائع دفعتك ويسلّم عند وصول المال.",
+    "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "يمكن للبائع التسليم الآن. تحتفظ Sarrif بالمال وتدفع للبائع بعد تأكيدك الاستلام.",
+    "The money is held safely and each seller gets paid after you confirm you received their product.": "يُحتفظ بالمال بأمان ويُدفع لكل بائع بعد تأكيدك استلام منتجه.",
+    "Buyers' phones dial": "تتصل هواتف المشترين بـ",
+    "Merchant number (*883* USD, *223* SLSH)": "رقم التاجر (*883* دولار، *223* شلن)",
+    "Normal number (*880* USD, *220* SLSH)": "الرقم العادي (*880* دولار، *220* شلن)",
+    "This payment code could not be dialled.": "تعذّر الاتصال برمز الدفع هذا."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",

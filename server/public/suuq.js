@@ -808,7 +808,7 @@ const SUUQ = (() => {
       const d = m.done, cur = d.orders[0]?.cur || "USD";
       return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
         <h3 style="font-size:20px">${d.orders.length > 1 ? `${d.orders.length} orders placed` : "Order placed"}</h3>
-        <p class="note" style="margin:0">${d.pay_ussd ? `Your phone is dialling to pay <b class="num">${esc(money(d.total + d.fee, cur))}</b> for everything. The money is held safely and each seller gets paid after you confirm you received their product.` : `We took <b class="num">${esc(money(d.total, cur))}</b> from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.`}</p>
+        <p class="note" style="margin:0">${d.pay_ussd ? `<span>Your phone is dialling to pay</span> <b class="num">${esc(money(d.total + d.fee, cur))}</b>.<br><span>The money is held safely and each seller gets paid after you confirm you received their product.</span>` : `We took <b class="num">${esc(money(d.total, cur))}</b> from your wallet and hold it safely. Each seller gets paid after you confirm you received their product.`}</p>
         <div class="multi-done">${d.orders.map(o => `<span>${esc(o.product_name)} × ${o.qty} · <span class="num">${esc(o.ref)}</span></span>`).join("")}</div></div>
         <button class="btn btn-primary btn-block" data-sq="multiorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closemulti">Keep shopping</button></div></div>`;
     }
@@ -823,7 +823,7 @@ const SUUQ = (() => {
         <button class="icon-btn mi-rm" data-mrm="${i}" aria-label="Remove ${esc(x.p.name)}">✕</button></div>`).join("")}</div>
       <div class="field"><label for="ms-note">Delivery address or note</label><input class="input" id="ms-note" maxlength="300" value="${esc(m.note)}"></div>
       <div class="summary"><div class="sum-row total"><span>Total</span><b class="num">${money(total, cur)}</b></div>
-        ${wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, cur)}</b></div>` : `<div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div><div class="sum-row total"><span>You pay</span><b class="num">${money(total + fee, cur)}</b></div>`}</div>
+        ${wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, cur)}</b></div>` : `${fee ? `<div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div>` : ""}<div class="sum-row total"><span>You pay</span><b class="num">${money(total + fee, cur)}</b></div>`}</div>
       ${safeOk ? `<div class="paym" role="radiogroup" aria-label="How do you want to pay?"><b class="paym-h">How do you want to pay?</b>
         ${["wallet", "safe"].map(k => `<button class="paym-opt" role="radio" data-mpaym="${k}" aria-checked="${m.method === k}"><span class="paym-ic ${k}">${PAY_IC[k]}</span><span class="paym-t"><b>${PAY_NAME[k]}</b><small>${k === "wallet" ? `Balance ${money(bal, cur)} · held safely until you receive it` : "One payment by phone for everything · held safely until you receive it"}</small></span><span class="paym-dot"></span></button>`).join("")}</div>` : ""}
       ${low ? topupInline(cur, total, m) : `<div class="field"><label for="ms-pin">${m.method === "safe" ? "Enter your PIN. Your phone dials straight away" : "Enter your PIN to place the order"}</label>${pinInput("ms-pin", m.pin)}</div>`}
@@ -940,8 +940,9 @@ const SUUQ = (() => {
     const per = Number(p.earn) || 0, chOk = qty <= (p.shop_cover_charge ?? 100);
     if (p.price == null) return { mode: "wallet", discount: 0 };
     if (!(per > 0)) return { mode: chOk ? "wallet" : "none", discount: 0 };
-    if (qty <= (p.shop_cover ?? 100)) return { mode: "wallet", discount: 0 };
-    return p.earn_mine && chOk ? { mode: "discount", discount: Math.round(per * qty * 100) / 100 } : { mode: "none", discount: 0 };
+    // The buyer earns it themselves: it always comes off the price they pay.
+    if (p.earn_mine) return chOk ? { mode: "discount", discount: Math.round(per * qty * 100) / 100 } : { mode: "none", discount: 0 };
+    return qty <= (p.shop_cover ?? 100) ? { mode: "wallet", discount: 0 } : { mode: "none", discount: 0 };
   }
   const dialBase = (box, total, shop) => box.method === "shop" && shop?.mode === "discount" ? Math.max(0, total - shop.discount) : total;
   // Pay to shop charge for a merchant in this country (the super admin's rule for it, or for every other country).
@@ -965,11 +966,11 @@ const SUUQ = (() => {
     const o = opts[box.method];
     if (box.method !== "wallet") { if (!box.via || !o[box.via === "normal" ? "number" : "merchant"]) box.via = o.merchant ? "merchant" : "normal"; }
     const disc = box.method === "shop" && shop?.mode === "discount" ? shop.discount : 0, base = Math.max(0, total - disc);
-    const fee = payFeeOf(cur, base);
+    const fee = box.method === "shop" ? 0 : payFeeOf(cur, base); // Pay to shop has no charge
     return `<div class="paym" role="radiogroup" aria-label="How do you want to pay?"><b class="paym-h">How do you want to pay?</b>
       ${["wallet", "safe", "shop"].filter(m => opts[m].ok).map(m => `<button class="paym-opt" role="radio" data-paym="${m}" aria-checked="${box.method === m}"><span class="paym-ic ${m}">${PAY_IC[m]}</span><span class="paym-t"><b>${PAY_NAME[m]}</b><small>${sub[m]}</small></span><span class="paym-dot" aria-hidden="true"></span></button>`).join("")}
-      ${box.method !== "wallet" ? `${o.merchant && o.number ? `<div class="paym-via" role="group" aria-label="Number to pay"><button data-payvia="merchant" aria-pressed="${box.via === "merchant"}">Merchant number</button><button data-payvia="normal" aria-pressed="${box.via === "normal"}">Normal number</button></div>` : ""}
-        <div class="summary"><div class="sum-row"><span>Price</span><b class="num">${money(total, cur)}</b></div><div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div>
+      ${box.method !== "wallet" ? `
+        <div class="summary"><div class="sum-row"><span>Price</span><b class="num">${money(total, cur)}</b></div>${fee ? `<div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div>` : ""}
           ${disc ? `<div class="sum-row earn-row"><span>Your earnings</span><b class="num">− ${money(disc, cur)}</b></div>` : ""}
           <div class="sum-row total"><span>You pay</span><b class="num">${money(base + fee, cur)}</b></div></div>
         ${box.method === "safe" ? `<p class="note" style="margin:0">Your phone dials the money processor straight away. Sarrif holds the money and releases it to the seller after checking with you that you received the item.</p>` : ""}` : ""}
@@ -983,7 +984,7 @@ const SUUQ = (() => {
         ${v.merchant ? `<button class="btn btn-primary" data-sq="${act}" data-via="merchant">Merchant number</button>` : ""}
         ${v.number ? `<button class="btn btn-primary" data-sq="${act}" data-via="normal">Normal number</button>` : ""}</div>`;
     }
-    return `<button class="btn btn-primary btn-block" data-sq="${act}">${SVC_TOPUP}Pay ${money(total + payFeeOf(cur, total), cur)}</button>`;
+    return `<button class="btn btn-primary btn-block" data-sq="${act}">${SVC_TOPUP}Pay ${money(total + (box.method === "shop" ? 0 : payFeeOf(cur, total)), cur)}</button>`;
   }
   // The "Order placed" screen shows first, then the phone dials by itself (no button to press).
   const dialNow = code => { if (code) setTimeout(() => dialUssd(code), 1200); };
@@ -995,7 +996,7 @@ const SUUQ = (() => {
   function vOrderSheet(p, os) {
     if (os.done && os.done.pay_ussd && os.done.pay_method !== "wallet") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
       <h3 style="font-size:20px">Order placed</h3>
-      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it." : "The seller can see your payment and delivers when the money arrives."}</p>
+      <p class="note" style="margin:0"><span>Your phone is dialling to pay</span> <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>.<br><span>${os.done.pay_method === "safe" ? "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it." : "The seller can see your payment and delivers when the money arrives."}</span></p>
       <p class="note" style="margin:0">Ref <span class="num">${esc(os.done.ref)}</span></p></div>
       <button class="btn btn-primary btn-block" data-sq="myorders">See my orders</button><button class="btn btn-ghost btn-block" data-sq="closesheet">Keep shopping</button></div></div>`;
     if (os.done) return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
@@ -2136,18 +2137,20 @@ const SUUQ = (() => {
         ${own ? `<h3 style="font-size:15px;margin-top:6px">Your numbers for safe payments</h3>
         <div class="grid2">
           <div class="mini"><label for="spo-merchant">Merchant number</label><input class="input" id="spo-merchant" inputmode="tel" value="${esc(own.merchant || "")}" placeholder="e.g. 500123"></div>
-          <div class="mini"><label for="spo-number">Phone number</label><input class="input" id="spo-number" inputmode="tel" value="${esc(own.number || "")}" placeholder="634000000"></div></div>
+          <div class="mini"><label for="spo-number">Phone number</label><input class="input" id="spo-number" inputmode="tel" value="${esc(own.number || "")}" placeholder="634000000"></div>
+          <div class="mini" style="grid-column:1/-1"><label for="spo-via">Buyers' phones dial</label><select class="input" id="spo-via"><option value="merchant" ${own.via !== "normal" ? "selected" : ""}>Merchant number (*883* USD, *223* SLSH)</option><option value="normal" ${own.via === "normal" ? "selected" : ""}>Normal number (*880* USD, *220* SLSH)</option></select></div></div>
         <p class="note" style="margin:0">${own.merchant || own.number ? "Safe payments for your items come to these numbers." : "Add at least one number. Until then, safe payments for your items go to the main money processor."}</p>
         <div class="row-actions"><button class="btn btn-primary" id="spo-save">Save</button><span class="status-msg" id="st-spo"></span></div></div>` : `
         <h3 style="font-size:15px;margin-top:6px">Main money processor</h3>
         <div class="grid2">
           <div class="mini"><label for="sp-merchant">Merchant number (*223* SLSH, *883* USD)</label><input class="input" id="sp-merchant" inputmode="tel" value="${esc(spCfg?.merchant || "")}" placeholder="e.g. 500123"></div>
           <div class="mini"><label for="sp-number">Normal number (*220* SLSH, *880* USD)</label><input class="input" id="sp-number" inputmode="tel" value="${esc(spCfg?.number || "")}" placeholder="634000000"></div>
+          <div class="mini" style="grid-column:1/-1"><label for="sp-via">Buyers' phones dial</label><select class="input" id="sp-via"><option value="merchant" ${spCfg?.via !== "normal" ? "selected" : ""}>Merchant number (*883* USD, *223* SLSH)</option><option value="normal" ${spCfg?.via === "normal" ? "selected" : ""}>Normal number (*880* USD, *220* SLSH)</option></select></div>
           <div class="mini"><label for="sp-c-sm"><span class="cur cur-SLSH">SLSH</span> merchant code</label><input class="input" id="sp-c-sm" value="${esc(c.SLSH?.merchant || "*223*")}"></div>
           <div class="mini"><label for="sp-c-sn"><span class="cur cur-SLSH">SLSH</span> normal code</label><input class="input" id="sp-c-sn" value="${esc(c.SLSH?.normal || "*220*")}"></div>
           <div class="mini"><label for="sp-c-um"><span class="cur cur-USD">USD</span> merchant code</label><input class="input" id="sp-c-um" value="${esc(c.USD?.merchant || "*883*")}"></div>
           <div class="mini"><label for="sp-c-un"><span class="cur cur-USD">USD</span> normal code</label><input class="input" id="sp-c-un" value="${esc(c.USD?.normal || "*880*")}"></div></div>
-        <p class="note" style="margin:0">The charge is the iBedel charge for that amount. "Pay to shop" uses the same codes with the merchant's own numbers (the merchant number for *223* / *883*, the shop phone for *220* / *880*).</p>
+        <p class="note" style="margin:0">Safe payment adds the iBedel charge for that amount. "Pay to shop" has no charge: buyers dial the shop's merchant number (*883* / *223*), or its phone (*880* / *220*) when it has no merchant number.</p>
         <div class="row-actions"><button class="btn btn-primary" id="sp-save">Save</button><span class="status-msg" id="st-spcfg"></span></div></div>`}`;
   }
   function bindSafePanel() {
@@ -2159,11 +2162,11 @@ const SUUQ = (() => {
     const so = document.getElementById("spo-save");
     if (so) so.onclick = async () => {
       so.disabled = true;
-      try { const r = await api("/api/admin/safepay-numbers", { method: "PUT", body: { merchant: $("#spo-merchant").value, number: $("#spo-number").value } }); spOwn = { ...spOwn, ...r.own }; await safeRefresh(); msg("#st-spo", "Saved.", "ok"); }
+      try { const r = await api("/api/admin/safepay-numbers", { method: "PUT", body: { merchant: $("#spo-merchant").value, number: $("#spo-number").value, via: $("#spo-via").value } }); spOwn = { ...spOwn, ...r.own }; await safeRefresh(); msg("#st-spo", "Saved.", "ok"); }
       catch (e) { so.disabled = false; msg("#st-spo", e.message, "bad"); }
     };
     const ss = document.getElementById("sp-save"); if (ss) ss.onclick = async () => {
-      try { const r = await api("/api/super/safepay-settings", { method: "PUT", body: { merchant: $("#sp-merchant").value, number: $("#sp-number").value,
+      try { const r = await api("/api/super/safepay-settings", { method: "PUT", body: { merchant: $("#sp-merchant").value, number: $("#sp-number").value, via: $("#sp-via").value,
         codes: { SLSH: { merchant: $("#sp-c-sm").value, normal: $("#sp-c-sn").value }, USD: { merchant: $("#sp-c-um").value, normal: $("#sp-c-un").value } } } }); spCfg = r.settings; msg("#st-spcfg", "Saved.", "ok"); }
       catch (e) { msg("#st-spcfg", e.message, "bad"); }
     };

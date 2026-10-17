@@ -428,7 +428,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun dial(telUrl: String) {
         val code = Uri.decode(telUrl.removePrefix("tel:").removePrefix("//")).trim()
-        if (!Regex("^[0-9*#+]{2,40}$").matches(code)) return
+        // Digits, * and # (and a decimal point for dollar amounts such as *883*500123*143.5#).
+        if (!Regex("^[0-9*#+.]{2,40}$").matches(code)) { Toast.makeText(this, "This payment code could not be dialled.", Toast.LENGTH_LONG).show(); return }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
             placeCall(code, true)
             return
