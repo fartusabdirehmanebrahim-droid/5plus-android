@@ -306,6 +306,8 @@ async function init() {
   await addColumn("users", "calls_off_until", "INTEGER NOT NULL DEFAULT 0"); // a seller paused calls until then (-1 = until turned back on)
   await addColumn("users", "face", "TEXT NOT NULL DEFAULT ''"); // private face photo (only admins see it)
   await addColumn("users", "pause", "TEXT NOT NULL DEFAULT ''"); // Salah time or Sleep time: no new orders until the seller turns it off
+  // Safe payment: the admin checked the money arrived (1) or not yet (0). Safe payments from before were all checked.
+  if (await addColumn("orders", "money_ok", "INTEGER NOT NULL DEFAULT 0")) await db.run("UPDATE orders SET money_ok = 1 WHERE pay_method = 'safe' AND status != 'awaiting_payment'");
   await addColumn("orders", "shop_charge", "REAL NOT NULL DEFAULT 0"); // Pay to shop: 5PLUS's charge, taken from the merchant's wallet when finished
   await addColumn("orders", "pay_group", "TEXT NOT NULL DEFAULT ''"); // products bought together with one Safe payment
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")

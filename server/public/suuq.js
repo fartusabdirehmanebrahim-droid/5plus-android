@@ -827,7 +827,7 @@ const SUUQ = (() => {
         ${wal ? `<div class="sum-row"><span>Your wallet</span><b class="num" style="color:${low ? "var(--danger)" : "var(--ink)"}">${money(bal, cur)}</b></div>` : `<div class="sum-row"><span>Charge</span><b class="num">${money(fee, cur)}</b></div><div class="sum-row total"><span>You pay</span><b class="num">${money(total + fee, cur)}</b></div>`}</div>
       ${safeOk ? `<div class="paym" role="radiogroup" aria-label="How do you want to pay?"><b class="paym-h">How do you want to pay?</b>
         ${["wallet", "safe"].map(k => `<button class="paym-opt" role="radio" data-mpaym="${k}" aria-checked="${m.method === k}"><span class="paym-ic ${k}">${PAY_IC[k]}</span><span class="paym-t"><b>${PAY_NAME[k]}</b><small>${k === "wallet" ? `Balance ${money(bal, cur)} · held safely until you receive it` : "One payment by phone for everything · held safely until you receive it"}</small></span><span class="paym-dot"></span></button>`).join("")}</div>` : ""}
-      ${low ? topupInline(cur, total, m) : `<div class="field"><label for="ms-pin">Enter your PIN to place the order</label>${pinInput("ms-pin", m.pin)}</div>`}
+      ${low ? topupInline(cur, total, m) : `<div class="field"><label for="ms-pin">${m.method === "safe" ? "Enter your PIN. Your phone dials straight away" : "Enter your PIN to place the order"}</label>${pinInput("ms-pin", m.pin)}</div>`}
       <div class="err" role="alert">${esc(m.err || "")}</div>
       ${low ? "" : `<button class="btn btn-primary btn-block" data-sq="multipay" ${(m.pin || "").length === 4 ? "" : "disabled"}>Pay ${money(wal ? total : total + fee, cur)}</button>`}
       <button class="btn btn-ghost btn-block" data-sq="closemulti">Cancel</button></div></div>`;
@@ -998,7 +998,7 @@ const SUUQ = (() => {
   function vOrderSheet(p, os) {
     if (os.done && os.done.pay_ussd && os.done.pay_method !== "wallet") return `<div class="sheet"><div class="sheet-card"><div class="receipt"><div class="tick">${ICON.tick}</div>
       <h3 style="font-size:20px">Order placed</h3>
-      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "When Sarrif confirms the money arrived, the seller delivers. The money is held until Sarrif checks with you that you received it." : "The seller can see your payment and delivers when the money arrives."}</p>
+      <p class="note" style="margin:0">Your phone is dialling to pay <b class="num">${esc(money(os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur))}</b>. ${os.done.pay_method === "safe" ? "The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it." : "The seller can see your payment and delivers when the money arrives."}</p>
       <p class="note" style="margin:0">Ref <span class="num">${esc(os.done.ref)}</span></p></div>
       <p class="note" style="margin:0">If your phone didn't dial, press:</p>
       ${dialLink(os.done.pay_ussd, os.done.total - (os.done.pay_discount || 0) + os.done.pay_fee, os.done.cur)}
@@ -1678,7 +1678,11 @@ const SUUQ = (() => {
       q("[data-mpaym]").forEach(b => b.onclick = () => { keepNote(); m.method = b.dataset.mpaym; m.err = ""; render(); });
       q("[data-mqty]").forEach(b => b.onclick = () => { keepNote(); const [i, d] = b.dataset.mqty.split(":").map(Number); m.items[i].qty = Math.min(100, Math.max(1, m.items[i].qty + d)); m.tpAmt = undefined; render(); });
       q("[data-mrm]").forEach(b => b.onclick = () => { keepNote(); const x = m.items.splice(Number(b.dataset.mrm), 1)[0]; if (x) picked.delete(x.p.id); if (!m.items.length) st.multi = null; render(); syncPickBar(); });
-      pinOn("ms-pin", v => { m.pin = v; m.err = ""; }, v => { const b = root.querySelector('[data-sq="multipay"]'); if (b) b.disabled = v.length !== 4; }, () => { if ((m.pin || "").length === 4) placeMulti(); });
+      pinOn("ms-pin", v => { m.pin = v; m.err = ""; }, v => {
+        const b = root.querySelector('[data-sq="multipay"]'); if (b) b.disabled = v.length !== 4;
+        // Safe payment: the 4th digit places the orders and the phone dials at once.
+        if (v.length === 4 && m.method === "safe" && !m.busy) { m.busy = true; if (b) b.disabled = true; placeMulti().finally(() => { m.busy = false; }); }
+      }, () => { if ((m.pin || "").length === 4 && !m.busy) placeMulti(); });
       bindTopupInline(m);
     }
     syncPickBar();
@@ -2106,6 +2110,7 @@ const SUUQ = (() => {
       <div class="people">${heldList.length ? heldList.map(o => `<div class="person ${o.buyer_ok ? "to-review" : ""}"><div class="person-top">${faceAvatar(o.buyer_id, o.buyer_name, o.buyer_face)}
         <div class="t"><b><span data-no-i18n>${esc(o.buyer_name)}</span> · ${money(o.paid_amount, o.cur)}</b><small>${new Date(o.updated_at).toLocaleString()}</small></div>
         <span class="pill ${o.buyer_ok ? "ok" : ""}">${o.buyer_ok ? "Customer says received" : o.status === "delivered" ? "Delivered" : "Paid"}</span></div>
+        ${o.money_ok ? "" : `<small class="note">Money not checked yet. Check your account before you release.</small>`}
         ${safeFacts(o)}
         <div class="person-actions"><a class="btn btn-ghost" href="tel:+252${esc(o.buyer_phone)}">${ICON_CALL}Call +252 ${esc(o.buyer_phone)}</a>
           <button class="btn btn-primary" data-release="${esc(o.id)}">Release</button></div></div>`).join("")
@@ -2124,14 +2129,15 @@ const SUUQ = (() => {
   function safePanel() {
     const pend = safeTab === "pending", c = spCfg?.codes || {}, own = safeHost ? spOwn : null;
     return `<div class="panel" id="safe-panel"><div class="panel-head"><div><h3>Safe payments${safeList.length && pend ? ` <span class="pill warn">${safeList.length}</span>` : ""}</h3><p>${own
-      ? `When a buyer chooses Safe payment for a <span data-no-i18n>${esc(own.name || "")}</span> item, the whole amount (the seller's price plus the charge) comes to your numbers below. Check you received it, then confirm. Keep it until the customer has the item, then release it in Held safely: the seller gets their price minus the earning, and the earning goes to the buyer or to the person who shared the link.`
-      : "Buyers pay the item price plus the charge by USSD: to the admin of that part (Suuq, Technician…) when that admin set their numbers, otherwise to the main money processor. Check the money arrived, then confirm. It is held until the customer has the item, then released from Held safely."}</p></div></div>
+      ? `When a buyer chooses Safe payment for a <span data-no-i18n>${esc(own.name || "")}</span> item, the whole amount (the seller's price plus the charge) comes to your numbers below. The buyer's phone dials as soon as they enter their PIN, and the order counts as paid straight away. Check you received it: press Money received, or Not received to stop the order. Keep it until the customer has the item, then release it in Held safely: the seller gets their price minus the earning, and the earning goes to the buyer or to the person who shared the link.`
+      : "Buyers pay the item price plus the charge by USSD: to the admin of that part (Suuq, Technician…) when that admin set their numbers, otherwise to the main money processor. The order counts as paid as soon as the buyer's phone dials. Check the money arrived: press Money received, or Not received to stop the order. It is held until the customer has the item, then released from Held safely."}</p></div></div>
         <div class="agent-tabs" role="group"><button data-spt="pending" aria-pressed="${pend}">Pending</button><button data-spt="done" aria-pressed="${!pend}">Done</button></div>
         <div class="people">${safeList.length ? safeList.map(o => `<div class="person"><div class="person-top">${faceAvatar(o.buyer_id, o.buyer_name, o.buyer_face)}
           <div class="t"><b><span data-no-i18n>${esc(o.buyer_name)}</span> · ${money(o.paid_amount, o.cur)}</b><small>Dialled <span class="num">${esc(o.pay_ussd)}</span> · ${new Date(o.updated_at).toLocaleString()}</small></div>
           <span class="pill ${statusTone(o.status)}">${esc(orderLabel(o))}</span></div>
           ${safeFacts(o)}
-          ${o.status === "awaiting_payment" ? `<div class="person-actions"><button class="btn btn-primary" data-spok="${esc(o.id)}">Money received · confirm</button><button class="btn btn-danger" data-spno="${esc(o.id)}">Not received</button></div>` : ""}</div>`).join("") : `<div class="empty">${pend ? "No safe payments waiting." : "Nothing yet."}</div>`}</div>
+          ${o.status === "awaiting_payment" || (["paid", "delivered"].includes(o.status) && !o.money_ok) ? `${o.status !== "awaiting_payment" ? `<small class="note">The order is already paid and the seller may deliver. Check your account: press Money received, or Not received to stop the order.</small>` : ""}
+            <div class="person-actions"><button class="btn btn-primary" data-spok="${esc(o.id)}">Money received</button><button class="btn btn-danger" data-spno="${esc(o.id)}">Not received</button></div>` : ""}</div>`).join("") : `<div class="empty">${pend ? "No safe payments to check." : "Nothing yet."}</div>`}</div>
         <span class="status-msg" id="st-sp"></span>
         ${own ? `<h3 style="font-size:15px;margin-top:6px">Your numbers for safe payments</h3>
         <div class="grid2">
@@ -2153,7 +2159,7 @@ const SUUQ = (() => {
   function bindSafePanel() {
     const el = document.getElementById("safe-panel"); if (!el) return;
     el.querySelectorAll("[data-spt]").forEach(b => b.onclick = () => { safeTab = b.dataset.spt; safeList = null; safeRefresh(); });
-    const decide = async (id, d, b) => { b.disabled = true; try { await api(`/api/super/safepay/${id}/${d}`, { body: {} }); safeList = null; heldList = null; await safeRefresh(); msg("#st-sp", d === "confirm" ? "Confirmed. The order is paid; the seller can deliver now." : "Marked not received.", "ok"); } catch (e) { b.disabled = false; msg("#st-sp", e.message, "bad"); } };
+    const decide = async (id, d, b) => { b.disabled = true; try { await api(`/api/super/safepay/${id}/${d}`, { body: {} }); safeList = null; heldList = null; await safeRefresh(); msg("#st-sp", d === "confirm" ? "Money received. It is held until the customer has the item." : "Marked not received. The order was stopped.", "ok"); } catch (e) { b.disabled = false; msg("#st-sp", e.message, "bad"); } };
     el.querySelectorAll("[data-spok]").forEach(b => b.onclick = () => decide(b.dataset.spok, "confirm", b));
     el.querySelectorAll("[data-spno]").forEach(b => b.onclick = () => decide(b.dataset.spno, "reject", b));
     const so = document.getElementById("spo-save");

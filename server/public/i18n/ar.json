@@ -1443,7 +1443,13 @@
     "Saved. Thank you.": "تم الحفظ. شكرًا لك.",
     "Enter your PIN. Your phone dials straight away": "أدخل رمز PIN. سيتصل هاتفك فورًا",
     "The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.": "اتصل هاتف المشتري برقمك للدفع. تأكد من وصول المال (رسالة ZAAD / eDahab) قبل التسليم.",
-    "Check the money arrived before you deliver.": "تأكد من وصول المال قبل التسليم."
+    "Check the money arrived before you deliver.": "تأكد من وصول المال قبل التسليم.",
+    "Sarrif is still checking this payment. You can cancel once it is checked.": "لا تزال Sarrif تتحقق من هذا الدفع. يمكنك الإلغاء بعد التحقق.",
+    "The order is already paid and the seller may deliver. Check your account: press Money received, or Not received to stop the order.": "الطلب مدفوع بالفعل ويمكن للبائع التسليم. تحقق من حسابك: اضغط تم استلام المال، أو لم يُستلم لإيقاف الطلب.",
+    "No safe payments to check.": "لا توجد مدفوعات آمنة للتحقق.",
+    "Money received. It is held until the customer has the item.": "تم استلام المال. يُحتفظ به حتى يستلم العميل المنتج.",
+    "Marked not received. The order was stopped.": "تم التعليم بعدم الاستلام. أُوقف الطلب.",
+    "Money not checked yet. Check your account before you release.": "لم يُتحقق من المال بعد. تحقق من حسابك قبل الإفراج."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",
@@ -1661,6 +1667,7 @@
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: أدخل مبلغًا ثابتًا 0 أو أكثر (حتى 1000 دولار / 10,000,000 شلن).",
     "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "عندما يدفع لك المشتري مباشرة (الدفع للمتجر)، تأخذ 5PLUS مبلغ {0} لكل طلب من محفظتك في 5PLUS عند إتمام الطلب. احتفظ بمال في محفظتك ليتمكن المشترون من استخدام الدفع للمتجر.",
     "Dial to pay {0}": "اتصل لدفع {0}",
-    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "هاتفك يتصل لدفع {0}. يرى البائع دفعتك ويسلّم عند وصول المال."
+    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "هاتفك يتصل لدفع {0}. يرى البائع دفعتك ويسلّم عند وصول المال.",
+    "Your phone is dialling to pay {0}. The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "هاتفك يتصل لدفع {0}. يمكن للبائع التسليم الآن. تحتفظ Sarrif بالمال وتدفع للبائع بعد تأكيدك الاستلام."
   }
 }

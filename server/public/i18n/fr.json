@@ -1443,7 +1443,13 @@
     "Saved. Thank you.": "Enregistré. Merci.",
     "Enter your PIN. Your phone dials straight away": "Entrez votre PIN. Votre téléphone compose aussitôt",
     "The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.": "Le téléphone de l'acheteur a composé votre numéro pour payer. Vérifiez que l'argent est arrivé (message ZAAD / eDahab) avant de livrer.",
-    "Check the money arrived before you deliver.": "Vérifiez que l'argent est arrivé avant de livrer."
+    "Check the money arrived before you deliver.": "Vérifiez que l'argent est arrivé avant de livrer.",
+    "Sarrif is still checking this payment. You can cancel once it is checked.": "Sarrif vérifie encore ce paiement. Vous pourrez annuler une fois vérifié.",
+    "The order is already paid and the seller may deliver. Check your account: press Money received, or Not received to stop the order.": "La commande est déjà payée et le vendeur peut livrer. Vérifiez votre compte : appuyez sur Argent reçu, ou Non reçu pour arrêter la commande.",
+    "No safe payments to check.": "Aucun paiement sécurisé à vérifier.",
+    "Money received. It is held until the customer has the item.": "Argent reçu. Il est conservé jusqu'à ce que le client ait l'article.",
+    "Marked not received. The order was stopped.": "Marqué non reçu. La commande a été arrêtée.",
+    "Money not checked yet. Check your account before you release.": "Argent pas encore vérifié. Vérifiez votre compte avant de libérer."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",
@@ -1661,6 +1667,7 @@
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0} : entrez un montant fixe de 0 ou plus (jusqu'à 1000 USD / 10 000 000 SLSH).",
     "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Quand un acheteur vous paie directement (Payer la boutique), 5PLUS prélève {0} par commande sur votre portefeuille 5PLUS à la fin de la commande. Gardez de l'argent dans votre portefeuille pour que les acheteurs puissent utiliser Payer la boutique.",
     "Dial to pay {0}": "Composer pour payer {0}",
-    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "Votre téléphone compose pour payer {0}. Le vendeur voit votre paiement et livre quand l'argent arrive."
+    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "Votre téléphone compose pour payer {0}. Le vendeur voit votre paiement et livre quand l'argent arrive.",
+    "Your phone is dialling to pay {0}. The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "Votre téléphone compose pour payer {0}. Le vendeur peut livrer maintenant. Sarrif garde l'argent et paie le vendeur après votre confirmation de réception."
   }
 }

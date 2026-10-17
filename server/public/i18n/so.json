@@ -1442,7 +1442,13 @@
     "Saved. Thank you.": "Waa la keydiyay. Mahadsanid.",
     "Enter your PIN. Your phone dials straight away": "Geli PIN-kaaga. Taleefankaagu isla markiiba wuu garaacayaa",
     "The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.": "Taleefanka iibsadaha ayaa lambarkaaga garaacay si uu u bixiyo. Hubi in lacagtu timid (fariinta ZAAD / eDahab) ka hor intaadan keenin.",
-    "Check the money arrived before you deliver.": "Hubi in lacagtu timid ka hor intaadan keenin."
+    "Check the money arrived before you deliver.": "Hubi in lacagtu timid ka hor intaadan keenin.",
+    "Sarrif is still checking this payment. You can cancel once it is checked.": "Sarrif weli way hubinaysaa lacag bixintan. Waad joojin kartaa marka la hubiyo.",
+    "The order is already paid and the seller may deliver. Check your account: press Money received, or Not received to stop the order.": "Dalabka waa la bixiyay, iibiyuhuna wuu keeni karaa. Hubi akoonkaaga: riix Lacagtii waa timid, ama Lama helin si aad dalabka u joojiso.",
+    "No safe payments to check.": "Ma jiraan lacag bixin ammaan ah oo la hubinayo.",
+    "Money received. It is held until the customer has the item.": "Lacagtii waa timid. Waa la hayaa ilaa macmiilku alaabta helo.",
+    "Marked not received. The order was stopped.": "Waxaa la calaamadeeyay lama helin. Dalabka waa la joojiyay.",
+    "Money not checked yet. Check your account before you release.": "Lacagta weli lama hubin. Hubi akoonkaaga ka hor intaadan sii dayn."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",
@@ -1660,6 +1666,7 @@
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: geli lacag go'an oo 0 ama ka badan (ilaa 1000 USD / 10,000,000 SLSH).",
     "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "Marka iibsaduhu si toos ah kuu siiyo (Ku bixi dukaanka), 5PLUS waxay boorsadaada 5PLUS ka qaadaysaa {0} dalab kasta marka dalabku dhammaado. Lacag ku hay boorsadaada si iibsadayaashu u isticmaali karaan Ku bixi dukaanka.",
     "Dial to pay {0}": "Garaac si aad u bixiso {0}",
-    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Iibiyuhu wuu arkayaa lacag bixintaada, wuuna keenayaa marka lacagtu timaado."
+    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Iibiyuhu wuu arkayaa lacag bixintaada, wuuna keenayaa marka lacagtu timaado.",
+    "Your phone is dialling to pay {0}. The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "Taleefankaagu wuxuu garaacayaa si uu u bixiyo {0}. Iibiyuhu hadda wuu keeni karaa. Sarrif ayaa lacagta haysa, waxayna siinaysaa iibiyaha marka aad xaqiijiso inaad heshay."
   }
 }

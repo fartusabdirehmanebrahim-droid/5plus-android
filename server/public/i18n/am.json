@@ -1443,7 +1443,13 @@
     "Saved. Thank you.": "ተቀምጧል። እናመሰግናለን።",
     "Enter your PIN. Your phone dials straight away": "PINዎን ያስገቡ። ስልክዎ ወዲያውኑ ይደውላል",
     "The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.": "የገዢው ስልክ ለመክፈል ቁጥርዎን ደውሏል። ከማድረስዎ በፊት ገንዘቡ መድረሱን ያረጋግጡ (የZAAD / eDahab መልእክት)።",
-    "Check the money arrived before you deliver.": "ከማድረስዎ በፊት ገንዘቡ መድረሱን ያረጋግጡ።"
+    "Check the money arrived before you deliver.": "ከማድረስዎ በፊት ገንዘቡ መድረሱን ያረጋግጡ።",
+    "Sarrif is still checking this payment. You can cancel once it is checked.": "Sarrif ይህን ክፍያ አሁንም እያረጋገጠ ነው። ከተረጋገጠ በኋላ መሰረዝ ይችላሉ።",
+    "The order is already paid and the seller may deliver. Check your account: press Money received, or Not received to stop the order.": "ትዕዛዙ ተከፍሏል፣ ሻጩም ማድረስ ይችላል። ሂሳብዎን ያረጋግጡ፦ ገንዘቡ ደርሷል ይጫኑ፣ ወይም ትዕዛዙን ለማቆም አልደረሰም ይጫኑ።",
+    "No safe payments to check.": "የሚረጋገጡ ደህንነቱ የተጠበቀ ክፍያዎች የሉም።",
+    "Money received. It is held until the customer has the item.": "ገንዘቡ ደርሷል። ደንበኛው እቃውን እስኪያገኝ ይያዛል።",
+    "Marked not received. The order was stopped.": "አልደረሰም ተብሎ ምልክት ተደርጓል። ትዕዛዙ ቆሟል።",
+    "Money not checked yet. Check your account before you release.": "ገንዘቡ ገና አልተረጋገጠም። ከመልቀቅዎ በፊት ሂሳብዎን ያረጋግጡ።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
@@ -1661,6 +1667,7 @@
     "{0}: enter a flat amount of 0 or more (up to 1000 USD / 10,000,000 SLSH).": "{0}: 0 ወይም ከዚያ በላይ ቋሚ መጠን ያስገቡ (እስከ 1000 USD / 10,000,000 SLSH)።",
     "When a buyer pays you directly (Pay to shop), 5PLUS takes {0} per order from your 5PLUS wallet when the order is finished. Keep money in your wallet so buyers can use Pay to shop.": "ገዢ በቀጥታ ሲከፍልዎ (ለሱቅ ይክፈሉ)፣ ትዕዛዙ ሲጠናቀቅ 5PLUS ከ5PLUS ቦርሳዎ በትዕዛዝ {0} ይወስዳል። ገዢዎች ለሱቅ ይክፈሉን እንዲጠቀሙ በቦርሳዎ ገንዘብ ያስቀምጡ።",
     "Dial to pay {0}": "{0} ለመክፈል ይደውሉ",
-    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። ሻጩ ክፍያዎን ያያል፣ ገንዘቡ ሲደርስም ያደርሳል።"
+    "Your phone is dialling to pay {0}. The seller can see your payment and delivers when the money arrives.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። ሻጩ ክፍያዎን ያያል፣ ገንዘቡ ሲደርስም ያደርሳል።",
+    "Your phone is dialling to pay {0}. The seller can deliver now. Sarrif holds the money and pays the seller after you confirm you received it.": "ስልክዎ {0} ለመክፈል እየደወለ ነው። ሻጩ አሁን ማድረስ ይችላል። Sarrif ገንዘቡን ይይዛል፣ እንደደረሰዎ ሲያረጋግጡ ለሻጩ ይከፍላል።"
   }
 }

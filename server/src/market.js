@@ -945,7 +945,7 @@ module.exports = function market(ctx) {
       }
       await db.run(`INSERT INTO orders (id, ref, product_id, shop_id, buyer_id, seller_id, kind, product_name, qty, unit_price, total, cur, commission, affiliate_id, status, note, created_at, updated_at, pay_method, pay_fee, pay_ussd)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, ref, p.id, p.shop_id, u.id, p.owner_id, p.mode, p.name, qty, ask ? 0 : p.price, ask ? 0 : total, p.cur, commission, aff,
-                  p.mode === "buy" && !ask ? (plan && method !== "shop" ? "awaiting_payment" : "paid") : "requested", note, now(), now(), plan ? method : "wallet", plan ? plan.fee : 0, plan ? plan.ussd : "");
+                  p.mode === "buy" && !ask ? "paid" : "requested", note, now(), now(), plan ? method : "wallet", plan ? plan.fee : 0, plan ? plan.ussd : "");
       if (limited) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
       if (discount) await db.run("UPDATE orders SET pay_discount = ? WHERE id = ?", discount, id);
       if (charge) await db.run("UPDATE orders SET shop_charge = ? WHERE id = ?", charge, id);
@@ -1001,7 +1001,7 @@ module.exports = function market(ctx) {
         if (!plan) await ledger(u.id, cur, -l.total, "order_payment", ref, `${p.name} × ${l.qty}`);
         await db.run(`INSERT INTO orders (id, ref, product_id, shop_id, buyer_id, seller_id, kind, product_name, qty, unit_price, total, cur, commission, affiliate_id, status, note, created_at, updated_at, pay_method, pay_fee, pay_ussd)
                     VALUES (?, ?, ?, ?, ?, ?, 'buy', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, ref, p.id, p.shop_id, u.id, p.owner_id, p.name, l.qty, p.price, l.total, cur, l.commission, l.aff,
-                    plan ? "awaiting_payment" : "paid", note, now(), now(), plan ? "safe" : "wallet", plan && i === 0 ? plan.fee : 0, plan ? plan.ussd : "");
+                    "paid", note, now(), now(), plan ? "safe" : "wallet", plan && i === 0 ? plan.fee : 0, plan ? plan.ussd : "");
         if (Number(p.stock) >= 0) await db.run("UPDATE orders SET reserved = 1 WHERE id = ?", id);
         if (plan?.section) await db.run("UPDATE orders SET safe_svc = ? WHERE id = ?", plan.section, id);
         if (group) await db.run("UPDATE orders SET pay_group = ? WHERE id = ?", group, id);
@@ -1093,7 +1093,7 @@ module.exports = function market(ctx) {
       if (!o || (o.buyer_id !== u.id && o.seller_id !== u.id)) fail("Order not found.", 404);
       const svcOf = (await db.get("SELECT service FROM products WHERE id = ?", o.product_id))?.service || "suuq"; pingSvc = o.safe_svc || "";
       const seller = o.seller_id === u.id, set = async st => await db.run("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", st, now(), o.id);
-      const refund = async () => { if (o.kind === "buy" && o.pay_method !== "shop") await ledger(o.buyer_id, o.cur, o.total, "refund", o.ref, `${o.product_name} × ${o.qty}`); };
+      const refund = async () => { if (o.kind === "buy" && o.pay_method !== "shop" && !(o.pay_method === "safe" && !o.money_ok)) await ledger(o.buyer_id, o.cur, o.total, "refund", o.ref, `${o.product_name} × ${o.qty}`); };
       if (o.kind === "buy") {
         // Price requests (hidden price): requested → quoted (seller sends the price) → paid (buyer pays) → the normal buy steps.
         // The merchant accepts a request, agrees the price with the buyer (in chat), then sends the price with the item name and description.
@@ -1120,10 +1120,10 @@ module.exports = function market(ctx) {
             if (mode === "discount") discount = o.commission;
           }
           const shop = await db.get("SELECT profile FROM shops WHERE id = ?", o.shop_id), plan = await payPlan(b.method, b.via, o.cur, round(o.cur, o.total - discount), shop?.profile, svcOf);
-          // Pay to shop: the phone dials the merchant's number with the amount, so the order counts as paid straight away
-          // (the merchant can still say "Not received" before delivering). Safe payment waits for the admin.
+          // Pay to shop and Safe payment: the phone dials the number with the amount, so the order counts as paid straight
+          // away. The merchant (Pay to shop) or the admin (Safe payment) can still say "Not received".
           await db.run("UPDATE orders SET status = ?, pay_method = ?, pay_fee = ?, pay_ussd = ?, commission = ?, pay_discount = ?, safe_svc = ?, shop_charge = ?, updated_at = ? WHERE id = ?",
-            b.method === "shop" ? "paid" : "awaiting_payment", b.method, plan.fee, plan.ussd, o.commission, discount, plan.section, charge, now(), o.id);
+            "paid", b.method, plan.fee, plan.ussd, o.commission, discount, plan.section, charge, now(), o.id);
           if (b.method === "safe") safeNote = [plan.section, o.product_name, round(o.cur, o.total - discount + plan.fee), o.cur];
           return;
         }
@@ -1160,7 +1160,11 @@ module.exports = function market(ctx) {
           await db.run("UPDATE orders SET buyer_ok = 1, updated_at = ? WHERE id = ?", now(), o.id); heldPing = true; return;
         }
         if (action === "received" && !seller && (o.status === "paid" || o.status === "delivered")) return await complete(o);
-        if (action === "cancel" && o.status === "paid") { await refund(); return await set(seller ? "cancelled_by_seller" : "cancelled"); }
+        if (action === "cancel" && o.status === "paid") {
+          // A Safe payment the admin hasn't checked yet: wait, so the money (if it came) can go back to the buyer's wallet.
+          if (o.pay_method === "safe" && !o.money_ok) fail("Sarrif is still checking this payment. You can cancel once it is checked.");
+          await refund(); return await set(seller ? "cancelled_by_seller" : "cancelled");
+        }
       } else {
         if (action === "accept" && seller && o.status === "requested") return await set("accepted");
         if (action === "decline" && seller && (o.status === "requested" || o.status === "accepted")) { await set("declined"); fwd = await forward(o); return; }
@@ -1509,12 +1513,12 @@ module.exports = function market(ctx) {
       buyer_id: o.buyer_id, seller_id: o.seller_id, buyer_face: !!buyer?.face, seller_face: !!seller?.face, earner, earner_name: earner === "none" ? "" : earner === "buyer" ? o.buyer_name : aff?.name || "", earner_phone: earner === "linker" ? aff?.phone || "" : "",
       group_count: o.pay_group ? (await db.get("SELECT COUNT(*) AS n FROM orders WHERE pay_group = ?", o.pay_group)).n : 1,
       group_paid: o.pay_group ? (r => round(o.cur, Number(r.t) || 0))(await db.get("SELECT SUM(total + pay_fee) AS t FROM orders WHERE pay_group = ?", o.pay_group)) : 0,
-      paid_amount: round(o.cur, o.total - (o.pay_discount || 0) + (o.pay_fee || 0)), paid_to: o.safe_svc ? `${sec?.name || o.safe_svc} admin` : "Main money processor", section: o.safe_svc || "" };
+      paid_amount: round(o.cur, o.total - (o.pay_discount || 0) + (o.pay_fee || 0)), paid_to: o.safe_svc ? `${sec?.name || o.safe_svc} admin` : "Main money processor", section: o.safe_svc || "", money_ok: !!o.money_ok };
   }
   route("GET", "/api/super/safepay", async (req, res, url) => {
     const u = await needSafeAdmin(req), sc = safeScope(u);
     const pend = url.searchParams.get("status") !== "done";
-    const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND ${sc.sql} AND ${pend ? "o.status = 'awaiting_payment'" : "o.status != 'awaiting_payment'"} ORDER BY o.updated_at DESC LIMIT 100`, ...sc.args);
+    const rows = await db.all(`${ORDER_SELECT} WHERE o.pay_method = 'safe' AND ${sc.sql} AND ${pend ? "(o.status = 'awaiting_payment' OR (o.status IN ('paid', 'delivered') AND o.money_ok = 0))" : "NOT (o.status = 'awaiting_payment' OR (o.status IN ('paid', 'delivered') AND o.money_ok = 0))"} ORDER BY o.updated_at DESC LIMIT 100`, ...sc.args);
     const out = []; for (const o of rows) out.push(await safeRow(o));
     const s = await getSettings(), mine = !isSuper(u) && s.services.find(x => x.id === u.service);
     send(res, 200, { orders: out, settings: isSuper(u) ? s.safePay : null, own: mine ? { merchant: mine.safe_merchant || "", number: mine.safe_number || "", name: mine.name } : null });
@@ -1536,11 +1540,15 @@ module.exports = function market(ctx) {
       const o = await db.get("SELECT * FROM orders WHERE id = ?", id);
       if (!o || o.pay_method !== "safe" || !canSafe(u, o)) fail("Order not found.", 404);
       sec = o.safe_svc || "";
-      if (o.status !== "awaiting_payment") fail("This payment was already handled.");
+      // Orders are paid as soon as the buyer's phone dials. Until the money is released the admin can still confirm it
+      // arrived, or say it never came (the order ends; nothing is refunded to a wallet).
+      const open = x => x.status === "awaiting_payment" || (["paid", "delivered"].includes(x.status) && !x.money_ok);
+      if (!open(o)) fail("This payment was already handled.");
       // Products bought together were paid in one payment: they are confirmed (or rejected) together.
-      const group = o.pay_group ? await db.all("SELECT * FROM orders WHERE pay_group = ? AND status = 'awaiting_payment'", o.pay_group) : [o];
+      const group = (o.pay_group ? await db.all("SELECT * FROM orders WHERE pay_group = ?", o.pay_group) : [o]).filter(open);
       for (const g of group) {
-        await db.run("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", decision === "confirm" ? "paid" : "payment_rejected", now(), g.id);
+        if (decision === "confirm") await db.run("UPDATE orders SET status = CASE WHEN status = 'awaiting_payment' THEN 'paid' ELSE status END, money_ok = 1, updated_at = ? WHERE id = ?", now(), g.id);
+        else await db.run("UPDATE orders SET status = 'payment_rejected', updated_at = ? WHERE id = ?", now(), g.id);
         if (decision !== "confirm" && g.reserved) { await db.run("UPDATE orders SET reserved = 0 WHERE id = ?", g.id); await db.run("UPDATE products SET stock = stock + 1 WHERE id = ? AND stock >= 0", g.product_id); }
         touched.push(g.id);
       }
@@ -1566,6 +1574,7 @@ module.exports = function market(ctx) {
       if (!o || o.pay_method !== "safe" || !canSafe(u, o)) fail("Order not found.", 404);
       sec = o.safe_svc || "";
       if (!["paid", "delivered"].includes(o.status)) fail("This order was already released or ended.");
+      await db.run("UPDATE orders SET money_ok = 1 WHERE id = ?", o.id); // releasing means the admin has the money
       await complete(o);
       if (o.reserved) { await db.run("UPDATE orders SET reserved = 0 WHERE id = ?", o.id); await db.run("UPDATE products SET stock = stock + 1 WHERE id = ? AND stock >= 0", o.product_id); }
     });
