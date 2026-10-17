@@ -592,8 +592,11 @@ const SUUQ = (() => {
     if (!num || !pre || !(amt > 0)) return null;
     if (!pre.startsWith("*")) pre = "*" + pre;
     if (!pre.endsWith("*")) pre += "*";
-    return `${pre}${num}*${cur === "SLSH" ? Math.round(amt) : Math.round(amt * 100) / 100}#`;
+    return `${pre}${num}*${ussdAmount(amt, cur)}#`;
   }
+  // Amount in a USSD code: shillings are whole; dollars with cents go as dollars*cents (42.75 -> 42*75, 143.5 -> 143*50),
+  // and whole dollars stay as they are (42).
+  const ussdAmount = (amount, cur) => { if (cur === "SLSH") return String(Math.round(amount)); const c = Math.round(Number(amount) * 100), d = Math.floor(c / 100), r = c % 100; return r ? `${d}*${String(r).padStart(2, "0")}` : String(d); };
   const telHref = code => "tel:" + code.replace(/#/g, "%23");
   const topupLabel = { pending: "Pending", approved: "Added to wallet", rejected: "Not added" };
   function topupList(list) {

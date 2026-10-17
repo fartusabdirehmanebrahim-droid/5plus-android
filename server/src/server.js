@@ -39,6 +39,9 @@ const isPin = p => /^\d{4}$/.test(String(p || ""));
 // New PINs can be anything except the three easiest to guess (the owner chose these). Existing accounts keep their PIN;
 // 5 wrong tries still lock an account for 15 minutes.
 const weakPin = pin => ["1234", "1111", "0000"].includes(String(pin));
+// Amount in a USSD code: shillings are whole; dollars with cents go as dollars*cents (42.75 -> 42*75, 143.5 -> 143*50),
+// and whole dollars stay as they are (42).
+const ussdAmount = (amount, cur) => { if (cur === "SLSH") return String(Math.round(amount)); const c = Math.round(Number(amount) * 100), d = Math.floor(c / 100), r = c % 100; return r ? `${d}*${String(r).padStart(2, "0")}` : String(d); };
 const now = () => Date.now();
 
 function send(res, status, body, headers = {}) {
@@ -167,8 +170,7 @@ function buildUssd(s, wallet, cur, amount) {
   if (!agent || !pre) return null;
   if (!pre.startsWith("*")) pre = "*" + pre;
   if (!pre.endsWith("*")) pre += "*";
-  const amt = cur === "SLSH" ? String(Math.round(amount)) : String(Math.round(amount * 100) / 100);
-  return `${pre}${agent}*${amt}#`;
+  return `${pre}${agent}*${ussdAmount(amount, cur)}#`;
 }
 
 /* ---------- routes ---------- */

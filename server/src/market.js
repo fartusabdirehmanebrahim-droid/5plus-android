@@ -5,6 +5,10 @@ module.exports = function market(ctx) {
     crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit } = ctx;
 
   /* ---------- money helpers ---------- */
+  // Amount in a USSD code: shillings are whole; dollars with cents go as dollars*cents (42.75 -> 42*75, 143.5 -> 143*50),
+  // and whole dollars stay as they are (42).
+  const ussdAmount = (amount, cur) => { if (cur === "SLSH") return String(Math.round(amount)); const c = Math.round(Number(amount) * 100), d = Math.floor(c / 100), r = c % 100; return r ? `${d}*${String(r).padStart(2, "0")}` : String(d); };
+
   const round = (cur, v) => cur === "SLSH" ? Math.round(v) : Math.round(v * 100) / 100;
   // A database transaction: all of it happens, or none of it.
   const tx = fn => db.tx(fn);
@@ -70,7 +74,7 @@ module.exports = function market(ctx) {
     if (!num || !pre) return null;
     if (!pre.startsWith("*")) pre = "*" + pre;
     if (!pre.endsWith("*")) pre += "*";
-    return `${pre}${num}*${cur === "SLSH" ? Math.round(amount) : Math.round(amount * 100) / 100}#`;
+    return `${pre}${num}*${ussdAmount(amount, cur)}#`;
   }
   const topupRow = t => ({ id: t.id, ref: t.ref, cur: t.cur, amount: t.amount, ussd: t.ussd, purpose: t.purpose, plan_id: t.plan_id, status: t.status, note: t.note, created_at: t.created_at, decided_at: t.decided_at });
   // The customer asks for a top-up and their phone dials the USSD code; the super admin approves it once the money arrives.
@@ -725,7 +729,7 @@ module.exports = function market(ctx) {
   const feeOf = (tiers, amt) => { for (const r of tiers || []) if (r.upTo == null || amt <= Number(r.upTo)) return Number(r.fee) || 0; return 0; };
   const ussdOf = (pre, num, amount, cur) => {
     pre = String(pre || "").trim(); if (!pre.startsWith("*")) pre = "*" + pre; if (!pre.endsWith("*")) pre += "*";
-    return `${pre}${num}*${cur === "SLSH" ? Math.round(amount) : Math.round(amount * 100) / 100}#`;
+    return `${pre}${num}*${ussdAmount(amount, cur)}#`;
   };
   // Safe payment: the whole amount goes to the admin of that part (Suuq, Technician, Hotels…) on the numbers they set.
   // A part whose admin hasn't set numbers yet uses the main money processor (the super admin) instead.
