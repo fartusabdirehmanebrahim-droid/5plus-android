@@ -24,8 +24,12 @@ function msg(id, text, kind) { const el = $(id); if (el) { el.textContent = text
 async function api(path, opts = {}) {
   const init = { method: opts.method || (opts.body ? "POST" : "GET"), headers: {}, credentials: "same-origin" };
   if (opts.body) { init.headers["Content-Type"] = "application/json"; init.body = JSON.stringify(opts.body); }
+  // opts.timeout: give up after this many ms (used while the app starts, so a slow server never leaves a blank screen).
+  let timer = null;
+  if (opts.timeout && window.AbortController) { const ac = new AbortController(); init.signal = ac.signal; timer = setTimeout(() => ac.abort(), opts.timeout); }
   let res;
   try { res = await fetch(path, init); } catch { throw new Error("No connection. Check your internet and try again."); }
+  finally { if (timer) clearTimeout(timer); }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && S.user && !path.startsWith("/api/auth")) { S.user = null; S.screen = "login"; S.err = "Please log in again."; render(); }
   if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
@@ -143,13 +147,26 @@ async function playVoice() {
 /* ---------- customer & login screens ---------- */
 const appEl = $("#app");
 function render() {
-  if (S.screen !== "welcome" && speaking) stopVoice();
-  applyRole();
-  if (S.user && S.user.role !== "customer") return;
-  if (S.user) normalizeQuote();
-  const views = { welcome: vWelcome, login: vLogin, adminpw: vAdminPw, signup: vSignup, merchant: vMerchantSignup, home: vHome };
-  appEl.innerHTML = views[S.user ? "home" : S.screen]();
-  bind();
+  if (S.booting) { appEl.innerHTML = vBoot(); return; }
+  try {
+    if (S.screen !== "welcome" && speaking) stopVoice();
+    applyRole();
+    if (S.user && S.user.role !== "customer") return;
+    if (S.user) normalizeQuote();
+    const views = { welcome: vWelcome, login: vLogin, adminpw: vAdminPw, signup: vSignup, merchant: vMerchantSignup, home: vHome };
+    appEl.innerHTML = views[S.user ? "home" : S.screen]();
+    bind();
+  } catch (e) {
+    // Never a blank screen: say something went wrong and offer to try again.
+    console.error(e);
+    appEl.innerHTML = vBoot("Something went wrong. Try again.");
+  }
+}
+// The first screen while the app starts (and if starting fails): logo, a spinner or the message, and Try again.
+function vBoot(err) {
+  return `<div class="view boot-view"><img class="welcome-logo" src="/logos/5plus.png" alt="5PLUS">
+    ${err ? `<p class="err" role="alert" style="text-align:center">${esc(err)}</p><button class="btn btn-primary btn-block" onclick="location.reload()">Try again</button>`
+      : `<div class="boot-spin" aria-hidden="true"></div><p class="note" role="status" style="text-align:center">Loading…</p>`}</div>`;
 }
 // Only on the demo page (the real app has no demo logins).
 const demoLink = () => window.SarrifDemo?.showLogins ? `<button class="link-btn demo-link" data-demo-logins>Demo logins</button>` : "";
@@ -317,7 +334,7 @@ async function doMerchantSignup() {
   if (EASY_PINS.includes(m.pin)) { m.pin = ""; m.pin2 = ""; return fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN."); }
   const b = document.getElementById("do-merchant"); if (b) b.disabled = true;
   try {
-    const r = await api("/api/auth/signup-merchant", { body: { profile: SUUQ.pfDraft(), pin: m.pin, face: S.face } });
+    const r = await api("/api/auth/signup-merchant", { body: { profile: SUUQ.pfDraft(), pin: m.pin, face: S.face, marketer: SUUQ.pfDraft().marketer || "" } });
     S.merchant = null; S.face = null; SUUQ.resetPf(); clearRegDraft(); await loggedIn(r.user); S.service = "suuq"; SUUQ.state.tab = "sell"; await SUUQ.open("suuq");
   } catch (e) {
     m.pin = ""; m.pin2 = "";
@@ -486,7 +503,9 @@ function vDrawer() {
       <div class="drawer-head"><div><span class="label">Salaan</span><b>Hi ${esc((S.user.name || "").split(" ")[0])}</b><small class="num">+252 ${esc(S.user.phone)}</small></div>
         <button class="icon-btn" data-drawer="close" aria-label="Hide menu">${MENU_ICONS.close}</button></div>
       ${S.user.account_type === "merchant" ? item("myshop", SUUQ_ICONS.shop, "shop", "My shop", "Products, orders and report") : ""}
+      ${S.user.lesson_pending ? item("lesson", MK_ICONS.learn, "lesson", "Learn 5PLUS", "A short lesson, then rate your marketer") : ""}
       ${item("affiliate", SUUQ_ICONS.aff, "aff", "Affiliate", "Share products and earn")}
+      ${settings.marketing?.on ? item("marketing", MK_ICONS.megaphone, "mkt", "Marketing rewards", "Register merchants, teach them the app and earn") : ""}
       ${item("account", MENU_ICONS.user, "", "Account and support", "Your details, PIN and WhatsApp help")}
       ${canPause() ? callsMenu() : ""}
       ${canPause() ? ["salah", "sleep"].map(m => `<label class="drawer-item pause-item"><span class="hm-ic ${m}">${PAUSE_ICONS[m]}</span><span class="pi-t"><b>${PAUSE_TEXT[m].name}</b><small>${S.user.pause === m ? PAUSE_TEXT[m].on : PAUSE_TEXT[m].off}</small></span>
@@ -531,6 +550,9 @@ function openService(v) {
   if (v === "ibedel") { loadMine(); SUUQ.loadWallet().then(() => { if (S.service === "ibedel") render(); }); }
   if (v === "ticket") S.ticket = { list: null, q: "", open: null };
   if (v === "technician") S.techMk = undefined;
+  if (v === "delivery") S.couriers = undefined;
+  if (v === "marketing") S.mk = undefined;
+  if (v === "lesson" && !S.lesson) S.lesson = { step: 0, show: !S.user?.lesson_pending, stars: 0, answers: {}, comment: "", err: "" };
   if (v === "myshop") { S.service = "suuq"; SUUQ.state.tab = "sell"; return SUUQ.open("suuq"); }
   if (["suuq", "visa", "scholarship", "wallet", "affiliate"].includes(v)) return SUUQ.open(v);
   if (v === "hub") SUUQ.loadWallet().then(render);
@@ -571,6 +593,7 @@ function vHub() {
       <button class="icon-btn menu-btn" data-drawer="open" aria-label="Open menu" aria-expanded="${!!S.drawer}">${MENU_ICONS.menu}</button></div>
     <div id="hub-results" ${S.hubQ ? "" : "hidden"}>${hubResults()}</div>
     <div id="hub-main" ${S.hubQ ? "hidden" : ""}>
+    ${S.user.lesson_pending ? `<button class="lesson-banner" data-svcgo="lesson">${MK_ICONS.learn}<span><b>Learn 5PLUS</b><small>A short lesson, then rate your marketer</small></span><span aria-hidden="true">›</span></button>` : ""}
     ${walletHidden() ? `<div class="wallet-top is-hidden">
         <button class="wt-open" data-svcgo="wallet"><span class="hm-ic">${SUUQ_ICONS.wallet}</span><b>Wallet</b></button>
         <button class="wt-topup" data-svcgo="wallet">+ Top up</button>
@@ -700,6 +723,97 @@ function svcItems(h) {
         ${x.stock >= 0 ? `<small class="${full ? "avail-none" : "avail"}">${full ? "Fully booked" : x.unit === "night" ? `${x.stock} room${x.stock === 1 ? "" : "s"} available` : `${x.stock} available`}</small>` : ""}
         <span class="btn btn-primary btn-sm">${esc(ITEM_BTN[h.id] || "Order")}</span></span></button></div>`; }).join("")}</div></div>`;
 }
+/* ---------- Marketing reward program ---------- */
+const MK_ICONS = {
+  learn: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>',
+  megaphone: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a3 3 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11"/></svg>',
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4L2.8 9.5l6.4-.8z"/></svg>',
+};
+// The Learn 5PLUS lesson: what a marketer shows a new merchant, one step at a time. A merchant registered by a
+// marketer then rates the marketer (1 to 6 stars) and answers three questions; that pays the marketer's reward.
+const LESSON = [
+  ["5PLUS in one app", "Customers shop in Suuq, book services, send money with iBedel and pay safely. Your shop has its own number, so customers can search for you.", "🛍️"],
+  ["Add your products", "My shop → Products → + Add product. Add real photos, the price and an earning for people who share your product. The admin approves it, then customers see it.", "📸"],
+  ["Orders and payments", "Customers pay with their wallet, with Safe payment (the money is held until they receive it) or straight to your merchant number. Deliver, the customer confirms, and the money is yours.", "💳"],
+  ["Chat and calls", "Answer customers in Chats and call them free over the internet. Turn on Salah time or Sleep time in the menu to stop new orders for a while.", "💬"],
+  ["Out of stock and delivery", "Mark a product Out of stock when it runs out. For an order, press Get a delivery man: he sends his price and the customer pays it.", "🛵"],
+  ["Earn and grow", "Share links to earn, choose a plan to post more products, and download your sales report as PDF or Word from Report.", "📈"],
+];
+const MK_Q = [["clear", "Did the marketer explain the app clearly?", [["yes", "Yes"], ["partly", "Partly"], ["no", "No"]]],
+  ["product", "Did the marketer help you add your first product?", [["yes", "Yes"], ["no", "No"]]],
+  ["recommend", "Would you recommend 5PLUS to other businesses?", [["yes", "Yes"], ["no", "No"]]]];
+function vLesson() {
+  const L = S.lesson || (S.lesson = { step: 0, show: !S.user?.lesson_pending, stars: 0, answers: {}, comment: "", err: "", busy: false });
+  const back = `<div class="svc-bar"><button class="back" data-svcgo="${L.show ? "marketing" : "hub"}" aria-label="Back">${ICON.back}</button><b>Learn 5PLUS</b></div>`;
+  if (L.done) return `<div class="view">${back}<div class="receipt"><div class="tick">${ICON.tick}</div><h3 style="font-size:20px">Thank you</h3>
+    <p class="note" style="margin:0">You finished the lesson and your review was sent.</p></div><button class="btn btn-primary btn-block" data-svcgo="myshop">Open My shop</button></div>`;
+  const n = LESSON.length, k = L.step;
+  if (k < n) { const [t, d, e] = LESSON[k];
+    return `<div class="view lesson">${back}
+      <div class="steps" aria-label="Step ${k + 1} of ${n}"><div class="steps-bar">${LESSON.map((_, i) => `<i class="${i < k ? "done" : i === k ? "on" : ""}"></i>`).join("")}</div><div class="steps-txt"><span class="label">Step ${k + 1} of ${n}</span></div></div>
+      <div class="lesson-card"><span class="lesson-emoji" aria-hidden="true">${e}</span><h2>${esc(t)}</h2><p>${esc(d)}</p></div>
+      <div class="m-nav">${k > 0 ? `<button class="btn btn-ghost" data-lesson="prev">Back</button>` : ""}<button class="btn btn-primary" data-lesson="next">${k === n - 1 ? (L.show ? "Finish" : "Next: rate your marketer") : "Next"}</button></div></div>`; }
+  // The review (merchants registered by a marketer).
+  return `<div class="view lesson">${back}<h2 style="font-size:22px">Rate your marketer</h2>
+    <p class="note" style="margin:0">How well did the person who registered you show you 5PLUS? Only the administration sees your answers.</p>
+    <div class="stars6" role="radiogroup" aria-label="Stars from 1 to 6">${[1, 2, 3, 4, 5, 6].map(i => `<button role="radio" aria-checked="${L.stars === i}" class="${i <= L.stars ? "on" : ""}" data-star="${i}" aria-label="${i} of 6">${MK_ICONS.star}</button>`).join("")}<span class="num">${L.stars ? L.stars + "/6" : ""}</span></div>
+    ${MK_Q.map(([key, q, opts]) => `<div class="field"><label>${esc(q)}</label><div class="seg-row" role="radiogroup" aria-label="${esc(q)}">${opts.map(([v, l]) => `<button role="radio" aria-checked="${L.answers[key] === v}" data-mkq="${key}" data-v="${v}">${esc(l)}</button>`).join("")}</div></div>`).join("")}
+    <div class="field"><label for="mk-comment">Anything else? (optional)</label><textarea class="input" id="mk-comment" rows="3" maxlength="500">${esc(L.comment)}</textarea></div>
+    <div class="err" role="alert">${esc(L.err)}</div>
+    <div class="m-nav"><button class="btn btn-ghost" data-lesson="prev">Back</button><button class="btn btn-primary" data-lesson="send" ${L.busy ? "disabled" : ""}>Send review</button></div></div>`;
+}
+document.addEventListener("click", async e => {
+  const t = e.target.closest?.("[data-lesson],[data-star],[data-mkq],[data-mklesson]"); if (!t) return;
+  if (t.dataset.mklesson !== undefined) { S.lesson = { step: 0, show: true, stars: 0, answers: {}, comment: "", err: "" }; openService("lesson"); return; }
+  const L = S.lesson; if (!L) return;
+  const c = document.getElementById("mk-comment"); if (c) L.comment = c.value;
+  if (t.dataset.star) { L.stars = +t.dataset.star; L.err = ""; return render(); }
+  if (t.dataset.mkq) { L.answers[t.dataset.mkq] = t.dataset.v; L.err = ""; return render(); }
+  const a = t.dataset.lesson;
+  if (a === "prev") { L.step = Math.max(0, L.step - 1); return render(); }
+  if (a === "next") { if (L.step === LESSON.length - 1 && L.show) { S.lesson = null; openService(S.user?.lesson_pending ? "hub" : "marketing"); return; } L.step++; render(); scrollTo(0, 0); return; }
+  if (a === "send") {
+    if (!L.stars) { L.err = "Choose 1 to 6 stars."; return render(); }
+    if (MK_Q.some(([k]) => !L.answers[k])) { L.err = "Answer every question."; return render(); }
+    L.busy = true; render();
+    try { const r = await api("/api/marketing/review", { body: { stars: L.stars, answers: L.answers, comment: L.comment } }); S.user = r.user; L.done = true; }
+    catch (x) { L.err = x.message; }
+    L.busy = false; render();
+  }
+});
+// The marketer's page: their code, the reward, the lesson to show, and the merchants they registered.
+function vMarketing() {
+  if (S.mk === undefined) { S.mk = null; api("/api/marketing").then(r => { S.mk = r; if (S.service === "marketing") render(); }).catch(() => { S.mk = { merchants: [], earned: {} }; render(); }); }
+  const m = S.mk, back = `<div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>Marketing rewards</b></div>`;
+  if (!m) return `<div class="view">${back}<div class="empty">Loading…</div></div>`;
+  const reward = m.amount ? fmt(m.amount, m.cur) : "";
+  return `<div class="view">${back}
+    <div class="mk-hero"><span class="mk-hero-ic">${MK_ICONS.megaphone}</span><div><b>${reward ? `<span>Earn</span> <span class="num">${esc(reward)}</span> <span>for every merchant</span>` : "Register merchants and teach them 5PLUS"}</b>
+      <small>Register a business with your code, show them the Learn 5PLUS lesson, and when they finish and rate you, you earn.</small></div></div>
+    <div class="mk-code"><span class="label">Your marketer code</span><b class="num">${esc(m.code || "")}</b><button class="btn btn-ghost btn-sm" data-mkcopy="${esc(m.code || "")}">Copy</button></div>
+    <ol class="mk-steps"><li>The merchant registers (Register as merchant) and types your code.</li><li>You show them the Learn 5PLUS lesson on their phone (they find it in the menu).</li><li>At the end they rate you from 1 to 6 stars. Your reward goes to My earnings.</li></ol>
+    <button class="btn btn-primary btn-block" data-mklesson>${MK_ICONS.learn} Show the lesson</button>
+    <div class="kpis mk-kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><span class="label">Merchants</span><b>${m.merchants.length}</b></div><div class="kpi"><span class="label">Finished</span><b>${m.done || 0}</b></div><div class="kpi"><span class="label">Your rating</span><b>${m.avg ? m.avg + "/6" : "—"}</b></div></div>
+    ${Object.keys(m.earned || {}).length ? `<p class="note" style="margin:0"><span>Earned</span>: <b class="num">${Object.entries(m.earned).map(([c, v]) => esc(fmt(v, c))).join(" · ")}</b></p>` : ""}
+    <h3 class="ts-h">Your merchants</h3>
+    ${m.merchants.length ? `<div class="hist">${m.merchants.map(x => `<div class="hist-item"><div class="t"><b data-no-i18n>${esc(x.shop || x.name)}</b><small><span data-no-i18n>${esc(x.name)}</span> · ${new Date(x.joined).toLocaleDateString()}</small></div>
+      <div class="a">${x.done ? `<span class="pill ok">${x.stars}/6</span>` : `<span class="pill waiting">Lesson not finished</span>`}</div></div>`).join("")}</div>` : `<div class="empty">No merchants yet. Give your code to a business when they register.</div>`}
+  </div>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest?.("[data-mkcopy]"); if (!b) return; navigator.clipboard?.writeText(b.dataset.mkcopy).then(() => { b.textContent = SarrifI18n?.t ? SarrifI18n.t("Copied") : "Copied"; }).catch(() => {}); });
+/* Delivery page: the delivery men available now. Ask one (or any) to pick something up and bring it. */
+function vDelivery(h) {
+  if (S.couriers === undefined) { S.couriers = null; api("/api/delivery/couriers").then(r => { S.couriers = r.couriers; if (S.service === h.id) render(); }).catch(() => { S.couriers = []; }); }
+  const list = S.couriers, DI = SUUQ.DELIV_IC;
+  return `<div class="view ts"><div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
+    <p class="note" style="margin:0">Ask a delivery man to pick something up and bring it to you. He sends his price; you pay it in My orders with Safe payment, your wallet or straight to him. If he can't take it, it goes to another delivery man.</p>
+    <button class="btn btn-primary btn-block" data-delivreq="">${DI} Request a delivery</button>
+    <h3 class="ts-h">Available now</h3>
+    ${list == null ? `<div class="empty">Loading…</div>` : list.length ? `<div class="deliv-list">${list.map(c => `<div class="deliv-opt as-card"><span class="deliv-ic">${DI}</span><span class="t"><b data-no-i18n>${esc(c.name)}</b><small>${[c.area, c.city].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}</small></span><button class="btn btn-primary btn-sm" data-delivreq="${esc(c.product_id)}">Ask</button></div>`).join("")}</div>`
+      : `<div class="empty">No delivery man is available right now. Try again a little later.</div>`}
+    <p class="note" style="margin:0">Are you a delivery man? Register as a merchant and choose the Delivery Man category. Your jobs then come to My shop → Orders.</p></div>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest?.("[data-delivreq]"); if (!b) return; if (!S.user) { go("login"); return; } SUUQ.openDelivery({ pick: b.dataset.delivreq, onDone: () => { S.couriers = undefined; } }); });
 /* Technician page (home-services design): search, category chips, then sections of photo cards with "See all". */
 function vTechnician(h) {
   const L = S.svcItems || (S.svcItems = {});
@@ -747,6 +861,7 @@ function vSoon() {
   if (!h) { S.service = null; return vHub(); }
   if (h.id === "ticket") return vTicket(h);
   if (h.id === "technician") return vTechnician(h);
+  if (h.id === "delivery") return vDelivery(h);
   if (h.id === "restaurant") return `<div class="view"><div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button></div></div>`;
   if ((h.videos || []).length || (h.gallery || []).length) return vVideos(h);
   // A service without its own page yet: its photo, name and description, and a way to contact it.
@@ -943,6 +1058,8 @@ function vHome() {
   if (S.service === "favs") return vFavs() + footNav("favs");
   if (S.service === "suuq" && S.footChats && SUUQ.state.tab === "chats" && !SUUQ.state.chat && !SUUQ.state.product) return SUUQ.view() + footNav("chats");
   if (["suuq", "visa", "scholarship", "wallet", "affiliate"].includes(S.service)) return SUUQ.view();
+  if (S.service === "marketing") return vMarketing();
+  if (S.service === "lesson") return vLesson();
   if (S.service === "account") return `<div class="view"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button>${vMe()}</div>`;
   if (S.service !== "ibedel" || !hubServices().some(x => x.id === "ibedel")) return vSoon();
   const bar = `<div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>iBedel</b></div>`;
@@ -2145,12 +2262,17 @@ function renderSvcDash(fromLoad) {
 
 /* ---------- start ---------- */
 (async function start() {
+  // Draw straight away: the customer sees the 5PLUS screen while we reach the server (a free server can take a minute to wake).
+  S.booting = true; document.querySelector(".topbar").hidden = true; document.body.classList.add("no-top"); render();
   if (I18N && !I18N.lang) setTimeout(showLanguages, 0);
   // A shared product link looks like /?p=<product>&ref=<affiliate code>. Remember it until the person buys.
   const qs = new URLSearchParams(location.search), linkP = qs.get("p"), linkRef = qs.get("ref");
   if (linkP) { try { if (linkRef) localStorage.setItem("sarrif.ref." + linkP, linkRef.toUpperCase()); localStorage.setItem("sarrif.open", linkP); } catch {} history.replaceState(null, "", location.pathname); }
-  try { settings = await api("/api/settings"); } catch {}
-  try { const me = await api("/api/me"); if (me.user) await loggedIn(me.user); } catch {}
+  let reached = false;
+  for (let i = 0; i < 2 && !reached; i++) { try { settings = await api("/api/settings", { timeout: 45000 }); reached = true; } catch {} }
+  try { const me = await api("/api/me", { timeout: 30000 }); if (me.user) { S.booting = false; await loggedIn(me.user); } } catch {}
   try { await resumeAfterCamera(); } catch {}
+  S.booting = false;
+  if (!reached) { appEl.innerHTML = vBoot("Can't reach 5PLUS right now. Check your internet and try again."); return; }
   render();
 })();

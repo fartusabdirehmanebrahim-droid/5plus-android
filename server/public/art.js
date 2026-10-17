@@ -42,9 +42,12 @@
     shop: `<svg ${W}><rect width="200" height="110" fill="#D9487A"/><g transform="translate(62 28)"><path d="M6 14 H70 L64 70 H12Z" fill="#fff"/><path d="M24 14 V8 A14 14 0 0 1 52 8 V14" fill="none" stroke="#fff" stroke-width="4"/><circle cx="38" cy="42" r="10" fill="#D9487A"/></g><circle cx="170" cy="20" r="22" fill="#fff" opacity=".1"/></svg>`,
     car: `<svg ${W}><rect width="200" height="110" fill="#3D4A5C"/><rect y="84" width="200" height="26" fill="#2A3240"/><path d="M0 97 H200" stroke="#F2C14E" stroke-width="2" stroke-dasharray="12 10"/><g transform="translate(50 42)"><path d="M0 30 Q2 18 16 16 L30 2 H70 L86 16 Q100 18 100 30 V40 H0Z" fill="#F2C14E"/><path d="M34 6 H52 V16 H24Z M56 6 H68 L80 16 H56Z" fill="#BFE0F5"/><circle cx="22" cy="40" r="9" fill="#1E2430"/><circle cx="78" cy="40" r="9" fill="#1E2430"/></g></svg>`,
     home: `<svg ${W}><rect width="200" height="110" fill="#4F8A5B"/><g transform="translate(60 22)"><path d="M40 0 L82 34 H-2Z" fill="#E4574B"/><rect x="6" y="34" width="68" height="46" fill="#F6E7C8"/><rect x="32" y="50" width="16" height="30" fill="#8B5A2B"/><rect x="12" y="44" width="14" height="12" fill="#BFE0F5"/><rect x="54" y="44" width="14" height="12" fill="#BFE0F5"/></g></svg>`,
+    delivery: `<svg ${W}><rect width="200" height="110" fill="#F08A24"/><rect y="86" width="200" height="24" fill="#C96A12"/><path d="M0 98 H200" stroke="#FFE2B8" stroke-width="2" stroke-dasharray="12 10"/>
+      <g transform="translate(52 30)"><rect x="46" y="0" width="34" height="28" rx="4" fill="#fff"/><path d="M52 10h22" stroke="#F08A24" stroke-width="3"/><path d="M10 50 H70 L80 34 H44 L36 22 H18" fill="none" stroke="#1F2A2E" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="14" cy="54" r="11" fill="#1F2A2E"/><circle cx="14" cy="54" r="4" fill="#fff"/><circle cx="82" cy="54" r="11" fill="#1F2A2E"/><circle cx="82" cy="54" r="4" fill="#fff"/><circle cx="38" cy="12" r="7" fill="#1F2A2E"/></g></svg>`,
     general: `<svg ${W}><rect width="200" height="110" fill="#2F6F86"/><g fill="#fff" opacity=".9"><rect x="64" y="30" width="30" height="30" rx="8"/><rect x="104" y="30" width="30" height="30" rx="8" opacity=".6"/><rect x="64" y="66" width="30" height="30" rx="8" opacity=".6"/><rect x="104" y="66" width="30" height="30" rx="8"/></g></svg>`,
   };
-  const LABELS = { money: "Money", electronics: "Electronics", travel: "Travel", visa: "Visa", education: "Education", food: "Food", health: "Health", shop: "Shopping", car: "Cars", home: "Homes", technician: "Technician", hotel: "Hotels", carrent: "Car rent", schoolbus: "School bus", restaurant: "Restaurant", general: "General" };
+  const LABELS = { money: "Money", electronics: "Electronics", travel: "Travel", visa: "Visa", education: "Education", food: "Food", health: "Health", shop: "Shopping", car: "Cars", home: "Homes", technician: "Technician", hotel: "Hotels", carrent: "Car rent", schoolbus: "School bus", restaurant: "Restaurant", delivery: "Delivery", general: "General" };
   // Every copy gets its own gradient ids, so a picture never borrows a gradient from a hidden copy.
   let n = 0;
   // Real photos for the built-in services (public/photos/services). Other services keep their drawing.
@@ -56,6 +59,7 @@
     hotel: I('<path d="M3 19V6"/><path d="M3 15h18v4"/><path d="M21 15v-3a3 3 0 0 0-3-3h-7v6"/><circle cx="7" cy="11" r="2"/>'),
     carrent: I('<path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/><circle cx="7.5" cy="13" r="1"/><circle cx="16.5" cy="13" r="1"/><path d="M5 19v2M19 19v2"/>'),
     restaurant: I('<path d="M5 3v8a2 2 0 0 0 2 2v8M9 3v8a2 2 0 0 1-2 2M7 3v6"/><path d="M17 21V3c-2 1-3 4-3 7s1 4 3 4"/>'),
+    delivery: I('<circle cx="6" cy="17" r="2.5"/><circle cx="18" cy="17" r="2.5"/><path d="M8.5 17h7M3.5 17V9h7l2 4h5.5l2.5 4"/><rect x="11" y="4" width="6" height="5" rx="1"/>'),
     schoolbus: I('<rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M9 3v8M15 3v8"/><circle cx="8" cy="15" r="1"/><circle cx="16" cy="15" r="1"/><path d="M6 18v3M18 18v3"/>'),
   };
   const icon = k => ICONS[k] ? `<span class="art-ic">${ICONS[k]}</span>` : "";

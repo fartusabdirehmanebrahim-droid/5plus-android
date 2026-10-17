@@ -24,7 +24,7 @@ module.exports = function market(ctx) {
     if (userId != null) broadcast("wallet", { balances: await balances(userId) }, u => u.id === userId);
   }
   const KIND_LABEL = { topup: "Top-up", withdraw: "Withdrawal", subscription: "Suuq subscription", order_payment: "Order payment",
-    refund: "Refund", sale: "Sale", affiliate: "Affiliate earning", subscription_income: "Subscription income", earnings: "Earnings withdrawn to wallet", affiliate_fee: "Affiliate earning (paid to your shop)", shop_charge: "5PLUS charge (Pay to shop)", shop_charge_income: "Pay to shop charge" };
+    refund: "Refund", sale: "Sale", affiliate: "Affiliate earning", subscription_income: "Subscription income", earnings: "Earnings withdrawn to wallet", affiliate_fee: "Affiliate earning (paid to your shop)", marketing: "Marketing reward", shop_charge: "5PLUS charge (Pay to shop)", shop_charge_income: "Pay to shop charge" };
   /* ---------- affiliate earnings ---------- */
   async function earnBalance(uid, cur) { return round(cur, (await db.get("SELECT COALESCE(SUM(amount),0) AS b FROM earnings WHERE user_id = ? AND cur = ?", uid, cur)).b); }
   const earnBalances = async uid => Object.fromEntries(await Promise.all(CURS.map(async c => [c, await earnBalance(uid, c)])));
@@ -385,6 +385,69 @@ module.exports = function market(ctx) {
     return p;
   }
 
+  /* ---------- Marketing reward program ---------- */
+  // A marketer gives a new merchant their code (the same code as their share link) when the merchant registers. The
+  // marketer then shows the merchant the Learn 5PLUS lesson; at the end the merchant rates the marketer (1 to 6 stars)
+  // and answers a few questions. That is one successful job: the marketer earns the reward the super admin set.
+  async function setMarketer(uid, code) {
+    code = String(code || "").trim().toUpperCase(); if (!code) return;
+    const s = await getSettings(); if (!s.marketing?.on) return;
+    const m = await db.get("SELECT id FROM users WHERE ref_code = ? AND suspended = 0", code);
+    if (m && m.id !== uid) await db.run("UPDATE users SET marketer_id = ? WHERE id = ? AND marketer_id IS NULL", m.id, uid);
+  }
+  route("GET", "/api/marketing/check", async (req, res, url) => {
+    const code = String(url.searchParams.get("code") || "").trim().toUpperCase();
+    const m = code ? await db.get("SELECT name FROM users WHERE ref_code = ? AND suspended = 0", code) : null;
+    send(res, 200, { ok: !!m, name: m?.name || "" });
+  });
+  const MK_ANS = { clear: ["yes", "partly", "no"], product: ["yes", "no"], recommend: ["yes", "no"] };
+  // The marketer's page: their code, the reward, the merchants they registered and how those merchants rated them.
+  route("GET", "/api/marketing", async (req, res) => {
+    const u = await needUser(req), s = await getSettings();
+    const rows = await db.all(`SELECT u.id, u.name, u.created_at, u.lesson_done, s.name AS shop, r.stars, r.reward, r.cur
+      FROM users u LEFT JOIN shops s ON s.owner_id = u.id LEFT JOIN marketing_reviews r ON r.merchant_id = u.id WHERE u.marketer_id = ? ORDER BY u.created_at DESC LIMIT 300`, u.id);
+    const earned = {}; for (const r of rows) if (r.reward > 0) earned[r.cur] = round(r.cur, (earned[r.cur] || 0) + r.reward);
+    const rated = rows.filter(r => r.stars), avg = rated.length ? Math.round(rated.reduce((a, r) => a + r.stars, 0) / rated.length * 10) / 10 : 0;
+    send(res, 200, { on: !!s.marketing?.on, amount: s.marketing?.amount || 0, cur: s.marketing?.cur || "USD", code: u.ref_code,
+      merchants: rows.map(r => ({ name: r.name, shop: r.shop || "", joined: r.created_at, done: !!Number(r.lesson_done), stars: r.stars || 0 })), earned, avg, done: rated.length });
+  });
+  // The merchant finished the lesson: their review of the marketer (once). The marketer earns the reward.
+  route("POST", "/api/marketing/review", async (req, res) => {
+    const u = await needRole(req, "customer"), b = await readJson(req);
+    if (!u.marketer_id) fail("No marketer registered you.");
+    if (Number(u.lesson_done)) fail("You already sent your review. Thank you.");
+    const stars = Math.floor(Number(b.stars));
+    if (!(stars >= 1 && stars <= 6)) fail("Choose 1 to 6 stars.");
+    const ans = {};
+    for (const [k, opts] of Object.entries(MK_ANS)) { const v = String(b.answers?.[k] || ""); if (!opts.includes(v)) fail("Answer every question."); ans[k] = v; }
+    const comment = String(b.comment || "").trim().slice(0, 500), s = await getSettings();
+    const amount = s.marketing?.on ? round(s.marketing.cur, Number(s.marketing.amount) || 0) : 0, cur = s.marketing?.cur || "USD";
+    await tx(async () => {
+      if ((await db.run("UPDATE users SET lesson_done = ? WHERE id = ? AND lesson_done = 0", now(), u.id)).changes !== 1) fail("You already sent your review. Thank you.");
+      await db.run("INSERT INTO marketing_reviews (merchant_id, marketer_id, stars, answers, comment, reward, cur, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", u.id, u.marketer_id, stars, JSON.stringify(ans), comment, amount, cur, now());
+      if (amount > 0) await addEarning(u.marketer_id, cur, amount, "marketing", null, `Marketing reward · ${u.name}`);
+    });
+    pushLater([u.marketer_id], { kind: "info", title: "Marketing reward", body: `${u.name} finished the lesson and rated you ${stars}/6.${amount > 0 ? ` You earned ${amount} ${cur}.` : ""}`, goto: "marketing", tag: "mk-" + u.id });
+    send(res, 200, { ok: true, user: publicUser(await db.get("SELECT * FROM users WHERE id = ?", u.id)) });
+  });
+  // Super admin: turn the program on or off, set the reward, see every marketer and every review.
+  route("GET", "/api/super/marketing", async (req, res) => {
+    await needRole(req, "super");
+    const s = await getSettings();
+    const marketers = await db.all(`SELECT m.id, m.name, m.phone, m.ref_code, COUNT(u.id) AS merchants, SUM(CASE WHEN u.lesson_done > 0 THEN 1 ELSE 0 END) AS done,
+      (SELECT AVG(stars) FROM marketing_reviews r WHERE r.marketer_id = m.id) AS avg FROM users m JOIN users u ON u.marketer_id = m.id GROUP BY m.id, m.name, m.phone, m.ref_code ORDER BY merchants DESC LIMIT 200`);
+    const reviews = await db.all(`SELECT r.*, mu.name AS merchant_name, mk.name AS marketer_name FROM marketing_reviews r JOIN users mu ON mu.id = r.merchant_id JOIN users mk ON mk.id = r.marketer_id ORDER BY r.created_at DESC LIMIT 200`);
+    send(res, 200, { settings: s.marketing, marketers: marketers.map(m => ({ ...m, merchants: Number(m.merchants) || 0, done: Number(m.done) || 0, avg: m.avg ? Math.round(Number(m.avg) * 10) / 10 : 0 })),
+      reviews: reviews.map(r => ({ id: r.id, merchant: r.merchant_name, marketer: r.marketer_name, stars: r.stars, answers: JSON.parse(r.answers || "{}"), comment: r.comment, reward: r.reward, cur: r.cur, created_at: r.created_at })) });
+  });
+  route("PUT", "/api/super/marketing", async (req, res) => {
+    await needRole(req, "super");
+    const b = await readJson(req), cur = CURS.includes(b.cur) ? b.cur : "USD", amount = round(cur, Number(b.amount));
+    if (!(amount >= 0) || amount > (cur === "SLSH" ? 10000000 : 1000)) fail("Enter a reward of 0 or more.");
+    const ns = await saveSettings({ marketing: { on: !!b.on, amount, cur } });
+    broadcast("settings", publicSettings(ns));
+    send(res, 200, { settings: ns.marketing });
+  });
   route("GET", "/api/suuq/plans", async (req, res) => { const s = await getSettings(); send(res, 200, { plans: s.suuq.plans, countries: COUNTRIES, categories: s.bizCats }); });
   // Merchant sign-up from the first screen: the seller registration form plus a PIN. The phone is the login.
   route("POST", "/api/auth/signup-merchant", async (req, res) => {
@@ -402,8 +465,9 @@ module.exports = function market(ctx) {
       return await db.get("SELECT * FROM users WHERE id = ?", info.lastInsertRowid);
     });
     if (face) await storeFace(u.id, face);
+    await setMarketer(u.id, b.marketer);
     startSession(res, u);
-    send(res, 200, { user: publicUser(face ? await db.get("SELECT * FROM users WHERE id = ?", u.id) : u) });
+    send(res, 200, { user: publicUser(await db.get("SELECT * FROM users WHERE id = ?", u.id)) });
   });
   // An existing customer becomes a merchant by filling in the same form.
   route("POST", "/api/suuq/become-merchant", async (req, res) => {
@@ -414,6 +478,7 @@ module.exports = function market(ctx) {
       await db.run("INSERT INTO shops (owner_id, name, profile, sub_until, plan, shop_no, created_at) VALUES (?, ?, ?, ?, 'free', ?, ?)", u.id, p.business_name, JSON.stringify(p), await freeUntil(), await nextShopNo(), now());
       await db.run("UPDATE users SET account_type = 'merchant' WHERE id = ?", u.id);
     });
+    await setMarketer(u.id, b.marketer);
     send(res, 200, { user: publicUser(await db.get("SELECT * FROM users WHERE id = ?", u.id)), shop: await publicShop(await shopOf(u.id)) });
   });
   // Seller updates their registration details at any time.
@@ -466,7 +531,7 @@ module.exports = function market(ctx) {
     return { id: p.id, name: p.name, description: p.description, price: p.price, cur: p.cur, mode: p.mode,
       images: JSON.parse(p.images || "[]").map(f => "/media/" + f), video: p.video, comm_type: p.comm_type, comm_value: p.comm_value,
       earn: COMMISSION(p, 1), pause: PAUSES.includes(p.shop_pause) ? p.shop_pause : "", shop_id: p.shop_id, shop_no: p.shop_no ?? null, shop_name: p.shop_name, seller_id: p.owner_id, hidden: !!p.hidden,
-      admin_hidden: !!p.admin_hidden, created_at: p.created_at, approval: p.approval || "approved", review_note: p.review_note || "", service: p.service || "suuq", country: p.country || "", price_hidden: !!p.price_hidden, price_label: p.price_label || "", category: p.category || "", stock: p.stock ?? -1, unit: p.unit || "",
+      admin_hidden: !!p.admin_hidden, created_at: p.created_at, approval: p.approval || "approved", review_note: p.review_note || "", service: p.service || "suuq", country: p.country || "", price_hidden: !!p.price_hidden, price_label: p.price_label || "", category: p.category || "", stock: p.stock ?? -1, unit: p.unit || "", out_of_stock: !!p.out_of_stock,
       pay_shop: p.shop_profile !== undefined ? (n => ({ merchant: !!n.merchant, number: !!n.number }))(shopPayNums(p.shop_profile)) : undefined, ...extra };
   }
   // What a shopper sees: a hidden price is replaced by the seller's word, but the affiliate earning is always shown
@@ -621,7 +686,7 @@ module.exports = function market(ctx) {
   // A merchant registered under a business category sells only in that category's section:
   // Clothes, Electronics… → Suuq; Barber, Mechanic… → Technician; Travel Agency → visas and scholarships.
   // Shops registered before categories existed have no limit.
-  const SECTION_SVCS = { suuq: ["suuq"], technician: ["technician"], ticket: ["visa", "scholarship"] };
+  const SECTION_SVCS = { suuq: ["suuq"], technician: ["technician"], ticket: ["visa", "scholarship"], delivery: ["delivery"] };
   function allowedSvcs(s) {
     let pf = {}; try { pf = JSON.parse(s?.profile || "{}"); } catch {}
     if (!pf.category) return null;
@@ -630,6 +695,7 @@ module.exports = function market(ctx) {
   const shopCategory = s => { try { return JSON.parse(s?.profile || "{}").category || ""; } catch { return ""; } };
   function checkCategory(s, service) {
     const a = allowedSvcs(s); if (!a || a.list.includes(service)) return;
+    if (a.list.includes("delivery")) fail("Your shop is registered as a delivery man. You don't add products: delivery jobs come to you in Orders.");
     const words = { suuq: "Suuq products", technician: "Technician services", visa: "visas", scholarship: "scholarships" };
     fail(`Your shop is registered as ${a.category}, so you can only add ${a.list.map(x => words[x]).join(" and ")}.`);
   }
@@ -667,6 +733,11 @@ module.exports = function market(ctx) {
     if (b.hidden !== undefined && Object.keys(b).length === 1) {
       await db.run("UPDATE products SET hidden = ?, updated_at = ? WHERE id = ?", b.hidden ? 1 : 0, now(), id);
       return send(res, 200, { ok: true });
+    }
+    // Out of stock: customers still see it, marked "Out of stock", but can't order it until the merchant turns it off.
+    if (b.out_of_stock !== undefined && Object.keys(b).length === 1) {
+      await db.run("UPDATE products SET out_of_stock = ?, updated_at = ? WHERE id = ?", b.out_of_stock ? 1 : 0, now(), id);
+      return send(res, 200, { ok: true, out_of_stock: !!b.out_of_stock });
     }
     const d = await readProduct(b, p);
     checkCategory(s, d.service);
@@ -910,6 +981,7 @@ module.exports = function market(ctx) {
     if (!await marketOpen(p.service || "suuq")) fail(`${MNAME[p.service || "suuq"]} is not available right now.`);
     if (p.owner_id === u.id) fail("You can't order your own product.");
     if (PAUSES.includes(p.shop_pause)) fail(pauseMsg(p.shop_name, p.shop_pause));
+    if (p.out_of_stock) fail(`${p.name} is out of stock.`);
     // Hidden price + Buy: the buyer asks for the price first. Nothing is paid until the seller sends the price.
     const ask = p.mode === "buy" && !!p.price_hidden;
     const qty = Math.floor(Number(b.qty) || 1);
@@ -980,6 +1052,7 @@ module.exports = function market(ctx) {
       if (p.mode !== "buy" || p.price_hidden || p.service === "ticket") fail(`${p.name} can't be bought together with other products. Open it to order it.`);
       if (p.owner_id === u.id) fail("You can't order your own product.");
       if (PAUSES.includes(p.shop_pause)) fail(pauseMsg(p.shop_name, p.shop_pause));
+      if (p.out_of_stock) fail(`${p.name} is out of stock.`);
       if (!await marketOpen(p.service || "suuq")) fail(`${MNAME[p.service || "suuq"]} is not available right now.`);
       if (lines.some(l => l.p.id === p.id)) continue;
       const qty = Math.floor(Number(it.qty) || 1); if (qty < 1 || qty > 100) fail("Choose a quantity between 1 and 100.");
@@ -1031,6 +1104,8 @@ module.exports = function market(ctx) {
       // Products bought together are paid with one dial: offer "Dial to pay" on one of them only, for the whole amount.
       r.dial = !!o.pay_ussd && o.status === "awaiting_payment" && !(o.pay_group && groups.has(o.pay_group));
       if (o.pay_group) { r.pay_group = true; groups.add(o.pay_group); }
+      if (o.kind === "buy" && ["paid", "delivered", "completed"].includes(o.status)) r.delivery = await deliveryOf(o.id);
+      if (o.for_order) r.for_order = o.for_order;
       if (o.status === "quoted") r.shop_mode = await shopPayMode(o.seller_id, o.cur, o.commission, o.affiliate_id, o.buyer_id, await shopChargeOf(o.cur, o.total, o.shop_id));
       if (o.status === "quoted" && r.shop_mode === "discount") r.shop_discount = o.commission;
       out.push(r);
@@ -1039,7 +1114,9 @@ module.exports = function market(ctx) {
   });
   route("GET", "/api/suuq/seller/orders", async (req, res) => {
     const u = await needRole(req, "customer");
-    send(res, 200, { orders: (await db.all(`${ORDER_SELECT} WHERE o.seller_id = ? ORDER BY o.created_at DESC LIMIT 500`, u.id)).map(o => orderRow(o, true)) });
+    const rows = await db.all(`${ORDER_SELECT} WHERE o.seller_id = ? ORDER BY o.created_at DESC LIMIT 500`, u.id), out = [];
+    for (const o of rows) { const r = orderRow(o, true); if (o.kind === "buy" && ["paid", "delivered"].includes(o.status)) r.delivery = await deliveryOf(o.id); if (o.p_service === "delivery") r.is_delivery = true; out.push(r); }
+    send(res, 200, { orders: out });
   });
 
   // Buy:  paid → delivered (seller) → completed (buyer confirms; money is released). Paid orders can be cancelled with a refund.
@@ -1075,6 +1152,13 @@ module.exports = function market(ctx) {
     const p = await db.get("SELECT * FROM products WHERE id = ?", o.product_id); if (!p) return null;
     const tried = new Set([o.seller_id, o.buyer_id]);
     for (let x = o, n = 0; x && x.from_order && n < 30; n++) { x = await db.get("SELECT seller_id, from_order FROM orders WHERE id = ?", x.from_order); if (x) tried.add(x.seller_id); }
+    // A delivery request: pass it to another delivery man who is available.
+    if (p.service === "delivery") {
+      const c = await pickCourier(tried); if (!c) return null;
+      const nid = await addRequest({ buyer_id: o.buyer_id, qty: 1, note: o.note, from_order: o.id }, c);
+      if (o.for_order) await db.run("UPDATE orders SET for_order = ? WHERE id = ?", o.for_order, nid);
+      return nid;
+    }
     // A trip request (Ticket): pass it to another travel agency.
     if (p.service === "ticket") {
       const c = await pickAgency(tried); if (!c) return null;
@@ -1964,6 +2048,105 @@ module.exports = function market(ctx) {
     if (o.from_order) await db.run("UPDATE orders SET forwarded_to = ? WHERE id = ?", nid, o.from_order);
     return nid;
   }
+  /* ---------- Delivery: delivery men (merchants in a Delivery category) ---------- */
+  // Each delivery man has one listing, "Delivery · <name>", with the price agreed per job: the customer (or the seller
+  // for the customer) asks, the delivery man accepts and sends his price, the customer pays (Safe payment, wallet or
+  // straight to him), he delivers and the customer confirms. If he declines, the job goes to another delivery man.
+  async function isCourierShop(s) {
+    let pf = {}; try { pf = JSON.parse(s.profile || "{}"); } catch {}
+    const cat = (await getSettings()).bizCats.find(c => c.name === pf.category);
+    return !!cat && cat.section === "delivery";
+  }
+  async function courierProduct(s) {
+    let p = await db.get("SELECT * FROM products WHERE shop_id = ? AND service = 'delivery' AND deleted = 0", s.id);
+    const name = `Delivery · ${s.name}`.slice(0, 60);
+    if (!p) {
+      const pid = crypto.randomUUID();
+      await db.run(`INSERT INTO products (id, shop_id, name, description, price, cur, mode, images, video, comm_type, comm_value, service, price_hidden, price_label, country, hidden, approval, created_at, updated_at)
+        VALUES (?, ?, ?, '', 1000, 'USD', 'buy', '[]', '', 'flat', 0, 'delivery', 1, 'Ask for the price', '', 0, 'approved', ?, ?)`, pid, s.id, name, now(), now());
+      p = await db.get("SELECT * FROM products WHERE id = ?", pid);
+    } else if (p.name !== name) { await db.run("UPDATE products SET name = ? WHERE id = ?", name, p.id); p.name = name; }
+    return p;
+  }
+  // Delivery men who can take a job now (their shop is open, they're available and not at Salah or Sleep time).
+  async function courierRows(skip = new Set()) {
+    const shops = await db.all("SELECT s.* FROM shops s WHERE s.suspended = 0 AND s.sub_until > ?", now()), out = [];
+    for (const s of shops) {
+      if (skip.has(s.owner_id) || !await isCourierShop(s)) continue;
+      const p = await courierProduct(s), row = await db.get(`${PROD_SELECT} WHERE p.id = ?`, p.id);
+      if (!row || row.hidden || row.admin_hidden || PAUSES.includes(row.shop_pause)) continue;
+      let pf = {}; try { pf = JSON.parse(s.profile || "{}"); } catch {}
+      const open = (await db.get("SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND status IN ('requested', 'accepted', 'quoted', 'paid')", s.id)).n;
+      out.push({ row, card: { product_id: p.id, name: s.name, shop_no: s.shop_no ?? null, area: row.description || "", city: pf.city || "", owner_id: s.owner_id, busy: Number(open) || 0 } });
+    }
+    return out;
+  }
+  // The least busy available delivery man (ties: a random one).
+  async function pickCourier(skip) {
+    const list = await courierRows(skip); if (!list.length) return null;
+    const best = list.map(x => [x.card.busy, Math.random(), x.row]).sort((a, b) => a[0] - b[0] || a[1] - b[1])[0][2];
+    return best;
+  }
+  route("GET", "/api/delivery/couriers", async (req, res) => {
+    const u = await needUser(req);
+    const list = (await courierRows()).filter(x => x.card.owner_id !== u.id).map(x => { const { owner_id, ...c } = x.card; return c; });
+    send(res, 200, { couriers: list });
+  });
+  // The delivery man's own settings: available or not, and the area he covers.
+  route("GET", "/api/delivery/me", async (req, res) => {
+    const u = await needRole(req, "customer"), s = await db.get("SELECT * FROM shops WHERE owner_id = ?", u.id);
+    if (!s || !await isCourierShop(s)) return send(res, 200, { courier: false });
+    const p = await courierProduct(s);
+    send(res, 200, { courier: true, available: !p.hidden, area: p.description || "" });
+  });
+  route("PUT", "/api/delivery/me", async (req, res) => {
+    const u = await needRole(req, "customer"), b = await readJson(req), s = await db.get("SELECT * FROM shops WHERE owner_id = ?", u.id);
+    if (!s || !await isCourierShop(s)) fail("Only delivery men (Delivery category) can do this.", 403);
+    const p = await courierProduct(s), area = String(b.area ?? p.description ?? "").trim().slice(0, 200);
+    await db.run("UPDATE products SET hidden = ?, description = ?, updated_at = ? WHERE id = ?", b.available === false ? 1 : 0, area, now(), p.id);
+    send(res, 200, { courier: true, available: b.available !== false, area });
+  });
+  // Ask a delivery man for a delivery. The customer asks for themselves; a seller can ask for the buyer of one of their
+  // orders (the buyer then gets the price and pays). No delivery man chosen: the least busy available one gets it.
+  route("POST", "/api/delivery/request", async (req, res) => {
+    const u = await needRole(req, "customer"), b = await readJson(req);
+    const from = String(b.from || "").trim().slice(0, 160), to = String(b.to || "").trim().slice(0, 160), extra = String(b.note || "").trim().slice(0, 200);
+    let buyerId = u.id, forOrder = "", note = "";
+    if (b.order_id) {
+      const o = await db.get(`${ORDER_SELECT} WHERE o.id = ?`, String(b.order_id));
+      if (!o || (o.seller_id !== u.id && o.buyer_id !== u.id)) fail("Order not found.", 404);
+      if (o.kind !== "buy" || !["paid", "delivered"].includes(o.status)) fail("Get a delivery man once the order is paid.");
+      if (await db.get("SELECT 1 AS x FROM orders WHERE for_order = ? AND status IN ('requested', 'accepted', 'quoted', 'awaiting_payment', 'paid', 'delivered', 'completed')", o.id)) fail("This order already has a delivery.");
+      buyerId = o.buyer_id; forOrder = o.id;
+      let pf = {}; try { pf = JSON.parse(o.shop_profile || "{}"); } catch {}
+      note = `Delivery for order ${o.ref}: ${o.product_name} × ${o.qty}. Pick up: ${from || [o.shop_name, pf.address, pf.city].filter(Boolean).join(", ")}. Deliver to: ${to || `${o.buyer_name} +252 ${o.buyer_phone}`}.`;
+    } else {
+      if (!from || !to) fail("Write where to pick up and where to deliver.");
+      note = `Pick up: ${from}. Deliver to: ${to}.`;
+    }
+    if (extra) note += ` ${extra}`;
+    await needPin(u, b.pin);
+    let c = null;
+    if (b.product_id) {
+      c = await db.get(`${PROD_SELECT} WHERE p.id = ? AND p.service = 'delivery' AND p.deleted = 0`, String(b.product_id));
+      if (!c || c.hidden || c.admin_hidden || c.shop_suspended || !(c.sub_until > now())) fail("This delivery man isn't available now. Choose another one.");
+      if (PAUSES.includes(c.shop_pause)) fail(pauseMsg(c.shop_name, c.shop_pause));
+      if (c.owner_id === buyerId || c.owner_id === u.id) fail("Choose another delivery man.");
+    } else c = await pickCourier(new Set([buyerId, u.id]));
+    if (!c) fail("No delivery man is available right now. Try again a little later.");
+    const id = await addRequest({ buyer_id: buyerId, qty: 1, note: note.slice(0, 600) }, c);
+    if (forOrder) await db.run("UPDATE orders SET for_order = ? WHERE id = ?", forOrder, id);
+    await pushOrder(id);
+    if (forOrder) { const o = await db.get(`${ORDER_SELECT} WHERE o.id = ?`, forOrder); if (o) await pushOrder(o.id); }
+    send(res, 200, { order: orderRow(await db.get(`${ORDER_SELECT} WHERE o.id = ?`, id), false), courier: c.shop_name });
+  });
+  // The delivery of an order (the newest request), shown on the order to the buyer and the seller.
+  async function deliveryOf(orderId) {
+    const d = await db.get(`SELECT o.status, o.total, o.cur, o.ref, s.name AS courier FROM orders o JOIN shops s ON s.id = o.shop_id
+      WHERE o.for_order = ? ORDER BY o.created_at DESC LIMIT 1`, orderId);
+    return d ? { status: d.status, total: d.total, cur: d.cur, ref: d.ref, courier: d.courier } : null;
+  }
+
   // The Ticket admin's own agency gets half of all new ticket requests: every second request goes to it, whichever
   // agency the customer chose (the other half goes to the agency they chose). Requests passed on after a rejection don't count.
   async function ticketStats(adminShop) {

@@ -233,6 +233,19 @@ CREATE TABLE IF NOT EXISTS push_tokens (
   user_id    INTEGER NOT NULL REFERENCES users(id),
   created_at INTEGER NOT NULL
 );
+-- Marketing reward program: a merchant rates the marketer who registered them, after the Learn 5PLUS lesson.
+CREATE TABLE IF NOT EXISTS marketing_reviews (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  merchant_id INTEGER NOT NULL REFERENCES users(id),
+  marketer_id INTEGER NOT NULL REFERENCES users(id),
+  stars       INTEGER NOT NULL,
+  answers     TEXT    NOT NULL DEFAULT '{}',
+  comment     TEXT    NOT NULL DEFAULT '',
+  reward      REAL    NOT NULL DEFAULT 0,
+  cur         TEXT    NOT NULL DEFAULT 'USD',
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mkt_marketer ON marketing_reviews(marketer_id);
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -309,7 +322,11 @@ async function init() {
   // Safe payment: the admin checked the money arrived (1) or not yet (0). Safe payments from before were all checked.
   if (await addColumn("orders", "money_ok", "INTEGER NOT NULL DEFAULT 0")) await db.run("UPDATE orders SET money_ok = 1 WHERE pay_method = 'safe' AND status != 'awaiting_payment'");
   await addColumn("orders", "shop_charge", "REAL NOT NULL DEFAULT 0"); // Pay to shop: 5PLUS's charge, taken from the merchant's wallet when finished
-  await addColumn("orders", "pay_group", "TEXT NOT NULL DEFAULT ''"); // products bought together with one Safe payment
+  await addColumn("orders", "pay_group", "TEXT NOT NULL DEFAULT ''");
+  await addColumn("products", "out_of_stock", "INTEGER NOT NULL DEFAULT 0");
+  await addColumn("orders", "for_order", "TEXT NOT NULL DEFAULT ''");
+  await addColumn("users", "marketer_id", "INTEGER"); // the marketer who registered this merchant (marketing reward program)
+  await addColumn("users", "lesson_done", "INTEGER NOT NULL DEFAULT 0"); // when the merchant finished the Learn 5PLUS lesson and the review // a delivery request: the order being delivered // the merchant marked it out of stock: shown, but can't be ordered // products bought together with one Safe payment
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")
   await addColumn("messages", "att", "TEXT NOT NULL DEFAULT ''"); // chat attachment: picture, voice message or file (JSON)
   await addColumn("service_docs", "earn_amount", "REAL NOT NULL DEFAULT 0"); // the earning the admin gave for these documents
@@ -362,6 +379,7 @@ const DEFAULT_SERVICES = [
   { id: "car-rent", name: "Car rent", sub: "Rent a car by the day", art: "carrent", visible: true, ready: false, builtIn: true },
   { id: "school-bus", name: "School Bus", sub: "Safe rides to school", art: "schoolbus", visible: true, ready: false, builtIn: true },
   { id: "restaurant", name: "Restaurant", sub: "Menu, dinners and sweets", art: "restaurant", visible: true, ready: false, builtIn: true },
+  { id: "delivery", name: "Delivery", sub: "Delivery men near you", art: "delivery", visible: true, ready: true, builtIn: true },
 ];
 
 // Business categories a merchant chooses when registering. The super admin edits the list and puts each one under a
@@ -395,6 +413,7 @@ const DEFAULT_BIZ_CATS = [
   {"name": "Computer Shop", "section": "suuq", "subs": [], "photo": "/photos/cats/computer-shop.jpg", "home": true},
   {"name": "Car Rental", "section": "car-rent", "subs": [], "photo": "/photos/cats/car-rental.jpg", "home": false},
   {"name": "Car Wash", "section": "technician", "subs": [], "photo": "", "home": false},
+  {"name": "Delivery Man", "section": "delivery", "subs": [], "photo": "", "home": false},
   {"name": "Mechanic & Garage", "section": "technician", "subs": [], "photo": "/photos/cats/mechanic-garage.jpg", "home": false},
   {"name": "Fuel Station", "section": "suuq", "subs": [], "photo": "", "home": true},
   {"name": "Real Estate", "section": "suuq", "subs": [], "photo": "", "home": true},
@@ -415,6 +434,9 @@ const DEFAULT_SETTINGS = {
   // is finished (super admin income). One rule per merchant country; "*" is every other country. Each rule is a percent
   // of the price (pct) or a flat amount per order (USD and SLSH). Set by the super admin.
   shopCharge: [{ country: "*", type: "pct", pct: 0, USD: 0, SLSH: 0 }],
+  // Marketing reward program: marketers register merchants with their code and teach them the app (the Learn 5PLUS
+  // lesson). When the merchant finishes the lesson and rates the marketer, the marketer earns this reward. Off = hidden.
+  marketing: { on: false, amount: 1, cur: "USD" },
   walletTopup: { number: "", numbers: { USD: "", SLSH: "" }, ussd: { USD: "*880*", SLSH: "*220*" } },
   // Safe payment: the buyer pays the money processor agent; Sarrif holds it until the buyer confirms they received the item.
   // merchant = the processor's merchant number (*223* SLSH, *883* USD); number = its normal number (*220* SLSH, *880* USD).
@@ -466,7 +488,7 @@ async function getSettings() {
   }
   // New built-in services are added once to older installs (a service the admin later removes stays removed).
   const added = new Set(Array.isArray(saved.addedServices) ? saved.addedServices : []);
-  for (const id of ["technician", "hotels", "car-rent", "school-bus", "restaurant"]) {
+  for (const id of ["technician", "hotels", "car-rent", "school-bus", "restaurant", "delivery"]) {
     if (!added.has(id) && !s.services.some(x => x.id === id)) s.services.push(structuredClone(DEFAULT_SERVICES.find(x => x.id === id)));
     added.add(id);
   }
@@ -479,10 +501,18 @@ async function getSettings() {
   if (!s.suuq.plans.some(p => p.id === "free")) s.suuq.plans = structuredClone(DEFAULT_SETTINGS.suuq.plans);
   if (Number(saved.earnFeePct) >= 0) s.earnFeePct = Number(saved.earnFeePct);
   if (Array.isArray(saved.shopCharge) && saved.shopCharge.length) s.shopCharge = saved.shopCharge;
+  if (saved.marketing) s.marketing = { ...s.marketing, ...saved.marketing };
   else if (Number(saved.shopChargePct) > 0) s.shopCharge = [{ country: "*", type: "pct", pct: Number(saved.shopChargePct), USD: 0, SLSH: 0 }]; // the first version: one percent
   if (Array.isArray(saved.bizCats)) s.bizCats = saved.bizCats;
   // Categories saved before photos and "Shop by category" existed get the built-in photo and the default setting.
   s.bizCats = s.bizCats.map(c => { const d = DEFAULT_BIZ_CATS.find(x => x.name === c.name); return { ...c, photo: c.photo ?? d?.photo ?? "", home: c.home ?? (c.section === "suuq") }; });
+  // New built-in categories are added once to older lists (one the admin later removes stays removed).
+  const addedCats = new Set(Array.isArray(saved.addedCats) ? saved.addedCats : []);
+  for (const name of ["Delivery Man"]) {
+    if (!addedCats.has(name) && !s.bizCats.some(c => c.name === name)) s.bizCats.push(structuredClone(DEFAULT_BIZ_CATS.find(c => c.name === name)));
+    addedCats.add(name);
+  }
+  s.addedCats = [...addedCats];
   s.ticketAdminAgency = Number(saved.ticketAdminAgency) || 0; // the Ticket admin's agency: it gets half of all ticket requests
   if (saved.safePay) s.safePay = { ...s.safePay, ...saved.safePay, codes: { SLSH: { ...s.safePay.codes.SLSH, ...(saved.safePay.codes?.SLSH || {}) }, USD: { ...s.safePay.codes.USD, ...(saved.safePay.codes?.USD || {}) } } };
   if (saved.walletTopup) s.walletTopup = { ...s.walletTopup, ...saved.walletTopup, ussd: { ...s.walletTopup.ussd, ...(saved.walletTopup.ussd || {}) }, numbers: { ...s.walletTopup.numbers, ...(saved.walletTopup.numbers || {}) } };

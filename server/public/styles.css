@@ -1263,3 +1263,54 @@ img, video, iframe{max-width:100%}
 .lang-screen{align-items:flex-start}
 .lang-screen > .lang-box{margin:auto}
 .lang-choice{min-height:54px}
+
+/* First screen while the app starts */
+.boot-view{justify-content:center;align-items:center;gap:18px}
+.boot-spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--green);animation:bootspin .9s linear infinite}
+@keyframes bootspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.boot-spin{animation-duration:3s}}
+
+.pause-tag.oos-tag{background:rgba(180,35,24,.9)}
+
+/* Delivery */
+.deliv-card{max-height:88vh;overflow:auto}
+.deliv-list{display:flex;flex-direction:column;gap:8px}
+.deliv-opt{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);text-align:start;cursor:pointer;font:inherit;color:inherit}
+.deliv-opt[aria-checked="true"]{border-color:var(--green);box-shadow:0 0 0 2px var(--green)}
+.deliv-opt.as-card{cursor:default}
+.deliv-opt .t{display:flex;flex-direction:column;flex:1;min-width:0}
+.deliv-opt .t small{color:var(--ink-3)}
+.deliv-ic{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;background:#FFF1E2;color:#C96A12;flex:none}
+.deliv-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.deliv-line svg,.deliv-btn svg{width:18px;height:18px;vertical-align:-4px}
+.deliv-btn{align-self:flex-start}
+.courier-panel{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #F6D1A6;background:#FFF8EF;border-radius:16px;margin-bottom:12px}
+.courier-top{display:flex;align-items:center;gap:8px;color:#9A4F0B}
+.switch-row{display:flex;align-items:center;gap:10px;font-weight:600}
+.switch-row input{width:22px;height:22px;accent-color:var(--green)}
+
+/* Marketing reward program */
+.lesson-banner{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;margin:0 0 12px;border:1px solid #BFE3D2;background:#EAF7F1;border-radius:16px;color:var(--green-ink);font:inherit;text-align:start;cursor:pointer}
+.lesson-banner span:nth-child(2){display:flex;flex-direction:column;flex:1}
+.lesson-banner small{color:var(--ink-3)}
+.lesson-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:26px 18px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}
+.lesson-card h2{font-size:22px;margin:0}
+.lesson-card p{margin:0;color:var(--ink-2);line-height:1.55;max-width:34ch}
+.lesson-emoji{font-size:54px;line-height:1}
+.stars6{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stars6 button{width:42px;height:42px;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer}
+.stars6 button svg{width:100%;height:100%;fill:#D5DDDA}
+.stars6 button.on svg{fill:#F2B01E}
+.stars6 button[aria-checked="true"]{border-color:#F2B01E}
+.stars6 .num{margin-inline-start:6px;font-weight:700}
+.seg-row{display:flex;gap:8px;flex-wrap:wrap}
+.seg-row button{padding:9px 16px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:inherit;font-weight:600;cursor:pointer}
+.seg-row button[aria-checked="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.mk-hero{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:16px;background:#FFF4E5;border:1px solid #F6D1A6}
+.mk-hero > div{display:flex;flex-direction:column;gap:4px}
+.mk-hero small{color:var(--ink-2);line-height:1.45}
+.mk-hero-ic{display:inline-flex;width:40px;height:40px;border-radius:12px;align-items:center;justify-content:center;background:#F08A24;color:#fff;flex:none}
+.mk-code{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px dashed var(--green);border-radius:14px}
+.mk-code b{font-size:20px;letter-spacing:.06em;flex:1}
+.mk-steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:6px;color:var(--ink-2);line-height:1.45}
+.mk-kpis .kpi{padding:12px 10px;min-width:0}.mk-kpis .label{letter-spacing:.02em;font-size:10px;overflow-wrap:normal;word-break:normal;hyphens:none}

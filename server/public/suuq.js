@@ -18,10 +18,11 @@ const SUUQ = (() => {
   const scholarOk = () => !!st.shop?.profile?.scholar && scholarOpen();
   const visaOpen = () => (settings.services || []).some(x => x.id === "visa");
   // What this merchant may list, from the business category they registered with (null = no limit, older shops).
-  const SECTION_SVCS = { suuq: ["suuq"], technician: ["technician"], ticket: ["visa", "scholarship"] };
+  const SECTION_SVCS = { suuq: ["suuq"], technician: ["technician"], ticket: ["visa", "scholarship"], delivery: ["delivery"] };
   const allowedSvcs = () => { const pf = st.shop?.profile; return pf?.category ? SECTION_SVCS[pf.section] || ["suuq"] : null; };
   const mayList = svc => { const a = allowedSvcs(); return !a || a.includes(svc); };
   const categoryNote = () => { const pf = st.shop?.profile; if (!pf?.category) return ""; const a = allowedSvcs(), w = { suuq: "Suuq products", technician: "Technician services", visa: "visas", scholarship: "scholarships" };
+    if (a.includes("delivery")) return "Your shop is registered as a delivery man. You don't add products: delivery jobs come to you in Orders.";
     return `Your shop is registered as ${pf.category}${pf.category_sub ? ` (${pf.category_sub})` : ""}, so you can only add ${a.map(x => w[x]).join(" and ")}.`; };
   const priceWords = () => settings.priceWords?.length ? settings.priceWords : ["Contact for price"];
   // A hidden price comes back as null for shoppers; they see the seller's words instead.
@@ -199,6 +200,16 @@ const SUUQ = (() => {
   async function loadShop() {
     try { const [a, b] = await Promise.all([api("/api/suuq/my-shop"), api("/api/suuq/plans")]); st.shop = a.shop ?? null; st.plans = b.plans; st.countries = b.countries || []; st.bizCats = b.categories || []; } catch {}
     if (st.shop) { try { const [p, o] = await Promise.all([api("/api/suuq/seller/products"), api("/api/suuq/seller/orders")]); st.myProducts = p.products; st.sellerOrders = o.orders; } catch {} }
+    if (st.shop) { try { st.courier = await api("/api/delivery/me"); } catch { st.courier = null; } }
+  }
+  // A delivery man (Delivery category): available or not, and the area he covers. Jobs come in Orders.
+  function vCourierPanel() {
+    const c = st.courier; if (!c?.courier) return "";
+    return `<div class="courier-panel"><div class="courier-top">${DELIV_IC}<b>You're a delivery man</b></div>
+      <label class="switch-row"><input type="checkbox" id="cr-on" ${c.available ? "checked" : ""}><span>${c.available ? "Available · customers and sellers can ask you" : "Not available · you get no new jobs"}</span></label>
+      <div class="field"><label for="cr-area">Area you cover</label><div class="inline-form"><input class="input" id="cr-area" maxlength="200" value="${esc(c.area)}" placeholder="e.g. Hargeisa: Jigjiga Yar, 26 June, Airport"><button class="btn btn-ghost" id="cr-save">Save</button></div></div>
+      <small class="note">Jobs arrive in Orders. Accept, agree the price in chat, send the price; the customer pays (Safe payment, wallet or straight to you). If you reject, the job goes to another delivery man.</small>
+      <span class="status-msg" id="st-cr"></span></div>`;
   }
   async function loadAff() { try { st.aff = await api("/api/affiliate"); } catch {} }
   const unreadChats = () => st.chats.reduce((a, c) => a + (c.unread || 0), 0);
@@ -772,7 +783,7 @@ const SUUQ = (() => {
   /* ---------- Buy several products together (no cart) ---------- */
   // Tick the circle on product cards; a bar shows how many are chosen and the total; Buy now pays for all of them at once.
   const picked = new Map(); // product id → { p, qty }
-  const canPick = p => p && p.mode === "buy" && !asksPrice(p) && p.service !== "ticket" && !p.pause && S.user && p.seller_id !== S.user.id && S.user.role === "customer";
+  const canPick = p => p && p.mode === "buy" && !asksPrice(p) && p.service !== "ticket" && !p.pause && !p.out_of_stock && S.user && p.seller_id !== S.user.id && S.user.role === "customer";
   const PICK_IC = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   const pickBtn = p => canPick(p) ? `<button class="pick-btn" data-pick="${esc(p.id)}" aria-pressed="${picked.has(p.id)}" aria-label="Choose ${esc(p.name)} to buy">${picked.has(p.id) ? PICK_IC : "+"}</button>` : "";
   const pickTotals = () => { const t = {}; for (const { p, qty } of picked.values()) t[p.cur] = (t[p.cur] || 0) + p.price * qty; return t; };
@@ -847,7 +858,7 @@ const SUUQ = (() => {
   }
   function productCard(p) {
     return `<div class="pcard-w">${ttButton(p)}${pickBtn(p)}<button class="pcard" data-prod="${esc(p.id)}">
-      <span class="pimg">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy">` : `<span class="noimg">▶ Video</span>`}<span class="mode ${p.mode}">${p.mode === "buy" ? "Buy" : "Book"}</span>${p.pause ? `<span class="pause-tag">${p.pause === "salah" ? "Salah time" : "Sleep time"}</span>` : ""}</span>
+      <span class="pimg">${p.images[0] ? `<img src="${esc(p.images[0])}" alt="" loading="lazy">` : `<span class="noimg">▶ Video</span>`}<span class="mode ${p.mode}">${p.mode === "buy" ? "Buy" : "Book"}</span>${p.out_of_stock ? `<span class="pause-tag oos-tag">Out of stock</span>` : p.pause ? `<span class="pause-tag">${p.pause === "salah" ? "Salah time" : "Sleep time"}</span>` : ""}</span>
       <span class="pbody">${hasCountry(p.service) && p.country ? `<span class="visa-country">${countryTag(p.country)}</span>` : ""}<b>${esc(p.name)}</b><span class="price ${p.price == null ? "hidden-price" : "num"}">${esc(priceText(p))}</span><small>${p.service === "scholarship" ? `<span class="by-agency">${PLANE_S}${esc(p.shop_name)}</span>` : `${esc(p.shop_name)}${p.shop_no ? ` · no. ${esc(p.shop_no)}` : ""}`}</small>${earnFor(p) ? `<span class="earn">${esc(earnFor(p))}</span>` : ""}</span></button></div>`;
   }
   // Visas: a "Rounded Horizontal Feature Card" at the top (icon, title, subtitle), and each visa as a horizontal card:
@@ -923,7 +934,7 @@ const SUUQ = (() => {
       ${mine ? `<div class="instr">${p.approval === "pending" ? "Waiting for admin approval. Customers can't see it yet. " : p.approval === "rejected" ? `Not approved: ${esc(p.review_note)}. ` : ""}This is your product. Edit it from My shop → Products.</div>` : `
         ${p.pause ? `<div class="pause-note ${p.pause}" role="status"><b>${p.pause === "salah" ? "Salah time" : "Sleep time"}</b><span>${p.pause === "salah" ? "This seller is at prayer. Orders open again when they finish. You can still chat with them." : "This seller is closed for the night. Orders open again in the morning. You can still chat with them."}</span></div>` : ""}
         <div class="row-actions" style="gap:8px">
-          <button class="btn btn-primary" data-order style="flex:1" ${p.pause ? "disabled" : ""}>${asksPrice(p) ? "Ask for price" : p.mode === "buy" ? "Buy now" : "Book now"}</button>
+          <button class="btn btn-primary" data-order style="flex:1" ${p.pause || p.out_of_stock ? "disabled" : ""}>${p.out_of_stock ? "Out of stock" : asksPrice(p) ? "Ask for price" : p.mode === "buy" ? "Buy now" : "Book now"}</button>
           ${String(p.service).startsWith("svc:") ? "" : `<button class="btn btn-ghost" data-chat="${esc(p.id)}" style="flex:1">Chat with seller</button>`}</div>`}
       ${os ? vOrderSheet(p, os) : ""}
     </div>`;
@@ -1046,6 +1057,7 @@ const SUUQ = (() => {
         ${o.my_earn > 0 ? `<span class="earn">${o.status === "completed" ? `You earned ${esc(money(o.my_earn, o.cur))} · added to your earnings` : ["cancelled", "cancelled_by_seller", "declined", "payment_rejected"].includes(o.status) ? "" : `You earn ${esc(money(o.my_earn, o.cur))} when you confirm you received it`}</span>` : ""}
         ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · <span class="num">${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))}</span>${o.pay_discount ? ` · your earnings ${esc(money(o.pay_discount, o.cur))} taken off` : ""}</small>` : ""}
         ${o.status === "awaiting_payment" ? `<small class="note">${o.pay_method === "safe" ? "Sarrif confirms the money arrived, then the seller delivers." : "The seller confirms the money arrived, then delivers."}</small>` : ""}
+        ${deliveryLine(o, false)}
         ${o.status === "payment_rejected" ? `<small class="note" style="color:var(--danger)">${o.pay_method === "safe" ? "Sarrif didn't receive this payment. Contact support if you paid." : "The seller didn't receive this payment. Chat with them if you paid."}</small>` : ""}
         <div class="req-actions">
           ${o.status === "awaiting_payment" ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">Cancel</button>` : ""}
@@ -1202,6 +1214,71 @@ const SUUQ = (() => {
   // Call: an internet call inside 5PLUS (like WhatsApp), no airtime. If it can't connect, the phone number is offered.
   const callBtn = (convId, name, phone) => convId ? `<button type="button" class="btn btn-ghost chat-call" data-netcall="${esc(convId)}" data-callname="${esc(name || "")}" data-callphone="${esc(phone || "")}" aria-label="Call ${esc(name || "")}">${CI.call}Call</button>` : "";
 
+  /* ---------- Delivery: ask a delivery man ---------- */
+  // opts.order: an order to deliver (the seller asks for the buyer, or the buyer asks); without it the customer writes
+  // where to pick up and where to deliver. The chosen delivery man sends his price; the customer pays it in My orders.
+  function openDelivery(opts = {}) {
+    const host = document.querySelector("#customer-area .screen") || document.body;
+    document.getElementById("deliv-sheet")?.remove();
+    const box = document.createElement("div"); box.className = "sheet"; box.id = "deliv-sheet";
+    const d = { couriers: null, pick: opts.pick || "", pin: "", from: "", to: "", note: "", err: "", done: null, busy: false };
+    const close = () => { box.remove(); if (opts.onDone && d.done) opts.onDone(d.done); };
+    const draw = () => {
+      if (d.done) { box.innerHTML = `<div class="sheet-card deliv-card"><div class="receipt"><div class="tick">${ICON.tick}</div><h3 style="font-size:20px">Request sent</h3>
+        <p class="note" style="margin:0"><span>The delivery man will send the delivery price.</span> <span>${opts.order?.seller ? "The customer pays it in My orders." : "You pay it in My orders (Safe payment, wallet or straight to him)."}</span></p>
+        <p class="note" style="margin:0"><span data-no-i18n>${esc(d.done.courier || "")}</span></p></div>
+        <button class="btn btn-primary btn-block" data-dv="close">OK</button></div>`; bind(); return; }
+      const list = d.couriers;
+      box.innerHTML = `<div class="sheet-card deliv-card"><h3 style="font-size:19px">${opts.order ? "Get a delivery man" : "Request a delivery"}</h3>
+        ${opts.order ? `<p class="note" style="margin:0"><span data-no-i18n>${esc(opts.order.label || "")}</span></p>` : `
+        <div class="field"><label for="dv-from">Pick up from</label><input class="input" id="dv-from" maxlength="160" value="${esc(d.from)}" placeholder="Shop, street, district"></div>
+        <div class="field"><label for="dv-to">Deliver to</label><input class="input" id="dv-to" maxlength="160" value="${esc(d.to)}" placeholder="Name, street, district, phone"></div>`}
+        <div class="field"><label for="dv-note">Note for the delivery man (optional)</label><input class="input" id="dv-note" maxlength="200" value="${esc(d.note)}" placeholder="Size, weight, best time…"></div>
+        <b style="font-size:14px">Choose a delivery man</b>
+        <div class="deliv-list" role="radiogroup" aria-label="Delivery men">
+          <button class="deliv-opt" role="radio" data-dvpick="" aria-checked="${d.pick === ""}"><span class="deliv-ic">${DELIV_IC}</span><span class="t"><b>Any available delivery man</b><small>The one with the fewest jobs gets it</small></span></button>
+          ${list == null ? `<div class="empty">Loading…</div>` : list.length ? list.map(c => `<button class="deliv-opt" role="radio" data-dvpick="${esc(c.product_id)}" aria-checked="${d.pick === c.product_id}"><span class="deliv-ic">${DELIV_IC}</span><span class="t"><b data-no-i18n>${esc(c.name)}</b><small>${[c.area, c.city].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}${c.busy ? ` · <span>${c.busy} open</span>` : ""}</small></span></button>`).join("")
+            : `<div class="empty">No delivery man is available right now. Try again a little later.</div>`}
+        </div>
+        <div class="field"><label for="dv-pin">Enter your PIN to send the request</label>${pinInput("dv-pin", d.pin)}</div>
+        <div class="err" role="alert">${esc(d.err)}</div>
+        <button class="btn btn-primary btn-block" data-dv="send" ${(d.pin || "").length === 4 && !d.busy && (list == null || list.length) ? "" : "disabled"}>Send request</button>
+        <button class="btn btn-ghost btn-block" data-dv="close">Cancel</button></div>`;
+      bind();
+    };
+    const keep = () => { for (const k of ["from", "to", "note"]) { const el = document.getElementById("dv-" + k); if (el) d[k] = el.value; } };
+    const bind = () => {
+      box.querySelectorAll("[data-dvpick]").forEach(b => b.onclick = () => { keep(); d.pick = b.dataset.dvpick; draw(); });
+      box.querySelectorAll('[data-dv="close"]').forEach(b => b.onclick = close);
+      const pin = document.getElementById("dv-pin");
+      if (pin) pin.oninput = () => { pin.value = pin.value.replace(/\D/g, "").slice(0, 4); d.pin = pin.value; const sb = box.querySelector('[data-dv="send"]'); if (sb) sb.disabled = d.pin.length !== 4 || d.busy || (d.couriers && !d.couriers.length); };
+      const send = box.querySelector('[data-dv="send"]');
+      if (send) send.onclick = async () => {
+        keep(); d.busy = true; send.disabled = true; d.err = "";
+        try {
+          const r = await api("/api/delivery/request", { body: { order_id: opts.order?.id || undefined, product_id: d.pick || undefined, from: d.from, to: d.to, note: d.note, pin: d.pin } });
+          d.done = r;
+        } catch (e) { d.err = e.message; d.pin = ""; }
+        d.busy = false; draw();
+      };
+    };
+    host.appendChild(box); draw();
+    api("/api/delivery/couriers").then(r => { d.couriers = r.couriers; draw(); }).catch(() => { d.couriers = []; draw(); });
+  }
+  const DELIV_IC = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="2.5"/><circle cx="18" cy="17" r="2.5"/><path d="M8.5 17h7M3.5 17V9h7l2 4h5.5l2.5 4"/><rect x="11" y="4" width="6" height="5" rx="1"/></svg>';
+  // On an order: the delivery (status and price) or a button to get one.
+  const DELIV_ST = { requested: "Asked · waiting for the delivery man", accepted: "Accepted · the price comes next", quoted: "Price sent · waiting for payment", awaiting_payment: "Waiting for payment confirmation", paid: "Paid · on the way", delivered: "Delivered", completed: "Delivered", declined: "Declined", cancelled: "Cancelled", payment_rejected: "Payment not received" };
+  function deliveryLine(o, seller) {
+    if (o.kind !== "buy" || !["paid", "delivered", "completed"].includes(o.status)) return "";
+    const d = o.delivery;
+    if (d && !["declined", "cancelled", "cancelled_by_seller", "payment_rejected"].includes(d.status)) return `<small class="note deliv-line">${DELIV_IC} <span>Delivery</span>: <span data-no-i18n>${esc(d.courier)}</span> · <span>${esc(DELIV_ST[d.status] || d.status)}</span>${d.total ? ` · <span class="num">${esc(money(d.total, d.cur))}</span>` : ""}</small>`;
+    if (o.status === "completed") return "";
+    return `<button class="btn btn-ghost btn-sm deliv-btn" data-getdeliv="${esc(o.id)}" data-seller="${seller ? 1 : ""}" data-label="${esc(`${o.product_name} × ${o.qty} · ${o.ref}`)}">${DELIV_IC} Get a delivery man</button>`;
+  }
+  if (!window.__delivBound) { window.__delivBound = true; document.addEventListener("click", e => {
+    const b = e.target.closest?.("[data-getdeliv]"); if (!b) return;
+    openDelivery({ order: { id: b.dataset.getdeliv, seller: !!b.dataset.seller, label: b.dataset.label }, onDone: async () => { try { if (b.dataset.seller) await goSellerOrders(); else await openMyOrders(); } catch {} } });
+  }); }
   /* ---------- Internet calls ---------- */
   // Voice goes straight between the two phones (WebRTC). The server rings the other person (and Firebase rings a closed
   // app), and passes the connection details between the phones.
@@ -1393,6 +1470,7 @@ const SUUQ = (() => {
       ${pf.travel ? `<div class="ticket-earn"><label for="te-value">Ticket earning for people who share or buy</label>
         <div class="te-row"><select class="input" id="te-type"><option value="percent" ${(pf.ticket_comm?.type || "percent") === "percent" ? "selected" : ""}>% of the price</option><option value="flat" ${pf.ticket_comm?.type === "flat" ? "selected" : ""}>USD per ticket</option></select>
         <input class="input" id="te-value" inputmode="decimal" value="${esc(pf.ticket_comm?.value ?? 5)}"><button class="btn btn-ghost" id="te-save">Save</button></div></div>` : ""}
+      ${vCourierPanel()}
       <div class="shop-head"><b>${esc(s.name)}</b>${s.shop_no ? `<small class="shop-no">Shop number <b class="num">${esc(s.shop_no)}</b> · customers can search for it</small>` : ""}<small><span class="tier-pill tier-${esc(s.plan || "")}">${esc(pi?.name || "Plan")}</span> until ${new Date(s.sub_until).toLocaleDateString()} · ${s.product_count}${lim ? "/" + lim : ""} products</small></div>
       <div class="sq-tabs sub" role="group" aria-label="Seller dashboard">${tabs.map(([k, l]) => `<button data-selltab="${k}" aria-pressed="${st.sell === k}">${esc(l)}</button>`).join("")}</div>${body}`;
   }
@@ -1425,7 +1503,7 @@ const SUUQ = (() => {
     root.querySelectorAll("[data-pfsub]").forEach(b => b.onclick = () => { keepPf(); pfDraft().category_sub = b.dataset.pfsub; render(); });
   }
   function bindPf(root) { root.querySelectorAll("[data-pfkind]").forEach(b => b.onclick = () => { keepPf(); pfDraft().kind = b.dataset.pfkind; render(); }); bindPfCat(root); }
-  function keepPf() { const d = pfDraft(); for (const k of PF_FIELDS) { const el = document.getElementById("pf-" + k); if (el) d[k] = k === "birth_date" ? SarrifDate.iso(el.value) || el.value : el.value; } }
+  function keepPf() { const d = pfDraft(); { const mk = document.getElementById("pf-marketer"); if (mk) d.marketer = mk.value.trim().toUpperCase(); } for (const k of PF_FIELDS) { const el = document.getElementById("pf-" + k); if (el) d[k] = k === "birth_date" ? SarrifDate.iso(el.value) || el.value : el.value; } }
   // The form is in three parts. The merchant sign-up shows one part per step (step = 1, 2 or 3);
   // everywhere else all three parts are shown together.
   const PF_STEPS = ["About you", "Your business", "Phone and merchant numbers"];
@@ -1440,7 +1518,8 @@ const SUUQ = (() => {
       <div class="field"><label for="pf-birth_date">Birth date</label><input class="input" id="pf-birth_date" value="${esc(SarrifDate.disp(d.birth_date || ""))}" ${SarrifDate.attrs}><small class="note">You must be at least 18.</small></div>
       <div class="grid2" style="grid-template-columns:1fr 1fr">
         <div class="field"><label for="pf-country">Country</label><select class="input" id="pf-country">${(st.countries || ["Somaliland"]).map(c => `<option ${c === d.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
-        ${f("city", "City", 'maxlength="60" placeholder="Hargeisa"')}</div>`,
+        ${f("city", "City", 'maxlength="60" placeholder="Hargeisa"')}</div>
+      ${settings.marketing?.on && !st.shop && !st.editPf ? f("marketer", "Marketer code (optional)", 'maxlength="12" autocapitalize="characters" placeholder="ABC123"', "If a 5PLUS marketer helped you register, type their code.") : ""}`,
       () => `${head(1)}
       <div class="field"><label>Shop or company</label><div class="cur-toggle" style="grid-template-columns:1fr 1fr"><button type="button" class="USD" data-pfkind="shop" aria-pressed="${d.kind === "shop"}">Shop</button><button type="button" class="SLSH" data-pfkind="company" aria-pressed="${d.kind === "company"}">Company</button></div><input type="hidden" id="pf-kind" value="${esc(d.kind)}"></div>
       ${catSelect(d)}
@@ -1542,11 +1621,13 @@ const SUUQ = (() => {
       ${st.myProducts.length ? `<div class="olist">${st.myProducts.map(p => `<div class="ocard ${p.hidden || p.admin_hidden || p.approval !== "approved" ? "off" : ""}">
         ${p.images[0] ? `<img src="${esc(p.images[0])}" alt="">` : `<span class="noimg">▶</span>`}
         <div class="t"><b>${esc(p.name)}</b><small>${p.service === "visa" ? `<span class="mk-tag">Visa</span> ` : p.service === "scholarship" ? `<span class="mk-tag">Scholarship</span> ` : ""}${money(p.price, p.cur)}${p.price_hidden ? ` · shown as “${esc(p.price_label)}”` : ""} · ${p.mode === "buy" ? "Buy" : "Book"} · ${p.sold} sold${p.admin_hidden ? ` · hidden by ${MNAMES[p.service] || "Suuq"} admin` : p.hidden ? " · hidden" : ""}</small>
+          ${p.out_of_stock ? `<span class="pill susp" style="align-self:flex-start">Out of stock · customers can't order it</span>` : ""}
           ${earnText(p) ? `<span class="earn">${esc(earnText(p))}</span>` : ""}
           ${p.approval === "pending" ? `<span class="pill waiting" style="align-self:flex-start">Waiting for admin approval</span>` : ""}
           ${p.approval === "rejected" ? `<span class="pill susp" style="align-self:flex-start">Not approved</span><small class="note" style="color:var(--danger)">${esc(p.review_note)} · Edit and save to send it again.</small>` : ""}
           <div class="req-actions"><button class="btn btn-ghost" data-editprod="${esc(p.id)}">Edit</button>
             <button class="btn btn-ghost" data-hideprod="${esc(p.id)}" data-to="${p.hidden ? 0 : 1}">${p.hidden ? "Show" : "Hide"}</button>
+            <button class="btn ${p.out_of_stock ? "btn-primary" : "btn-ghost"}" data-oosprod="${esc(p.id)}" data-to="${p.out_of_stock ? 0 : 1}">${p.out_of_stock ? "Back in stock" : "Out of stock"}</button>
             <button class="btn btn-ghost" data-viewprod="${esc(p.id)}">View</button></div></div></div>`).join("")}</div>` : `<div class="empty">No products yet.</div>`}`;
   }
   function vEditProduct() {
@@ -1599,6 +1680,7 @@ const SUUQ = (() => {
         ${o.kind === "buy" && !o.needs_price && o.status !== "quoted" ? `<small class="note">You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}${o.shop_charge ? ` · 5PLUS charge ${money(o.shop_charge, o.cur)} (from your wallet when finished)` : ""}</small>` : ""}
         ${o.kind === "buy" && o.pay_method !== "wallet" ? `<small class="note">${esc(PAY_NAME[o.pay_method])}${o.pay_ussd ? ` · <span class="num">${esc(o.pay_ussd)}</span> (${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))})` : ""}${o.pay_method === "shop" ? " · paid to you directly" : ""}</small>` : ""}
         ${o.status === "awaiting_payment" && o.pay_method === "safe" ? `<small class="note">Waiting for Sarrif to confirm the buyer's payment. Don't deliver yet.</small>` : ""}
+        ${o.is_delivery ? "" : deliveryLine(o, true)}
         <div class="req-actions">
           ${o.status === "awaiting_payment" && o.pay_method === "shop" ? `<button class="btn btn-primary" data-oact="money_received" data-oid="${o.id}">Money received</button><button class="btn btn-ghost" data-oact="decline" data-oid="${o.id}">Not received</button>` : ""}
           ${o.kind === "buy" && o.status === "paid" && o.pay_method === "shop" ? `<small class="note" style="flex-basis:100%">The buyer's phone dialled your number to pay. Check the money arrived (your ZAAD / eDahab message) before you deliver.</small>` : ""}
@@ -1649,6 +1731,10 @@ const SUUQ = (() => {
       try { const image = await compressImage(f, 600_000); st.shop = (await api("/api/suuq/shop/logo", { body: { image } })).shop; render(); }
       catch (e) { alertNote(logoIn.parentElement, e.message || "That photo could not be used."); }
     };
+    const crOn = one("cr-on"), crSave = one("cr-save");
+    const crPut = async on => { try { st.courier = await api("/api/delivery/me", { method: "PUT", body: { available: on, area: one("cr-area").value } }); render(); msg("#st-cr", "Saved.", "ok"); } catch (e) { msg("#st-cr", e.message, "bad"); } };
+    if (crOn) crOn.onchange = () => crPut(crOn.checked);
+    if (crSave) crSave.onclick = () => crPut(one("cr-on").checked);
     const teSave = one("te-save");
     if (teSave) teSave.onclick = async () => { try { st.shop = (await api("/api/suuq/shop/ticket-earn", { body: { type: one("te-type").value, value: one("te-value").value } })).shop; render(); } catch (e) { alertNote(teSave, e.message); } };
     const trav = one("shop-travel");
@@ -1728,6 +1814,7 @@ const SUUQ = (() => {
     };
     const cur = one("pe-cur"); if (cur) cur.onchange = () => { keepEdit(); render(); };
     q("[data-editprod]").forEach(b => b.onclick = () => { const p = st.myProducts.find(x => x.id === b.dataset.editprod); st.edit = { ...p, images: [...p.images] }; render(); });
+    q("[data-oosprod]").forEach(b => b.onclick = async () => { b.disabled = true; try { await api(`/api/suuq/products/${b.dataset.oosprod}`, { method: "PUT", body: { out_of_stock: b.dataset.to === "1" } }); } catch {} await loadShop(); render(); });
     q("[data-hideprod]").forEach(b => b.onclick = async () => { try { await api(`/api/suuq/products/${b.dataset.hideprod}`, { method: "PUT", body: { hidden: b.dataset.to === "1" } }); } catch {} await loadShop(); render(); });
     const fin = one("sq-fin"); if (fin) mountFinance(fin);
     q("[data-pfkind]").forEach(b => b.onclick = () => { keepPf(); pfDraft().kind = b.dataset.pfkind; render(); }); bindPfCat(root);
@@ -2185,6 +2272,34 @@ const SUUQ = (() => {
     // On a phone the tab row scrolls: keep the chosen tab in view.
     document.querySelectorAll(".agent-tabs").forEach(nav => { const t = nav.querySelector('[aria-pressed="true"]'); if (t && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, t.offsetLeft - nav.offsetLeft - 16); });
   }
+  // Marketing reward program (super admin): on/off, the reward, every marketer and every review.
+  let mkAdm = null;
+  async function renderMarketingAdmin() {
+    const host = document.getElementById("sup-wallets"); if (!host) return;
+    if (!mkAdm) { try { mkAdm = await api("/api/super/marketing"); } catch { return; } }
+    document.getElementById("mk-admin")?.remove();
+    const m = mkAdm, cfg = m.settings || {}, ans = { yes: "Yes", partly: "Partly", no: "No" };
+    host.insertAdjacentHTML("beforeend", `<div class="panel" id="mk-admin"><div class="panel-head"><div><h3>Marketing reward program</h3>
+      <p>Marketers register merchants with their code and show them the Learn 5PLUS lesson. When the merchant finishes it and rates the marketer (1 to 6 stars), the marketer earns this reward in My earnings. Turn it off to hide it from the menu and from merchant registration.</p></div></div>
+      <div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
+        <label class="switch-row" style="grid-column:1/-1"><input type="checkbox" id="mk-on" ${cfg.on ? "checked" : ""}><span>Show the program in the menu and in merchant registration</span></label>
+        <div class="mini"><label for="mk-amt">Reward per merchant</label><input class="input" id="mk-amt" inputmode="decimal" value="${esc(String(cfg.amount ?? 1))}"></div>
+        <div class="mini"><label for="mk-cur">Currency</label><select class="input" id="mk-cur"><option ${cfg.cur !== "SLSH" ? "selected" : ""}>USD</option><option ${cfg.cur === "SLSH" ? "selected" : ""}>SLSH</option></select></div></div>
+      <div class="row-actions"><button class="btn btn-primary" id="mk-save">Save</button><span class="status-msg" id="st-mk"></span></div>
+      <h3 style="font-size:15px;margin-top:6px">Marketers</h3>
+      ${m.marketers.length ? `<div class="hist">${m.marketers.map(x => `<div class="hist-item"><div class="t"><b data-no-i18n>${esc(x.name)}</b><small>+252 ${esc(x.phone)} · <span class="num">${esc(x.ref_code || "")}</span></small></div>
+        <div class="a"><span>${x.done}/${x.merchants}</span> · <b>${x.avg ? x.avg + "/6" : "—"}</b></div></div>`).join("")}</div>` : `<div class="empty">No marketers yet.</div>`}
+      <h3 style="font-size:15px;margin-top:6px">Reviews from merchants</h3>
+      ${m.reviews.length ? `<div class="hist">${m.reviews.map(r => `<div class="hist-item"><div class="t"><b><span data-no-i18n>${esc(r.merchant)}</span> → <span data-no-i18n>${esc(r.marketer)}</span> · ${r.stars}/6</b>
+        <small>${MK_QS.map(([k, q]) => `<span>${esc(q)}</span> <b>${esc(ans[r.answers[k]] || "—")}</b>`).join(" · ")}${r.comment ? `<br>“<span data-no-i18n>${esc(r.comment)}</span>”` : ""}</small></div>
+        <div class="a num">${r.reward ? "+" + esc(money(r.reward, r.cur)) : ""}</div></div>`).join("")}</div>` : `<div class="empty">No reviews yet.</div>`}</div>`);
+    document.getElementById("mk-save").onclick = async () => {
+      try { const r = await api("/api/super/marketing", { method: "PUT", body: { on: document.getElementById("mk-on").checked, amount: Number(String(document.getElementById("mk-amt").value).replace(",", ".")), cur: document.getElementById("mk-cur").value } });
+        mkAdm.settings = r.settings; settings.marketing = r.settings; msg("#st-mk", "Saved.", "ok"); }
+      catch (e) { msg("#st-mk", e.message, "bad"); }
+    };
+  }
+  const MK_QS = [["clear", "Explained clearly"], ["product", "Helped add a product"], ["recommend", "Would recommend"]];
   // Pay to shop charges being edited (kept while the page redraws, until saved).
   let chgEdit = null;
   const chargeRows = () => chgEdit || (chgEdit = structuredClone(income?.shopCharge?.length ? income.shopCharge : [{ country: "*", type: "pct", pct: 0, USD: 0, SLSH: 0 }]));
@@ -2258,6 +2373,7 @@ const SUUQ = (() => {
           ${CURS.map(c => `<div class="kpi"><span class="label">In customer wallets ${c}</span><b>${money(income.customerMoney[c] || 0, c)}</b></div>`).join("")}</div>
         <div class="hist">${income.tx.map(t => `<div class="hist-item"><div class="t"><b>${esc(t.label)}</b><small>${new Date(t.created_at).toLocaleString()} · ${esc(t.note)}</small></div><div class="a num" style="color:var(--green)">+${money(t.amount, t.cur)}</div></div>`).join("") || `<div class="empty">No income yet.</div>`}</div></div>`;
     bindCharges();
+    renderMarketingAdmin();
     el.insertAdjacentHTML("afterbegin", safePanel()); bindSafePanel();
     el.insertAdjacentHTML("afterbegin", heldPanel()); bindHeldPanel();
     el.querySelectorAll("[data-tpt]").forEach(b => b.onclick = () => { topupsTab = b.dataset.tpt; topups = null; renderSuperWallets(); });
@@ -2321,6 +2437,6 @@ const SUUQ = (() => {
   async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { syncPickBar, catTile, openCategory, CALL, onChatRead, callsOffText, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, setPf(d) { st.pf = d && typeof d === "object" ? { ...d } : null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { openDelivery, DELIV_IC, syncPickBar, catTile, openCategory, CALL, onChatRead, callsOffText, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, setPf(d) { st.pf = d && typeof d === "object" ? { ...d } : null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; heldList = null; }, state: st };
 })();

@@ -118,13 +118,13 @@ const clearFails = async u => await db.run("UPDATE users SET failed = 0, locked_
 const tooMany = `Too many wrong tries. Try again in ${LOCK_MINUTES} minutes.`;
 
 function publicUser(u) {
-  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, pause: u.pause || "", has_face: !!u.face, calls_off_until: (n => n === -1 || n > Date.now() ? n : 0)(Number(u.calls_off_until) || 0), created_at: u.created_at };
+  return { id: u.id, name: u.name, phone: u.phone, role: u.role, service: u.service || null, ref_code: u.ref_code || null, account_type: u.account_type || "customer", wallets: JSON.parse(u.wallets || "{}"), suspended: !!u.suspended, pause: u.pause || "", has_face: !!u.face, lesson_pending: !!u.marketer_id && !Number(u.lesson_done), calls_off_until: (n => n === -1 || n > Date.now() ? n : 0)(Number(u.calls_off_until) || 0), created_at: u.created_at };
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
   return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "", gallery: galleryOut(x) })),
     premierPayTo: s.agentNums.premier || "", minUsd: MIN_USD_RECEIVE,
-    safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct, shopCharge: s.shopCharge,
+    safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct, shopCharge: s.shopCharge, marketing: { on: !!s.marketing?.on, amount: Number(s.marketing?.amount) || 0, cur: s.marketing?.cur || "USD" },
     // "Shop by category" on the home screen: the categories the super admin chose, with their photos.
     homeCats: (s.bizCats || []).filter(c => c.home && s.services.some(v => v.id === c.section && v.visible)).map(c => ({ name: c.name, section: c.section, photo: c.photo || "" })),
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };
