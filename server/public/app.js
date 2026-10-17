@@ -31,7 +31,7 @@ async function api(path, opts = {}) {
   try { res = await fetch(path, init); } catch { throw new Error("No connection. Check your internet and try again."); }
   finally { if (timer) clearTimeout(timer); }
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && S.user && !path.startsWith("/api/auth")) { S.user = null; S.screen = "login"; S.err = "Please log in again."; render(); }
+  if (res.status === 401 && S.user && !path.startsWith("/api/auth")) { rememberMe(null); S.user = null; S.screen = "login"; S.err = "Please log in again."; render(); }
   if (!res.ok) throw new Error(data.error || "Something went wrong. Try again.");
   return data;
 }
@@ -1437,6 +1437,7 @@ window.__pushOpen = goto => {
 async function loggedIn(user) {
   S.loginNote = "";
   SUUQ.reset();
+  rememberMe(user);
   S.user = user; S.err = ""; S.tab = "send"; S.screen = "home"; S.service = null; S.viewAs = null;
   connectEvents();
   registerPush();
@@ -1450,8 +1451,10 @@ async function loggedIn(user) {
 async function logout() {
   await unregisterPush();
   try { await api("/api/auth/logout", { body: {} }); } catch {}
-  S.user = null; S.viewAs = null; S.screen = "welcome"; S.sheet = null; if (es) { es.close(); es = null; } stopRing(); render();
+  rememberMe(null); S.user = null; S.viewAs = null; S.screen = "welcome"; S.sheet = null; if (es) { es.close(); es = null; } stopRing(); render();
 }
+// The phone remembers the logged-in customer, so the app opens straight on their home screen.
+function rememberMe(u) { try { if (u && u.role === "customer") localStorage.setItem("sarrif.me", JSON.stringify(u)); else localStorage.removeItem("sarrif.me"); } catch {} }
 async function loadMine() { try { S.mine = (await api("/api/requests/mine")).requests; if (S.tab === "history" && !S.sheet) render(); } catch {} }
 async function submitTx() {
   // The server checks the PIN with every transfer.
@@ -2262,17 +2265,29 @@ function renderSvcDash(fromLoad) {
 
 /* ---------- start ---------- */
 (async function start() {
-  // Draw straight away: the customer sees the 5PLUS screen while we reach the server (a free server can take a minute to wake).
-  S.booting = true; document.querySelector(".topbar").hidden = true; document.body.classList.add("no-top"); render();
+  // No waiting screen: draw the app at once from what this phone remembers, then refresh from the server quietly.
+  const mem = k => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
+  const cachedSettings = mem("sarrif.settings"), cachedUser = mem("sarrif.me");
+  if (cachedSettings) settings = cachedSettings;
+  S.booting = false;
   if (I18N && !I18N.lang) setTimeout(showLanguages, 0);
   // A shared product link looks like /?p=<product>&ref=<affiliate code>. Remember it until the person buys.
   const qs = new URLSearchParams(location.search), linkP = qs.get("p"), linkRef = qs.get("ref");
   if (linkP) { try { if (linkRef) localStorage.setItem("sarrif.ref." + linkP, linkRef.toUpperCase()); localStorage.setItem("sarrif.open", linkP); } catch {} history.replaceState(null, "", location.pathname); }
-  let reached = false;
-  for (let i = 0; i < 2 && !reached; i++) { try { settings = await api("/api/settings", { timeout: 45000 }); reached = true; } catch {} }
-  try { const me = await api("/api/me", { timeout: 30000 }); if (me.user) { S.booting = false; await loggedIn(me.user); } } catch {}
-  try { await resumeAfterCamera(); } catch {}
-  S.booting = false;
-  if (!reached) { appEl.innerHTML = vBoot("Can't reach 5PLUS right now. Check your internet and try again."); return; }
+  let shown = null;
+  const draft = readRegDraft();
+  if (cachedUser && cachedUser.role === "customer") { shown = cachedUser; loggedIn(cachedUser).then(() => { if (!S.sheet) render(); }).catch(() => {}); }
+  else if (draft && draft.kind !== "account") { try { await resumeAfterCamera(); } catch {} } // back to the registration form with the photo
   render();
+  const getSettings = async () => { for (let i = 0; i < 3; i++) { try { return await api("/api/settings", { timeout: 60000 }); } catch {} } return null; };
+  const [st, me] = await Promise.all([getSettings(), api("/api/me", { timeout: 60000 }).catch(() => undefined)]);
+  if (st) { settings = st; try { localStorage.setItem("sarrif.settings", JSON.stringify(st)); } catch {} }
+  if (me !== undefined) {
+    if (me.user) {
+      if (shown && shown.id === me.user.id) { S.user = { ...S.user, ...me.user }; rememberMe(me.user); }
+      else await loggedIn(me.user);
+    } else if (shown) { rememberMe(null); S.user = null; S.screen = "welcome"; S.sheet = null; if (es) { es.close(); es = null; } }
+  }
+  if (readRegDraft()) { try { await resumeAfterCamera(); } catch {} }
+  if (!S.sheet) render();
 })();
