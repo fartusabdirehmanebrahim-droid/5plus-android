@@ -656,7 +656,7 @@
     "This is your product. Edit it from My shop → Products.": "Tani waa alaabtaada. Wax kaga beddel Dukaankayga → Alaabta.",
     "This month": "Bishan",
     "This number already has an account.": "Lambarkan horey ayuu akoon u lahaa.",
-    "This number already has an account. Log in instead.": "Lambarkan horey ayuu akoon u lahaa. Beddelkeeda gal.",
+    "This number already has an account. Log in instead.": "Lambarkan akoon baa horey loogu sameeyay. Fadlan gal.",
     "This number is already saved. Contact support to change it.": "Lambarkan horey ayaa loo kaydiyay. La xiriir taageerada si aad u beddesho.",
     "This order can't be changed that way now.": "Dalabkan hadda sidaas looma beddeli karo.",
     "This phone number already has an account. Log in, then choose “Become a merchant” in Account.": "Lambarkan taleefanka horey ayuu akoon u lahaa. Gal, kadib Akoonka ka dooro “Noqo ganacsade”.",
@@ -1449,7 +1449,9 @@
     "Money received. It is held until the customer has the item.": "Lacagtii waa timid. Waa la hayaa ilaa macmiilku alaabta helo.",
     "Marked not received. The order was stopped.": "Waxaa la calaamadeeyay lama helin. Dalabka waa la joojiyay.",
     "Money not checked yet. Check your account before you release.": "Lacagta weli lama hubin. Hubi akoonkaaga ka hor intaadan sii dayn.",
-    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234, 1111 iyo 0000 aad bay u fudud yihiin. Dooro PIN kale."
+    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234, 1111 iyo 0000 aad bay u fudud yihiin. Dooro PIN kale.",
+    "You already have an account with this number. Enter your PIN to log in.": "Lambarkan akoon baad ku leedahay. Geli PIN-kaaga si aad u gasho.",
+    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "Lambarkan akoon baad ku leedahay. Gal, kadib Akoonka ka dooro “Noqo ganacsade”."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

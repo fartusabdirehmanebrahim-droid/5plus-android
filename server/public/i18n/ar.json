@@ -1450,7 +1450,9 @@
     "Money received. It is held until the customer has the item.": "تم استلام المال. يُحتفظ به حتى يستلم العميل المنتج.",
     "Marked not received. The order was stopped.": "تم التعليم بعدم الاستلام. أُوقف الطلب.",
     "Money not checked yet. Check your account before you release.": "لم يُتحقق من المال بعد. تحقق من حسابك قبل الإفراج.",
-    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "الأرقام 1234 و1111 و0000 سهلة التخمين جدًا. اختر رمز PIN آخر."
+    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "الأرقام 1234 و1111 و0000 سهلة التخمين جدًا. اختر رمز PIN آخر.",
+    "You already have an account with this number. Enter your PIN to log in.": "لديك حساب بهذا الرقم. أدخل رمز PIN لتسجيل الدخول.",
+    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "لديك حساب بهذا الرقم. سجّل الدخول، ثم اختر “كن تاجرًا” في الحساب."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "يمكن أن يحتوي المعرض على {0} صورة كحد أقصى.",

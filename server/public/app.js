@@ -184,6 +184,7 @@ function vLogin() {
     <div class="field"><label for="l-phone">Phone number</label>
       <div class="phone-input"><span>+252</span><input id="l-phone" inputmode="tel" autocomplete="tel" placeholder="63 4123456" value="${esc(S.login.phone)}"></div></div>
     <div class="field"><label for="l-pin">PIN</label>${pinInput("l-pin", S.login.pin)}</div>
+    ${S.loginNote && !S.err ? `<p class="note" role="status" style="margin:0;color:var(--green-ink)">${esc(S.loginNote)}</p>` : ""}
     <div class="err" role="alert">${esc(S.err)}</div>
     <button class="btn btn-primary btn-block" id="do-login" ${S.login.pin.length === 4 && !S.busy ? "" : "disabled"}>Log in</button>
     <button class="btn-link" data-go="signup">No account yet? Create one</button>
@@ -318,7 +319,11 @@ async function doMerchantSignup() {
   try {
     const r = await api("/api/auth/signup-merchant", { body: { profile: SUUQ.pfDraft(), pin: m.pin, face: S.face } });
     S.merchant = null; S.face = null; SUUQ.resetPf(); clearRegDraft(); await loggedIn(r.user); S.service = "suuq"; SUUQ.state.tab = "sell"; await SUUQ.open("suuq");
-  } catch (e) { m.pin = ""; m.pin2 = ""; fail(e.message); }
+  } catch (e) {
+    m.pin = ""; m.pin2 = "";
+    if (/already has an account/i.test(e.message)) { const ph = SUUQ.pfDraft().phone; S.merchant = null; SUUQ.resetPf(); return toLogin(ph, "You already have an account with this number. Log in, then choose “Become a merchant” in Account."); }
+    fail(e.message);
+  }
 }
 function vSignup() {
   const s = S.signup;
@@ -1146,7 +1151,7 @@ function vSheet() {
 }
 
 /* ---------- customer events ---------- */
-function go(screen) { if (screen === "welcome" || screen === "login") clearRegDraft(); S.screen = screen; S.err = ""; render(); }
+function go(screen) { if (screen === "welcome" || screen === "login") clearRegDraft(); S.loginNote = ""; S.screen = screen; S.err = ""; render(); }
 const padKey = (v, k) => k === "del" ? v.slice(0, -1) : k === "clear" ? "" : v.length < 4 ? v + k : v;
 function bindPad(id, fn) { const p = document.getElementById(id); if (p) p.querySelectorAll("[data-k]").forEach(b => b.onclick = () => fn(b.dataset.k)); }
 function bind() {
@@ -1263,8 +1268,17 @@ async function doSignup() {
   if (!S.face) { S.err = "Please take a photo of your face. Thank you."; return render(); }
   S.busy = true; render();
   try { const r = await api("/api/auth/signup", { body: { name: s.name, phone: s.phone, pin: s.pin, wallets: s.wallets, face: S.face } }); S.signup = { name: "", phone: "", pin: "", pin2: "", wallets: {} }; S.face = null; clearRegDraft(); await loggedIn(r.user); }
-  catch (e) { S.err = e.message; s.pin = ""; s.pin2 = ""; }
+  catch (e) {
+    s.pin = ""; s.pin2 = "";
+    // The number already has an account: go to Log in with the number filled in, instead of an error.
+    if (/already has an account/i.test(e.message)) { S.busy = false; return toLogin(s.phone, "You already have an account with this number. Enter your PIN to log in."); }
+    S.err = e.message;
+  }
   S.busy = false; render();
+}
+function toLogin(phone, note) {
+  clearRegDraft(); S.login = { ...S.login, phone: String(phone || "").replace(/\D/g, ""), pin: "" }; S.loginNote = note; S.err = ""; S.screen = "login"; render();
+  const p = document.getElementById("l-pin") || document.querySelector("#app input[type=password], #app input[inputmode=numeric]"); if (p) p.focus();
 }
 async function openSharedProduct() {
   let pid = null; try { pid = localStorage.getItem("sarrif.open"); localStorage.removeItem("sarrif.open"); } catch {}
@@ -1302,6 +1316,7 @@ window.__pushOpen = goto => {
   }
 };
 async function loggedIn(user) {
+  S.loginNote = "";
   SUUQ.reset();
   S.user = user; S.err = ""; S.tab = "send"; S.screen = "home"; S.service = null; S.viewAs = null;
   connectEvents();

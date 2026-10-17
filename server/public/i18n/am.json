@@ -1450,7 +1450,9 @@
     "Money received. It is held until the customer has the item.": "ገንዘቡ ደርሷል። ደንበኛው እቃውን እስኪያገኝ ይያዛል።",
     "Marked not received. The order was stopped.": "አልደረሰም ተብሎ ምልክት ተደርጓል። ትዕዛዙ ቆሟል።",
     "Money not checked yet. Check your account before you release.": "ገንዘቡ ገና አልተረጋገጠም። ከመልቀቅዎ በፊት ሂሳብዎን ያረጋግጡ።",
-    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234፣ 1111 እና 0000 በቀላሉ ይገመታሉ። ሌላ PIN ይምረጡ።"
+    "1234, 1111 and 0000 are too easy to guess. Choose another PIN.": "1234፣ 1111 እና 0000 በቀላሉ ይገመታሉ። ሌላ PIN ይምረጡ።",
+    "You already have an account with this number. Enter your PIN to log in.": "በዚህ ቁጥር መለያ አለዎት። ለመግባት PINዎን ያስገቡ።",
+    "You already have an account with this number. Log in, then choose “Become a merchant” in Account.": "በዚህ ቁጥር መለያ አለዎት። ይግቡ፣ ከዚያ በመለያ ውስጥ “ነጋዴ ይሁኑ” የሚለውን ይምረጡ።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",
