@@ -5,6 +5,9 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+# Needed to put the APK on the public download page (Releases).
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -35,3 +38,14 @@ jobs:
           name: 5PLUS-apk
           path: "**/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
+      # A permanent public download link (no GitHub account needed), replaced by every new build of main:
+      # https://github.com/<owner>/<repo>/releases/download/app/5PLUS.apk
+      - name: Publish the download link
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(find . -path "*/app/build/outputs/apk/debug/*.apk" | head -1)
+          cp "$APK" 5PLUS.apk
+          gh release view app >/dev/null 2>&1 || gh release create app --title "5PLUS app" --notes "Download 5PLUS.apk on your Android phone and open it to install. If asked, allow installing from this source." --latest
+          gh release upload app 5PLUS.apk --clobber
