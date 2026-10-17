@@ -152,7 +152,7 @@ class MainActivity : AppCompatActivity() {
         val code = pendingCode
         pendingCode = null
         if (code != null) placeCall(code, granted)
-        if (!granted) Toast.makeText(this, "Phone calls are off: press call in the dialer.", Toast.LENGTH_LONG).show()
+        if (!granted && code != null) Toast.makeText(this, "Phone calls are off: press call in the dialer.", Toast.LENGTH_LONG).show()
     }
 
     // Chat voice messages: the page asks for the microphone; Android asks the person once, then the page gets it.
@@ -164,18 +164,18 @@ class MainActivity : AppCompatActivity() {
 
     /* ---------- push notifications ---------- */
     private var pendingGoto: String? = null
-    private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { askCallAtStart() }
     private fun setupPush() {
-        if (!App.pushReady) return
+        if (!App.pushReady) { askCallAtStart(); return }
         try {
             com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnSuccessListener { t ->
                 if (!t.isNullOrEmpty()) prefs.edit().putString("fcmToken", t).apply()
             }
-        } catch (e: Exception) { return }
+        } catch (e: Exception) { askCallAtStart(); return }
         if (android.os.Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        } else askCallAtStart()
     }
     // A tapped notification: open the page it is about (the web app decides, e.g. the seller's orders).
     private fun openGoto(goto: String?) {
@@ -451,13 +451,31 @@ class MainActivity : AppCompatActivity() {
     private fun placeCall(code: String, direct: Boolean) {
         // "#" must be written as %23 in a tel: address, or everything after it is lost.
         val uri = Uri.parse("tel:" + code.replace("#", Uri.encode("#")))
-        try {
-            startActivity(Intent(if (direct) Intent.ACTION_CALL else Intent.ACTION_DIAL, uri))
-        } catch (e: SecurityException) {
-            startActivity(Intent(Intent.ACTION_DIAL, uri))
-        } catch (e: ActivityNotFoundException) {
-            Toast.makeText(this, "This device can't make phone calls.", Toast.LENGTH_LONG).show()
+        val tm = getSystemService(TELECOM_SERVICE) as? android.telecom.TelecomManager
+        // Straight to the phone's own calling system: no "Complete action using" list of calling apps.
+        if (direct && tm != null && ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+            try { tm.placeCall(uri, Bundle()); return } catch (e: Exception) { /* fall back to the dialer below */ }
         }
+        // No permission: open the phone's own dialer (not other calling apps) with the code filled in.
+        val dialer = try { tm?.defaultDialerPackage } catch (e: Exception) { null }
+        val intent = Intent(if (direct) Intent.ACTION_CALL else Intent.ACTION_DIAL, uri).apply { if (dialer != null) setPackage(dialer) }
+        try {
+            startActivity(intent)
+        } catch (e: SecurityException) {
+            startActivity(Intent(Intent.ACTION_DIAL, uri).apply { if (dialer != null) setPackage(dialer) })
+        } catch (e: ActivityNotFoundException) {
+            try { startActivity(Intent(Intent.ACTION_DIAL, uri)) } catch (e2: ActivityNotFoundException) {
+                Toast.makeText(this, "This device can't make phone calls.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    // When the app is opened the first time, ask for phone calls straight away (after notifications), so paying later
+    // dials without any question.
+    private fun askCallAtStart() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) return
+        if (prefs.getBoolean("askedCallStart", false)) return
+        prefs.edit().putBoolean("askedCallStart", true).putBoolean("askedCall", true).apply()
+        askCallPermission.launch(Manifest.permission.CALL_PHONE)
     }
 
     override fun onPause() {
