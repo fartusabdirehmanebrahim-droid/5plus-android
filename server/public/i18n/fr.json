@@ -1613,7 +1613,19 @@
     "The delivery man suggests a price, and you can agree or suggest another.": "Le livreur propose un prix, et vous pouvez accepter ou en proposer un autre.",
     "Enter the price you suggest.": "Saisissez le prix que vous proposez.",
     "Suggest a lower price, or pay the price the delivery man asked.": "Proposez un prix plus bas, ou payez le prix demandé par le livreur.",
-    "Customer's price": "Prix du client"
+    "Customer's price": "Prix du client",
+    "Motorbike": "Moto",
+    "Bajaj": "Bajaj (tuk-tuk)",
+    "Car": "Voiture",
+    "Truck": "Camion",
+    "Bicycle": "Vélo",
+    "On foot": "À pied",
+    "Any": "Tous",
+    "Type of delivery": "Type de livraison",
+    "Types of delivery you do": "Types de livraison que vous faites",
+    "Choose at least one type of delivery.": "Choisissez au moins un type de livraison.",
+    "No delivery man of this type is available right now. Choose another type or try again later.": "Aucun livreur de ce type n’est disponible pour le moment. Choisissez un autre type ou réessayez plus tard.",
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "Marquez un produit En rupture quand il est épuisé, pour que les clients ne puissent pas le commander. Appuyez sur De retour en stock quand vous l’avez à nouveau."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Une galerie peut contenir jusqu’à {0} photos.",

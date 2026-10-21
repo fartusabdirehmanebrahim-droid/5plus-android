@@ -1,6 +1,7 @@
 // Wallets, the Suuq marketplace, private buyer-seller chat and the affiliate program.
 // Loaded by server.js, which passes in its helpers.
 module.exports = function market(ctx) {
+  const { deliveryOn, noDelivery } = require("./db");
   const { needPin, readFace, storeFace, hashSecret, nextShopNo, newRefCode, startSession, publicUser, isPin, weakPin, route, db, send, fail, readJson, needRole, loadUser, broadcast, getSettings, saveSettings, isSuper, publicSettings, serviceVideos, needPageEditor, pageOf,
     crypto, fs, path, DATA_DIR, CURS, cleanPhone, now, rateLimit } = ctx;
 
@@ -448,11 +449,11 @@ module.exports = function market(ctx) {
     broadcast("settings", publicSettings(ns));
     send(res, 200, { settings: ns.marketing });
   });
-  route("GET", "/api/suuq/plans", async (req, res) => { const s = await getSettings(); send(res, 200, { plans: s.suuq.plans, countries: COUNTRIES, categories: s.bizCats }); });
+  route("GET", "/api/suuq/plans", async (req, res) => { const s = await getSettings(); send(res, 200, { plans: s.suuq.plans, countries: COUNTRIES, categories: noDelivery(s, s.bizCats, "section") }); });
   // Merchant sign-up from the first screen: the seller registration form plus a PIN. The phone is the login.
   route("POST", "/api/auth/signup-merchant", async (req, res) => {
     rateLimit(req);
-    const b = await readJson(req, 1024 * 1024), p = readProfile(b.profile || {}, (await getSettings()).bizCats, true), pin = String(b.pin || "");
+    const b = await readJson(req, 1024 * 1024), p = readProfile(b.profile || {}, (s => noDelivery(s, s.bizCats, "section"))(await getSettings()), true), pin = String(b.pin || "");
     const phone = cleanPhone(p.phone);
     if (phone.length < 7 || phone.length > 12) fail("Enter a valid phone number.");
     if (!isPin(pin)) fail("Choose a 4-digit PIN."); if (weakPin(pin)) fail("1234, 1111 and 0000 are too easy to guess. Choose another PIN.");
@@ -473,7 +474,7 @@ module.exports = function market(ctx) {
   route("POST", "/api/suuq/become-merchant", async (req, res) => {
     const u = await needRole(req, "customer"), b = await readJson(req);
     if (await shopOf(u.id)) fail("You are already a merchant.");
-    const p = readProfile(b, (await getSettings()).bizCats, true);
+    const p = readProfile(b, (s => noDelivery(s, s.bizCats, "section"))(await getSettings()), true);
     await tx(async () => {
       await db.run("INSERT INTO shops (owner_id, name, profile, sub_until, plan, shop_no, created_at) VALUES (?, ?, ?, ?, 'free', ?, ?)", u.id, p.business_name, JSON.stringify(p), await freeUntil(), await nextShopNo(), now());
       await db.run("UPDATE users SET account_type = 'merchant' WHERE id = ?", u.id);
@@ -869,7 +870,7 @@ module.exports = function market(ctx) {
     // A hidden-price request: the seller sends the price, then the buyer pays it from the wallet.
     if (o.kind === "buy" && (o.status === "requested" || o.status === "accepted")) r.needs_price = true;
     r.offer_desc = o.offer_desc || ""; r.forwarded = !!o.forwarded_to; r.from_order = !!o.from_order;
-    if (o.p_service === "delivery") { r.is_delivery = true; r.counter = o.counter || 0; r.agreed = !!o.agreed; }
+    if (o.p_service === "delivery") { r.is_delivery = true; r.counter = o.counter || 0; r.agreed = !!o.agreed; r.deliv_type = o.deliv_type || ""; }
     if (forSeller && r.needs_price) r.suggested = round(o.cur, o.p_price * o.qty);
     if (forSeller) Object.assign(r, { buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, commission: o.commission, shop_charge: o.shop_charge || 0, net: round(o.cur, o.total - o.commission - (o.shop_charge || 0)), has_affiliate: !!o.affiliate_id });
     return r;
@@ -1156,9 +1157,9 @@ module.exports = function market(ctx) {
     for (let x = o, n = 0; x && x.from_order && n < 30; n++) { x = await db.get("SELECT seller_id, from_order FROM orders WHERE id = ?", x.from_order); if (x) tried.add(x.seller_id); }
     // A delivery request: pass it to another delivery man who is available.
     if (p.service === "delivery") {
-      const c = await pickCourier(tried); if (!c) return null;
+      const c = await pickCourier(tried, o.deliv_type || ""); if (!c) return null;
       const nid = await addRequest({ buyer_id: o.buyer_id, qty: 1, note: o.note, from_order: o.id }, c);
-      if (o.for_order) await db.run("UPDATE orders SET for_order = ? WHERE id = ?", o.for_order, nid);
+      if (o.for_order || o.deliv_type) await db.run("UPDATE orders SET for_order = ?, deliv_type = ? WHERE id = ?", o.for_order || "", o.deliv_type || "", nid);
       return nid;
     }
     // A trip request (Ticket): pass it to another travel agency.
@@ -1429,7 +1430,7 @@ module.exports = function market(ctx) {
   });
 
   /* ---------- Business categories (super admin) ---------- */
-  route("GET", "/api/super/biz-categories", async (req, res) => { await needRole(req, "super"); send(res, 200, { categories: (await getSettings()).bizCats }); });
+  route("GET", "/api/super/biz-categories", async (req, res) => { await needRole(req, "super"); const s = await getSettings(); send(res, 200, { categories: noDelivery(s, s.bizCats, "section") }); });
   route("PUT", "/api/super/biz-categories", async (req, res) => {
     await needRole(req, "super"); const b = await readJson(req, 64 * 1024), sv = (await getSettings()).services.map(x => x.id);
     if (!Array.isArray(b.categories) || b.categories.length > 200) fail("Check the categories list.");
@@ -1444,10 +1445,12 @@ module.exports = function market(ctx) {
       out.push({ name, section: c.section, subs, photo, home: !!c.home });
     }
     if (!out.length) fail("Keep at least one category.");
+    // Delivery is switched off: its categories aren't shown to the admin, so keep them as they were.
+    { const s0 = await getSettings(); if (!deliveryOn(s0)) for (const c of s0.bizCats) if (c.section === "delivery" && !out.some(o => o.name.toLowerCase() === c.name.toLowerCase())) out.push(c); }
     // Photos uploaded for categories that were removed are deleted.
     for (const c of (await getSettings()).bizCats) if (String(c.photo || "").startsWith("/media/svc-cat-") && !out.some(o => o.photo === c.photo)) { try { await db.files.del(c.photo.slice(7)); } catch {} }
     const ns = await saveSettings({ bizCats: out }); broadcast("settings", publicSettings(ns));
-    send(res, 200, { categories: ns.bizCats });
+    send(res, 200, { categories: noDelivery(ns, ns.bizCats, "section") });
   });
 
   // A real photo for a category tile (Shop by category). Replaces the built-in or earlier photo.
@@ -1460,7 +1463,7 @@ module.exports = function market(ctx) {
     if (old.startsWith("/media/svc-cat-")) { try { await db.files.del(old.slice(7)); } catch {} }
     const bizCats = s.bizCats.map((c, j) => j === i ? { ...c, photo: b.image ? photo : (b.builtin ? (require("./db").DEFAULT_BIZ_CATS || []).find(d => d.name === c.name)?.photo || "" : "") } : c);
     const ns = await saveSettings({ bizCats }); broadcast("settings", publicSettings(ns));
-    send(res, 200, { categories: ns.bizCats });
+    send(res, 200, { categories: noDelivery(ns, ns.bizCats, "section") });
   });
 
   /* ---------- Internet calls (like WhatsApp): voice goes phone to phone (WebRTC) ---------- */
@@ -2083,46 +2086,64 @@ module.exports = function market(ctx) {
     return p;
   }
   // Delivery men who can take a job now (their shop is open, they're available and not at Salah or Sleep time).
-  async function courierRows(skip = new Set()) {
+  // Delivery is switched off for now (settings.delivery.on): its routes answer as if they didn't exist.
+  async function needDelivery() { if (!deliveryOn(await getSettings())) fail("Not found.", 404); }
+  // Types of delivery: what the delivery man uses. Each delivery man ticks the ones he does (default: motorbike).
+  const VEHICLES = ["moto", "bajaj", "car", "truck", "bicycle", "foot"];
+  const vehiclesOf = pf => { const v = Array.isArray(pf?.vehicles) ? pf.vehicles.filter(x => VEHICLES.includes(x)) : []; return v.length ? v : ["moto"]; };
+  async function courierRows(skip = new Set(), type = "") {
     const shops = await db.all("SELECT s.* FROM shops s WHERE s.suspended = 0 AND s.sub_until > ?", now()), out = [];
     for (const s of shops) {
       if (skip.has(s.owner_id) || !await isCourierShop(s)) continue;
       const p = await courierProduct(s), row = await db.get(`${PROD_SELECT} WHERE p.id = ?`, p.id);
       if (!row || row.hidden || row.admin_hidden || PAUSES.includes(row.shop_pause)) continue;
       let pf = {}; try { pf = JSON.parse(s.profile || "{}"); } catch {}
+      const vehicles = vehiclesOf(pf); if (type && !vehicles.includes(type)) continue;
       const open = (await db.get("SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND status IN ('requested', 'accepted', 'quoted', 'countered', 'paid')", s.id)).n;
-      out.push({ row, card: { product_id: p.id, name: s.name, shop_no: s.shop_no ?? null, area: row.description || "", city: pf.city || "", owner_id: s.owner_id, busy: Number(open) || 0 } });
+      out.push({ row, card: { product_id: p.id, name: s.name, shop_no: s.shop_no ?? null, area: row.description || "", city: pf.city || "", vehicles, owner_id: s.owner_id, busy: Number(open) || 0 } });
     }
     return out;
   }
   // The least busy available delivery man (ties: a random one).
-  async function pickCourier(skip) {
-    const list = await courierRows(skip); if (!list.length) return null;
+  async function pickCourier(skip, type = "") {
+    const list = await courierRows(skip, type); if (!list.length) return null;
     const best = list.map(x => [x.card.busy, Math.random(), x.row]).sort((a, b) => a[0] - b[0] || a[1] - b[1])[0][2];
     return best;
   }
-  route("GET", "/api/delivery/couriers", async (req, res) => {
+  route("GET", "/api/delivery/couriers", async (req, res, url) => {
+    await needDelivery();
     const u = await needUser(req);
-    const list = (await courierRows()).filter(x => x.card.owner_id !== u.id).map(x => { const { owner_id, ...c } = x.card; return c; });
-    send(res, 200, { couriers: list });
+    const type = VEHICLES.includes(String(url.searchParams.get("type") || "")) ? String(url.searchParams.get("type")) : "";
+    const list = (await courierRows(new Set(), type)).filter(x => x.card.owner_id !== u.id).map(x => { const { owner_id, ...c } = x.card; return c; });
+    send(res, 200, { couriers: list, types: VEHICLES });
   });
   // The delivery man's own settings: available or not, and the area he covers.
   route("GET", "/api/delivery/me", async (req, res) => {
+    await needDelivery();
     const u = await needRole(req, "customer"), s = await db.get("SELECT * FROM shops WHERE owner_id = ?", u.id);
     if (!s || !await isCourierShop(s)) return send(res, 200, { courier: false });
     const p = await courierProduct(s);
-    send(res, 200, { courier: true, available: !p.hidden, area: p.description || "" });
+    let pf = {}; try { pf = JSON.parse(s.profile || "{}"); } catch {}
+    send(res, 200, { courier: true, available: !p.hidden, area: p.description || "", vehicles: vehiclesOf(pf) });
   });
   route("PUT", "/api/delivery/me", async (req, res) => {
+    await needDelivery();
     const u = await needRole(req, "customer"), b = await readJson(req), s = await db.get("SELECT * FROM shops WHERE owner_id = ?", u.id);
     if (!s || !await isCourierShop(s)) fail("Only delivery men (Delivery category) can do this.", 403);
     const p = await courierProduct(s), area = String(b.area ?? p.description ?? "").trim().slice(0, 200);
     await db.run("UPDATE products SET hidden = ?, description = ?, updated_at = ? WHERE id = ?", b.available === false ? 1 : 0, area, now(), p.id);
-    send(res, 200, { courier: true, available: b.available !== false, area });
+    let pf = {}; try { pf = JSON.parse(s.profile || "{}"); } catch {}
+    if (Array.isArray(b.vehicles)) {
+      const v = [...new Set(b.vehicles.map(String))].filter(x => VEHICLES.includes(x));
+      if (!v.length) fail("Choose at least one type of delivery.");
+      pf.vehicles = v; await db.run("UPDATE shops SET profile = ? WHERE id = ?", JSON.stringify(pf), s.id);
+    }
+    send(res, 200, { courier: true, available: b.available !== false, area, vehicles: vehiclesOf(pf) });
   });
   // Ask a delivery man for a delivery. The customer asks for themselves; a seller can ask for the buyer of one of their
   // orders (the buyer then gets the price and pays). No delivery man chosen: the least busy available one gets it.
   route("POST", "/api/delivery/request", async (req, res) => {
+    await needDelivery();
     const u = await needRole(req, "customer"), b = await readJson(req);
     const from = String(b.from || "").trim().slice(0, 160), to = String(b.to || "").trim().slice(0, 160), extra = String(b.note || "").trim().slice(0, 200);
     let buyerId = u.id, forOrder = "", note = "";
@@ -2139,6 +2160,7 @@ module.exports = function market(ctx) {
       note = `Pick up: ${from}. Deliver to: ${to}.`;
     }
     if (extra) note += ` ${extra}`;
+    const type = VEHICLES.includes(String(b.type || "")) ? String(b.type) : "";
     await needPin(u, b.pin);
     let c = null;
     if (b.product_id) {
@@ -2146,10 +2168,10 @@ module.exports = function market(ctx) {
       if (!c || c.hidden || c.admin_hidden || c.shop_suspended || !(c.sub_until > now())) fail("This delivery man isn't available now. Choose another one.");
       if (PAUSES.includes(c.shop_pause)) fail(pauseMsg(c.shop_name, c.shop_pause));
       if (c.owner_id === buyerId || c.owner_id === u.id) fail("Choose another delivery man.");
-    } else c = await pickCourier(new Set([buyerId, u.id]));
-    if (!c) fail("No delivery man is available right now. Try again a little later.");
+    } else c = await pickCourier(new Set([buyerId, u.id]), type);
+    if (!c) fail(type ? "No delivery man of this type is available right now. Choose another type or try again later." : "No delivery man is available right now. Try again a little later.");
     const id = await addRequest({ buyer_id: buyerId, qty: 1, note: note.slice(0, 600) }, c);
-    if (forOrder) await db.run("UPDATE orders SET for_order = ? WHERE id = ?", forOrder, id);
+    if (forOrder || type) await db.run("UPDATE orders SET for_order = ?, deliv_type = ? WHERE id = ?", forOrder, type, id);
     await pushOrder(id);
     if (forOrder) { const o = await db.get(`${ORDER_SELECT} WHERE o.id = ?`, forOrder); if (o) await pushOrder(o.id); }
     send(res, 200, { order: orderRow(await db.get(`${ORDER_SELECT} WHERE o.id = ?`, id), false), courier: c.shop_name });

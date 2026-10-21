@@ -1613,7 +1613,19 @@
     "The delivery man suggests a price, and you can agree or suggest another.": "डिलीवरी मैन कीमत सुझाता है, और आप मान सकते हैं या दूसरी सुझा सकते हैं।",
     "Enter the price you suggest.": "अपनी सुझाई कीमत डालें।",
     "Suggest a lower price, or pay the price the delivery man asked.": "कम कीमत सुझाएँ, या डिलीवरी मैन की माँगी कीमत चुकाएँ।",
-    "Customer's price": "ग्राहक की कीमत"
+    "Customer's price": "ग्राहक की कीमत",
+    "Motorbike": "मोटरबाइक",
+    "Bajaj": "बजाज (ऑटो)",
+    "Car": "कार",
+    "Truck": "ट्रक",
+    "Bicycle": "साइकिल",
+    "On foot": "पैदल",
+    "Any": "कोई भी",
+    "Type of delivery": "डिलीवरी का प्रकार",
+    "Types of delivery you do": "आप किस तरह की डिलीवरी करते हैं",
+    "Choose at least one type of delivery.": "कम से कम एक डिलीवरी प्रकार चुनें।",
+    "No delivery man of this type is available right now. Choose another type or try again later.": "इस प्रकार का कोई डिलीवरी मैन अभी उपलब्ध नहीं है। दूसरा प्रकार चुनें या बाद में कोशिश करें।",
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "प्रोडक्ट ख़त्म होने पर उसे स्टॉक ख़त्म चिह्नित करें, ताकि ग्राहक उसे ऑर्डर न कर सकें। फिर से आने पर फिर से स्टॉक में दबाएँ।"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "एक गैलरी में {0} फ़ोटो तक हो सकती हैं।",

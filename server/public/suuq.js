@@ -203,14 +203,19 @@ const SUUQ = (() => {
   async function loadShop() {
     try { const [a, b] = await Promise.all([api("/api/suuq/my-shop"), api("/api/suuq/plans")]); st.shop = a.shop ?? null; st.plans = b.plans; st.countries = b.countries || []; st.bizCats = b.categories || []; } catch {}
     if (st.shop) { try { const [p, o] = await Promise.all([api("/api/suuq/seller/products"), api("/api/suuq/seller/orders")]); st.myProducts = p.products; st.sellerOrders = o.orders; } catch {} }
-    if (st.shop) { try { st.courier = await api("/api/delivery/me"); } catch { st.courier = null; } }
+    if (st.shop && settings.delivery) { try { st.courier = await api("/api/delivery/me"); } catch { st.courier = null; } }
   }
-  // A delivery man (Delivery category): available or not, and the area he covers. Jobs come in Orders.
+  // Types of delivery (what the delivery man uses).
+  const VEHICLES = [["moto", "Motorbike", "🛵"], ["bajaj", "Bajaj", "🛺"], ["car", "Car", "🚗"], ["truck", "Truck", "🚚"], ["bicycle", "Bicycle", "🚲"], ["foot", "On foot", "🚶"]];
+  const vehLabel = id => { const v = VEHICLES.find(x => x[0] === id); return v ? `<span class="veh"><span aria-hidden="true">${v[2]}</span> <span>${v[1]}</span></span>` : ""; };
+  const vehList = ids => (ids || []).map(vehLabel).join("");
+  // A delivery man (Delivery category): available or not, the area he covers and his types of delivery. Jobs come in Orders.
   function vCourierPanel() {
-    const c = st.courier; if (!c?.courier) return "";
+    const c = st.courier; if (!c?.courier || !settings.delivery) return "";
     return `<div class="courier-panel"><div class="courier-top">${DELIV_IC}<b>You're a delivery man</b></div>
       <label class="switch-row"><input type="checkbox" id="cr-on" ${c.available ? "checked" : ""}><span>${c.available ? "Available · customers and sellers can ask you" : "Not available · you get no new jobs"}</span></label>
       <div class="field"><label for="cr-area">Area you cover</label><div class="inline-form"><input class="input" id="cr-area" maxlength="200" value="${esc(c.area)}" placeholder="e.g. Hargeisa: Jigjiga Yar, 26 June, Airport"><button class="btn btn-ghost" id="cr-save">Save</button></div></div>
+      <div class="field"><label>Types of delivery you do</label><div class="veh-pick" role="group" aria-label="Types of delivery you do">${VEHICLES.map(([id, l, e]) => `<button type="button" class="veh-chip" data-crveh="${id}" aria-pressed="${(c.vehicles || ["moto"]).includes(id)}"><span aria-hidden="true">${e}</span> <span>${l}</span></button>`).join("")}</div></div>
       <small class="note">Jobs arrive in Orders. Suggest your price; the customer agrees and pays (Safe payment, wallet or straight to you) or suggests another price, which you agree to or answer with a new price. If you reject, the job goes to another delivery man.</small>
       <span class="status-msg" id="st-cr"></span></div>`;
   }
@@ -1087,7 +1092,7 @@ const SUUQ = (() => {
         ${o.my_earn > 0 ? `<span class="earn">${o.status === "completed" ? `You earned ${esc(money(o.my_earn, o.cur))} · added to your earnings` : ["cancelled", "cancelled_by_seller", "declined", "payment_rejected"].includes(o.status) ? "" : `You earn ${esc(money(o.my_earn, o.cur))} when you confirm you received it`}</span>` : ""}
         ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · <span class="num">${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))}</span>${o.pay_discount ? ` · your earnings ${esc(money(o.pay_discount, o.cur))} taken off` : ""}</small>` : ""}
         ${o.status === "awaiting_payment" ? `<small class="note">${o.pay_method === "safe" ? "Sarrif confirms the money arrived, then the seller delivers." : "The seller confirms the money arrived, then delivers."}</small>` : ""}
-        ${deliveryLine(o, false)}${o.is_delivery ? delivTalkBuyer(o) : ""}
+        ${o.deliv_type ? `<span class="veh-row">${vehLabel(o.deliv_type)}</span>` : ""}${deliveryLine(o, false)}${o.is_delivery ? delivTalkBuyer(o) : ""}
         ${o.status === "payment_rejected" ? `<small class="note" style="color:var(--danger)">${o.pay_method === "safe" ? "Sarrif didn't receive this payment. Contact support if you paid." : "The seller didn't receive this payment. Chat with them if you paid."}</small>` : ""}
         <div class="req-actions">
           ${o.status === "awaiting_payment" ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">Cancel</button>` : ""}
@@ -1252,24 +1257,27 @@ const SUUQ = (() => {
     const host = document.querySelector("#customer-area .screen") || document.body;
     document.getElementById("deliv-sheet")?.remove();
     const box = document.createElement("div"); box.className = "sheet"; box.id = "deliv-sheet";
-    const d = { couriers: null, pick: opts.pick || "", pin: "", from: "", to: "", note: "", err: "", done: null, busy: false };
+    const d = { couriers: null, pick: opts.pick || "", type: opts.type || "", pin: "", from: "", to: "", note: "", err: "", done: null, busy: false };
     const close = () => { box.remove(); if (opts.onDone && d.done) opts.onDone(d.done); };
     const draw = () => {
       if (d.done) { box.innerHTML = `<div class="sheet-card deliv-card"><div class="receipt"><div class="tick">${ICON.tick}</div><h3 style="font-size:20px">Request sent</h3>
         <p class="note" style="margin:0"><span>${opts.order?.seller ? "The delivery man suggests a price; the customer agrees or suggests another." : "The delivery man suggests a price, and you can agree or suggest another."}</span> <span>${opts.order?.seller ? "The customer pays it in My orders." : "You pay it in My orders (Safe payment, wallet or straight to him)."}</span></p>
         <p class="note" style="margin:0"><span data-no-i18n>${esc(d.done.courier || "")}</span></p></div>
         <button class="btn btn-primary btn-block" data-dv="close">OK</button></div>`; bind(); return; }
-      const list = d.couriers;
+      const list = d.couriers && d.couriers.filter(c => !d.type || (c.vehicles || []).includes(d.type));
+      if (d.pick && list && !list.some(c => c.product_id === d.pick)) d.pick = "";
       box.innerHTML = `<div class="sheet-card deliv-card"><h3 style="font-size:19px">${opts.order ? "Get a delivery man" : "Request a delivery"}</h3>
         ${opts.order ? `<p class="note" style="margin:0"><span data-no-i18n>${esc(opts.order.label || "")}</span></p>` : `
         <div class="field"><label for="dv-from">Pick up from</label><input class="input" id="dv-from" maxlength="160" value="${esc(d.from)}" placeholder="Shop, street, district"></div>
         <div class="field"><label for="dv-to">Deliver to</label><input class="input" id="dv-to" maxlength="160" value="${esc(d.to)}" placeholder="Name, street, district, phone"></div>`}
         <div class="field"><label for="dv-note">Note for the delivery man (optional)</label><input class="input" id="dv-note" maxlength="200" value="${esc(d.note)}" placeholder="Size, weight, best time…"></div>
+        <b style="font-size:14px">Type of delivery</b>
+        <div class="veh-pick" role="radiogroup" aria-label="Type of delivery"><button type="button" class="veh-chip" role="radio" data-dvtype="" aria-checked="${!d.type}">Any</button>${VEHICLES.map(([id, l, e]) => `<button type="button" class="veh-chip" role="radio" data-dvtype="${id}" aria-checked="${d.type === id}"><span aria-hidden="true">${e}</span> <span>${l}</span></button>`).join("")}</div>
         <b style="font-size:14px">Choose a delivery man</b>
         <div class="deliv-list" role="radiogroup" aria-label="Delivery men">
           <button class="deliv-opt" role="radio" data-dvpick="" aria-checked="${d.pick === ""}"><span class="deliv-ic">${DELIV_IC}</span><span class="t"><b>Any available delivery man</b><small>The one with the fewest jobs gets it</small></span></button>
-          ${list == null ? `<div class="empty">Loading…</div>` : list.length ? list.map(c => `<button class="deliv-opt" role="radio" data-dvpick="${esc(c.product_id)}" aria-checked="${d.pick === c.product_id}"><span class="deliv-ic">${DELIV_IC}</span><span class="t"><b data-no-i18n>${esc(c.name)}</b><small>${[c.area, c.city].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}${c.busy ? ` · <span>${c.busy} open</span>` : ""}</small></span></button>`).join("")
-            : `<div class="empty">No delivery man is available right now. Try again a little later.</div>`}
+          ${list == null ? `<div class="empty">Loading…</div>` : list.length ? list.map(c => `<button class="deliv-opt" role="radio" data-dvpick="${esc(c.product_id)}" aria-checked="${d.pick === c.product_id}"><span class="deliv-ic">${DELIV_IC}</span><span class="t"><b data-no-i18n>${esc(c.name)}</b><small>${[c.area, c.city].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}${c.busy ? ` · <span>${c.busy} open</span>` : ""}</small><span class="veh-row">${vehList(c.vehicles)}</span></span></button>`).join("")
+            : `<div class="empty">${d.type ? "No delivery man of this type is available right now. Choose another type or try again later." : "No delivery man is available right now. Try again a little later."}</div>`}
         </div>
         <div class="field"><label for="dv-pin">Enter your PIN to send the request</label>${pinInput("dv-pin", d.pin)}</div>
         <div class="err" role="alert">${esc(d.err)}</div>
@@ -1280,6 +1288,7 @@ const SUUQ = (() => {
     const keep = () => { for (const k of ["from", "to", "note"]) { const el = document.getElementById("dv-" + k); if (el) d[k] = el.value; } };
     const bind = () => {
       box.querySelectorAll("[data-dvpick]").forEach(b => b.onclick = () => { keep(); d.pick = b.dataset.dvpick; draw(); });
+      box.querySelectorAll("[data-dvtype]").forEach(b => b.onclick = () => { keep(); d.type = b.dataset.dvtype; draw(); });
       box.querySelectorAll('[data-dv="close"]').forEach(b => b.onclick = close);
       const pin = document.getElementById("dv-pin");
       if (pin) pin.oninput = () => { pin.value = pin.value.replace(/\D/g, "").slice(0, 4); d.pin = pin.value; const sb = box.querySelector('[data-dv="send"]'); if (sb) sb.disabled = d.pin.length !== 4 || d.busy || (d.couriers && !d.couriers.length); };
@@ -1287,7 +1296,7 @@ const SUUQ = (() => {
       if (send) send.onclick = async () => {
         keep(); d.busy = true; send.disabled = true; d.err = "";
         try {
-          const r = await api("/api/delivery/request", { body: { order_id: opts.order?.id || undefined, product_id: d.pick || undefined, from: d.from, to: d.to, note: d.note, pin: d.pin } });
+          const r = await api("/api/delivery/request", { body: { order_id: opts.order?.id || undefined, product_id: d.pick || undefined, type: d.type || undefined, from: d.from, to: d.to, note: d.note, pin: d.pin } });
           d.done = r;
         } catch (e) { d.err = e.message; d.pin = ""; }
         d.busy = false; draw();
@@ -1300,6 +1309,7 @@ const SUUQ = (() => {
   // On an order: the delivery (status and price) or a button to get one.
   const DELIV_ST = { requested: "Asked · waiting for the delivery man", accepted: "Accepted · the price comes next", quoted: "Price suggested · waiting for payment", countered: "Customer suggested a price · waiting for the delivery man", awaiting_payment: "Waiting for payment confirmation", paid: "Paid · on the way", delivered: "Delivered", completed: "Delivered", declined: "Declined", cancelled: "Cancelled", payment_rejected: "Payment not received" };
   function deliveryLine(o, seller) {
+    if (!settings.delivery) return "";
     if (o.kind !== "buy" || !["paid", "delivered", "completed"].includes(o.status)) return "";
     const d = o.delivery;
     if (d && !["declined", "cancelled", "cancelled_by_seller", "payment_rejected"].includes(d.status)) return `<small class="note deliv-line">${DELIV_IC} <span>Delivery</span>: <span data-no-i18n>${esc(d.courier)}</span> · <span>${esc(DELIV_ST[d.status] || d.status)}</span>${d.total ? ` · <span class="num">${esc(money(d.total, d.cur))}</span>` : ""}</small>`;
@@ -1697,7 +1707,7 @@ const SUUQ = (() => {
       <div class="t"><b>${esc(o.product_name)} × ${o.qty}</b><small>${esc(o.buyer_name)} · +252 ${esc(o.buyer_phone)} · ${new Date(o.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</small>
         ${o.book_at ? `<small class="onote book-at">📅 ${esc(o.book_at)}</small>` : ""}${o.note ? `<small class="onote">“${esc(o.note)}”</small>` : ""}
         <div class="orow"><span class="pill ${statusTone(o.status)}">${esc(o.is_delivery && o.status === "countered" ? "Customer's price" : o.is_delivery && o.needs_price ? "New delivery job" : o.is_delivery && o.status === "declined" && o.forwarded ? "Rejected · sent to another delivery man" : o.status === "accepted" ? (o.kind === "buy" ? "Accepted · send the agreed price" : "Booking accepted") : o.needs_price ? "Price requested" : o.status === "declined" && o.forwarded ? "Rejected · sent to another merchant" : statusLabel[o.status] || o.status)}</span><b class="num">${o.needs_price ? "—" : money(o.total, o.cur)}</b></div>
-        ${o.is_delivery ? delivTalkSeller(o) : ""}
+        ${o.deliv_type ? `<span class="veh-row">${vehLabel(o.deliv_type)}</span>` : ""}${o.is_delivery ? delivTalkSeller(o) : ""}
         ${o.status === "requested" && !o.is_delivery ? `<div class="req-actions"><button class="btn btn-primary" data-oact="accept" data-oid="${o.id}">Accept</button><button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button></div>
           <small class="note">Accept, then agree the price with the buyer in chat. If you reject, the request goes to another merchant who sells the same thing.</small>` : ""}
         ${o.status === "accepted" && !o.is_delivery ? `<div class="offer-form">
@@ -1764,7 +1774,9 @@ const SUUQ = (() => {
       catch (e) { alertNote(logoIn.parentElement, e.message || "That photo could not be used."); }
     };
     const crOn = one("cr-on"), crSave = one("cr-save");
-    const crPut = async on => { try { st.courier = await api("/api/delivery/me", { method: "PUT", body: { available: on, area: one("cr-area").value } }); render(); msg("#st-cr", "Saved.", "ok"); } catch (e) { msg("#st-cr", e.message, "bad"); } };
+    const crVeh = () => [...root.querySelectorAll("[data-crveh]")].filter(b => b.getAttribute("aria-pressed") === "true").map(b => b.dataset.crveh);
+    const crPut = async on => { try { st.courier = await api("/api/delivery/me", { method: "PUT", body: { available: on, area: one("cr-area").value, vehicles: crVeh() } }); render(); msg("#st-cr", "Saved.", "ok"); } catch (e) { msg("#st-cr", e.message, "bad"); } };
+    q("[data-crveh]").forEach(b => b.onclick = () => { b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true"); crPut(one("cr-on").checked); });
     if (crOn) crOn.onchange = () => crPut(crOn.checked);
     if (crSave) crSave.onclick = () => crPut(one("cr-on").checked);
     const teSave = one("te-save");
@@ -2476,6 +2488,6 @@ const SUUQ = (() => {
   async function openChats() { S.service = "suuq"; S.drawer = false; st.tab = "chats"; st.chat = null; st.product = null; st.shopView = null; await open("suuq"); render(); }
   async function openTicketChat(chatId) { st.fromTicket = true; st.tab = "chats"; st.product = null; st.shopView = null; S.service = "suuq"; await openChat(chatId); render(); }
   function onEarnings() { if (S.service === "affiliate") loadAff().then(render); else if (!S.service) loadWallet().then(render); }
-  return { openDelivery, DELIV_IC, syncPickBar, catTile, openCategory, CALL, onChatRead, callsOffText, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, setPf(d) { st.pf = d && typeof d === "object" ? { ...d } : null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
+  return { openDelivery, DELIV_IC, VEHICLES, vehList, syncPickBar, catTile, openCategory, CALL, onChatRead, callsOffText, renderSafeDesk, resetSafe() { safeList = null; heldList = null; }, goSafeTab(id) { if (id === "suuq") st.adminTab = "safe"; else if (id === "visa") st.visaTab = "safe"; else if (id === "scholarship") st.scholarTab = "safe"; }, marketReviewPanel, newTechProduct, openChatById, openSvcChat, CHAT: { msgHtml, composerHtml, bindComposer, bindMsgs, callBtn, CI }, openFavProduct, orderLabel, goSellerOrders, openMyOrders, openChats, techPhoto, TECH_ICONS, TECH_CHIPS, TECH_GROUPS, TECH_CATS, openSvcItem, itemsPanel, UNIT_NAME, deskPanel, onDeskOrder, deskName(n) { desk.name = n; }, openServiceRequest, onEarnings, alarm, zoom, bindTikTok, openTicket, shareTicket, earnLabel, renderScholarAdmin, scholarTabs, bindScholarTabs, get scholarTab() { return st.scholarTab || "list"; }, openTicketChat, PLANE, videoEmbed, bindAutoplay, productCard, openShop, onReview, onProduct, renderVisaAdmin, visaTabs, bindVisaTabs, get visaTab() { return st.visaTab; }, onTopup, reset, profileForm, pfCheck, PF_STEPS, pfDraft, keepPf, bindPf, loadCountries, resetPf() { st.pf = null; }, setPf(d) { st.pf = d && typeof d === "object" ? { ...d } : null; }, view, bind, open, onChat, onOrder, onWallet, loadWallet, walletChip, renderAdmin, adminTabs, bindAdminTabs,
     get adminTab() { return st.adminTab; }, renderSuperWallets, resetSuper() { income = null; topups = null; safeList = null; heldList = null; }, state: st };
 })();

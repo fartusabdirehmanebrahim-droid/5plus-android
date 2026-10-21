@@ -1612,7 +1612,19 @@
     "The delivery man suggests a price, and you can agree or suggest another.": "Ninka gaarsiiya wuxuu soo jeediyaa qiime, adiguna waad aqbali kartaa ama soo jeedin kartaa mid kale.",
     "Enter the price you suggest.": "Geli qiimaha aad soo jeedinayso.",
     "Suggest a lower price, or pay the price the delivery man asked.": "Soo jeedi qiime ka yar, ama bixi qiimaha ninka gaarsiiya weydiistay.",
-    "Customer's price": "Qiimaha macmiilka"
+    "Customer's price": "Qiimaha macmiilka",
+    "Motorbike": "Mooto",
+    "Bajaj": "Bajaaj",
+    "Car": "Baabuur",
+    "Truck": "Gaari xamuul",
+    "Bicycle": "Baaskiil",
+    "On foot": "Lugeyn",
+    "Any": "Mid kasta",
+    "Type of delivery": "Nooca gaarsiinta",
+    "Types of delivery you do": "Noocyada gaarsiinta aad samayso",
+    "Choose at least one type of delivery.": "Dooro ugu yaraan hal nooc oo gaarsiin ah.",
+    "No delivery man of this type is available right now. Choose another type or try again later.": "Hadda nin gaarsiiya oo noocan ah ma jiro. Dooro nooc kale ama mar dambe isku day.",
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "Alaab marka ay dhammaato u calaamadee Wuu dhammaaday, si macaamiishu aysan u dalban. Riix Waa la helayaa mar kale marka aad haysato."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

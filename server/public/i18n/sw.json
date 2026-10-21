@@ -1613,7 +1613,19 @@
     "The delivery man suggests a price, and you can agree or suggest another.": "Msafirishaji anapendekeza bei, nawe unaweza kukubali au kupendekeza nyingine.",
     "Enter the price you suggest.": "Weka bei unayopendekeza.",
     "Suggest a lower price, or pay the price the delivery man asked.": "Pendekeza bei ya chini, au lipa bei aliyoomba msafirishaji.",
-    "Customer's price": "Bei ya mteja"
+    "Customer's price": "Bei ya mteja",
+    "Motorbike": "Pikipiki",
+    "Bajaj": "Bajaji",
+    "Car": "Gari",
+    "Truck": "Lori",
+    "Bicycle": "Baiskeli",
+    "On foot": "Kwa miguu",
+    "Any": "Yoyote",
+    "Type of delivery": "Aina ya usafirishaji",
+    "Types of delivery you do": "Aina za usafirishaji unazofanya",
+    "Choose at least one type of delivery.": "Chagua angalau aina moja ya usafirishaji.",
+    "No delivery man of this type is available right now. Choose another type or try again later.": "Hakuna msafirishaji wa aina hii anayepatikana sasa. Chagua aina nyingine au jaribu baadaye.",
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "Weka alama Imeisha kwa bidhaa inapoisha, ili wateja wasiiagize. Bonyeza Imerudi ukiwa nayo tena."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Albamu inaweza kuwa na picha hadi {0}.",

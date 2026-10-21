@@ -731,14 +731,17 @@ const MK_ICONS = {
 };
 // The Learn 5PLUS lesson: what a marketer shows a new merchant, one step at a time. A merchant registered by a
 // marketer then rates the marketer (1 to 6 stars) and answers three questions; that pays the marketer's reward.
-const LESSON = [
+const LESSON_ALL = [
   ["5PLUS in one app", "Customers shop in Suuq, book services, send money with iBedel and pay safely. Your shop has its own number, so customers can search for you.", "🛍️"],
   ["Add your products", "My shop → Products → + Add product. Add real photos, the price and an earning for people who share your product. The admin approves it, then customers see it.", "📸"],
   ["Orders and payments", "Customers pay with their wallet, with Safe payment (the money is held until they receive it) or straight to your merchant number. Deliver, the customer confirms, and the money is yours.", "💳"],
   ["Chat and calls", "Answer customers in Chats and call them free over the internet. Turn on Salah time or Sleep time in the menu to stop new orders for a while.", "💬"],
   ["Out of stock and delivery", "Mark a product Out of stock when it runs out. For an order, press Get a delivery man: he suggests a price, the customer agrees or suggests another, then pays it.", "🛵"],
+  ["Out of stock", "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.", "📦", "nodelivery"],
   ["Earn and grow", "Share links to earn, choose a plan to post more products, and download your sales report as PDF or Word from Report.", "📈"],
 ];
+// Delivery switched off: the lesson shows the out-of-stock slide without delivery.
+const LESSON_ON = () => LESSON_ALL.filter(x => settings.delivery ? x[3] !== "nodelivery" : !x[0].includes("delivery"));
 const MK_Q = [["clear", "Did the marketer explain the app clearly?", [["yes", "Yes"], ["partly", "Partly"], ["no", "No"]]],
   ["product", "Did the marketer help you add your first product?", [["yes", "Yes"], ["no", "No"]]],
   ["recommend", "Would you recommend 5PLUS to other businesses?", [["yes", "Yes"], ["no", "No"]]]];
@@ -747,7 +750,7 @@ function vLesson() {
   const back = `<div class="svc-bar"><button class="back" data-svcgo="${L.show ? "marketing" : "hub"}" aria-label="Back">${ICON.back}</button><b>Learn 5PLUS</b></div>`;
   if (L.done) return `<div class="view">${back}<div class="receipt"><div class="tick">${ICON.tick}</div><h3 style="font-size:20px">Thank you</h3>
     <p class="note" style="margin:0">You finished the lesson and your review was sent.</p></div><button class="btn btn-primary btn-block" data-svcgo="myshop">Open My shop</button></div>`;
-  const n = LESSON.length, k = L.step;
+  const LESSON = LESSON_ON(), n = LESSON.length, k = L.step;
   if (k < n) { const [t, d, e] = LESSON[k];
     return `<div class="view lesson">${back}
       <div class="steps" aria-label="Step ${k + 1} of ${n}"><div class="steps-bar">${LESSON.map((_, i) => `<i class="${i < k ? "done" : i === k ? "on" : ""}"></i>`).join("")}</div><div class="steps-txt"><span class="label">Step ${k + 1} of ${n}</span></div></div>
@@ -771,7 +774,7 @@ document.addEventListener("click", async e => {
   if (t.dataset.mkq) { L.answers[t.dataset.mkq] = t.dataset.v; L.err = ""; return render(); }
   const a = t.dataset.lesson;
   if (a === "prev") { L.step = Math.max(0, L.step - 1); return render(); }
-  if (a === "next") { if (L.step === LESSON.length - 1 && L.show) { S.lesson = null; openService(S.user?.lesson_pending ? "hub" : "marketing"); return; } L.step++; render(); scrollTo(0, 0); return; }
+  if (a === "next") { if (L.step === LESSON_ON().length - 1 && L.show) { S.lesson = null; openService(S.user?.lesson_pending ? "hub" : "marketing"); return; } L.step++; render(); scrollTo(0, 0); return; }
   if (a === "send") {
     if (!L.stars) { L.err = "Choose 1 to 6 stars."; return render(); }
     if (MK_Q.some(([k]) => !L.answers[k])) { L.err = "Answer every question."; return render(); }
@@ -804,16 +807,18 @@ document.addEventListener("click", e => { const b = e.target.closest?.("[data-mk
 /* Delivery page: the delivery men available now. Ask one (or any) to pick something up and bring it. */
 function vDelivery(h) {
   if (S.couriers === undefined) { S.couriers = null; api("/api/delivery/couriers").then(r => { S.couriers = r.couriers; if (S.service === h.id) render(); }).catch(() => { S.couriers = []; }); }
-  const list = S.couriers, DI = SUUQ.DELIV_IC;
+  const DI = SUUQ.DELIV_IC, type = S.delivType || "", list = S.couriers && S.couriers.filter(c => !type || (c.vehicles || []).includes(type));
   return `<div class="view ts"><div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
     <p class="note" style="margin:0">Ask a delivery man to pick something up and bring it to you. He suggests a price; you agree or suggest another price, then pay it in My orders with Safe payment, your wallet or straight to him. If he can't take it, it goes to another delivery man.</p>
+    <div class="veh-pick" role="radiogroup" aria-label="Type of delivery"><button type="button" class="veh-chip" role="radio" data-delivtype="" aria-checked="${!type}">All</button>${SUUQ.VEHICLES.map(([id, l, e]) => `<button type="button" class="veh-chip" role="radio" data-delivtype="${id}" aria-checked="${type === id}"><span aria-hidden="true">${e}</span> <span>${l}</span></button>`).join("")}</div>
     <button class="btn btn-primary btn-block" data-delivreq="">${DI} Request a delivery</button>
     <h3 class="ts-h">Available now</h3>
-    ${list == null ? `<div class="empty">Loading…</div>` : list.length ? `<div class="deliv-list">${list.map(c => `<div class="deliv-opt as-card"><span class="deliv-ic">${DI}</span><span class="t"><b data-no-i18n>${esc(c.name)}</b><small>${[c.area, c.city].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}</small></span><button class="btn btn-primary btn-sm" data-delivreq="${esc(c.product_id)}">Ask</button></div>`).join("")}</div>`
-      : `<div class="empty">No delivery man is available right now. Try again a little later.</div>`}
+    ${list == null ? `<div class="empty">Loading…</div>` : list.length ? `<div class="deliv-list">${list.map(c => `<div class="deliv-opt as-card"><span class="deliv-ic">${DI}</span><span class="t"><b data-no-i18n>${esc(c.name)}</b><small>${[c.area, c.city].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}</small><span class="veh-row">${SUUQ.vehList(c.vehicles)}</span></span><button class="btn btn-primary btn-sm" data-delivreq="${esc(c.product_id)}">Ask</button></div>`).join("")}</div>`
+      : `<div class="empty">${type ? "No delivery man of this type is available right now. Choose another type or try again later." : "No delivery man is available right now. Try again a little later."}</div>`}
     <p class="note" style="margin:0">Are you a delivery man? Register as a merchant and choose the Delivery Man category. Your jobs then come to My shop → Orders.</p></div>`;
 }
-document.addEventListener("click", e => { const b = e.target.closest?.("[data-delivreq]"); if (!b) return; if (!S.user) { go("login"); return; } SUUQ.openDelivery({ pick: b.dataset.delivreq, onDone: () => { S.couriers = undefined; } }); });
+document.addEventListener("click", e => { const b = e.target.closest?.("[data-delivtype]"); if (!b) return; S.delivType = b.dataset.delivtype; render(); });
+document.addEventListener("click", e => { const b = e.target.closest?.("[data-delivreq]"); if (!b) return; if (!S.user) { go("login"); return; } SUUQ.openDelivery({ pick: b.dataset.delivreq, type: S.delivType || "", onDone: () => { S.couriers = undefined; } }); });
 /* Technician page (home-services design): search, category chips, then sections of photo cards with "See all". */
 function vTechnician(h) {
   const L = S.svcItems || (S.svcItems = {});

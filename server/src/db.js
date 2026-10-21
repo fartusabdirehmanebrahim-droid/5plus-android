@@ -328,6 +328,8 @@ async function init() {
   // Delivery price talks: the customer's suggested price, and whether the delivery man agreed to it.
   await addColumn("orders", "counter", "REAL NOT NULL DEFAULT 0");
   await addColumn("orders", "agreed", "INTEGER NOT NULL DEFAULT 0");
+  // The type of delivery the customer asked for (moto, bajaj, car, truck, bicycle, foot), empty for any.
+  await addColumn("orders", "deliv_type", "TEXT NOT NULL DEFAULT ''");
   await addColumn("users", "marketer_id", "INTEGER"); // the marketer who registered this merchant (marketing reward program)
   await addColumn("users", "lesson_done", "INTEGER NOT NULL DEFAULT 0"); // when the merchant finished the Learn 5PLUS lesson and the review // a delivery request: the order being delivered // the merchant marked it out of stock: shown, but can't be ordered // products bought together with one Safe payment
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")
@@ -440,6 +442,8 @@ const DEFAULT_SETTINGS = {
   // Marketing reward program: marketers register merchants with their code and teach them the app (the Learn 5PLUS
   // lesson). When the merchant finishes the lesson and rates the marketer, the marketer earns this reward. Off = hidden.
   marketing: { on: false, amount: 1, cur: "USD" },
+  // Delivery (Delivery service, Delivery Man category, "Get a delivery man") is switched off for now.
+  delivery: { on: false },
   walletTopup: { number: "", numbers: { USD: "", SLSH: "" }, ussd: { USD: "*880*", SLSH: "*220*" } },
   // Safe payment: the buyer pays the money processor agent; Sarrif holds it until the buyer confirms they received the item.
   // merchant = the processor's merchant number (*223* SLSH, *883* USD); number = its normal number (*220* SLSH, *880* USD).
@@ -504,8 +508,9 @@ async function getSettings() {
   if (!s.suuq.plans.some(p => p.id === "free")) s.suuq.plans = structuredClone(DEFAULT_SETTINGS.suuq.plans);
   if (Number(saved.earnFeePct) >= 0) s.earnFeePct = Number(saved.earnFeePct);
   if (Array.isArray(saved.shopCharge) && saved.shopCharge.length) s.shopCharge = saved.shopCharge;
-  if (saved.marketing) s.marketing = { ...s.marketing, ...saved.marketing };
   else if (Number(saved.shopChargePct) > 0) s.shopCharge = [{ country: "*", type: "pct", pct: Number(saved.shopChargePct), USD: 0, SLSH: 0 }]; // the first version: one percent
+  if (saved.marketing) s.marketing = { ...s.marketing, ...saved.marketing };
+  if (saved.delivery) s.delivery = { on: !!saved.delivery.on };
   if (Array.isArray(saved.bizCats)) s.bizCats = saved.bizCats;
   // Categories saved before photos and "Shop by category" existed get the built-in photo and the default setting.
   s.bizCats = s.bizCats.map(c => { const d = DEFAULT_BIZ_CATS.find(x => x.name === c.name); return { ...c, photo: c.photo ?? d?.photo ?? "", home: c.home ?? (c.section === "suuq") }; });
@@ -545,4 +550,7 @@ async function seedAdmin() {
 function cleanPhone(p) { return String(p || "").replace(/\D/g, "").replace(/^252/, "").replace(/^0/, ""); }
 function cleanNum(p) { return String(p || "").replace(/\D/g, ""); }
 
-module.exports = { init, nextShopNo, newRefCode, PROOF_WALLETS, ARTS, db, DATA_DIR, WALLETS, CURS, getSettings, saveSettings, seedAdmin, cleanPhone, cleanNum, DEFAULT_BIZ_CATS };
+// While delivery is switched off, the Delivery service and the Delivery Man category are left out of every list.
+const deliveryOn = s => !!s?.delivery?.on;
+const noDelivery = (s, list, key = "id") => deliveryOn(s) ? list : list.filter(x => (key === "id" ? x.id : x.section) !== "delivery");
+module.exports = { deliveryOn, noDelivery, init, nextShopNo, newRefCode, PROOF_WALLETS, ARTS, db, DATA_DIR, WALLETS, CURS, getSettings, saveSettings, seedAdmin, cleanPhone, cleanNum, DEFAULT_BIZ_CATS };

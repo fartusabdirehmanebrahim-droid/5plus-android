@@ -14,7 +14,7 @@ const crypto = require("node:crypto");
   }
 })();
 
-const { init, nextShopNo, newRefCode, PROOF_WALLETS, ARTS, db, DATA_DIR, WALLETS, CURS, getSettings, saveSettings, seedAdmin, cleanPhone, cleanNum } = require("./db");
+const { init, nextShopNo, newRefCode, PROOF_WALLETS, ARTS, db, DATA_DIR, WALLETS, CURS, getSettings, saveSettings, seedAdmin, cleanPhone, cleanNum, deliveryOn, noDelivery } = require("./db");
 const { hashSecret, checkSecret, signToken, verifyToken, parseCookies, cookieHeader } = require("./security");
 
 const SECRET = process.env.JWT_SECRET || "";
@@ -122,11 +122,11 @@ function publicUser(u) {
 }
 function publicSettings(s) {
   // Customers never receive agent numbers or USSD templates; the server builds each USSD code.
-  return { services: s.services.filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "", gallery: galleryOut(x) })),
+  return { delivery: deliveryOn(s), services: noDelivery(s, s.services).filter(x => x.visible).map(x => ({ id: x.id, name: x.name, sub: x.sub, art: x.art, ready: x.ready, photo: x.photo ? "/media/" + x.photo : null, videos: serviceVideos(x), whatsapp: x.whatsapp || "", phone: x.phone || "", tiktok: x.tiktok || "", gallery: galleryOut(x) })),
     premierPayTo: s.agentNums.premier || "", minUsd: MIN_USD_RECEIVE,
     safePay: { merchant: !!s.safePay.merchant, number: !!s.safePay.number }, earnFeePct: s.earnFeePct, shopCharge: s.shopCharge, marketing: { on: !!s.marketing?.on, amount: Number(s.marketing?.amount) || 0, cur: s.marketing?.cur || "USD" },
     // "Shop by category" on the home screen: the categories the super admin chose, with their photos.
-    homeCats: (s.bizCats || []).filter(c => c.home && s.services.some(v => v.id === c.section && v.visible)).map(c => ({ name: c.name, section: c.section, photo: c.photo || "" })),
+    homeCats: noDelivery(s, s.bizCats || [], "section").filter(c => c.home && s.services.some(v => v.id === c.section && v.visible)).map(c => ({ name: c.name, section: c.section, photo: c.photo || "" })),
     priceWords: s.priceWords, tiers: s.tiers, show: s.show, support: s.support, voice: { script: s.voice.script, lang: s.voice.lang, hasAudio: !!s.voice.audio, audioVer: s.voice.audio?.ver || null } };
 }
 
@@ -281,7 +281,7 @@ route("GET", "/api/me", async (req, res) => {
   const u = await loadUser(req);
   const staff = u && u.role !== "customer";
   if (u && !staff) startSession(res, u); // renew: customers and sellers stay logged in
-  send(res, 200, { user: u ? publicUser(u) : null, services: staff ? (await getSettings()).services.map(({ id, name, art, ready, visible, photo }) => ({ id, name, art, ready, visible, photo: photo ? "/media/" + photo : null })) : undefined });
+  send(res, 200, { user: u ? publicUser(u) : null, services: staff ? (s => noDelivery(s, s.services))(await getSettings()).map(({ id, name, art, ready, visible, photo }) => ({ id, name, art, ready, visible, photo: photo ? "/media/" + photo : null })) : undefined });
 });
 
 route("POST", "/api/me/wallets", async (req, res) => {
@@ -590,7 +590,7 @@ route("GET", "/api/super/overview", async (req, res) => {
   const month = new Date(); month.setDate(1); month.setHours(0, 0, 0, 0);
   const waiting = (await db.get("SELECT COUNT(*) AS n FROM requests WHERE status = 'waiting'")).n;
   const sentMonth = await db.all("SELECT cur, COUNT(*) AS n, SUM(fee) AS fees FROM requests WHERE status = 'sent' AND sent_at >= ? GROUP BY cur", month.getTime());
-  send(res, 200, { services: s.services.map(x => ({ ...x, photo: x.photo ? "/media/" + x.photo : null })), staff, customers, ibedel: { waiting, sentMonth } });
+  send(res, 200, { services: noDelivery(s, s.services).map(x => ({ ...x, photo: x.photo ? "/media/" + x.photo : null })), staff, customers, ibedel: { waiting, sentMonth } });
 });
 // A service's videos: up to 10, each a web link (YouTube and others) with an optional title.
 // Accepts a list, or text with one video per line: the link, then the title ("https://youtu.be/… Our new shop").
@@ -643,11 +643,13 @@ route("PUT", "/api/super/services", async (req, res) => {
     // Keep what the service's own admin set (Pay to shop and safe payment numbers, document earnings…).
     out.push({ ...(old || {}), id, name, sub, art: ARTS.includes(x.art) ? x.art : "general", visible: x.visible !== false, ready: old ? !!old.ready : false, builtIn: old ? !!old.builtIn : false, photo: old?.photo || null, videos: await fillVideoTitles(cleanVideos(x.videos ?? x.video)), whatsapp: cleanWa(x.whatsapp), phone: cleanPhoneNo(x.phone), tiktok: cleanTiktok(x.tiktok), gallery: old?.gallery || [] });
   }
+  // Delivery is switched off: the admin doesn't see it in the list, so keep it as it was.
+  { const st0 = await getSettings(), dv = cur.find(c => c.id === "delivery"); if (!deliveryOn(st0) && dv && !out.some(o => o.id === "delivery")) out.push(dv); }
   for (const c of cur) if (c.builtIn && !out.some(o => o.id === c.id)) fail(`${c.name} can be hidden but not deleted.`);
   for (const c of cur) if (!out.some(o => o.id === c.id)) { if (c.photo) await db.files.del(c.photo); for (const g of c.gallery || []) await db.files.del(g.file); }
   const s = await saveSettings({ services: out });
   broadcast("settings", publicSettings(s));
-  send(res, 200, { services: s.services.map(x => ({ ...x, photo: x.photo ? "/media/" + x.photo : null })) });
+  send(res, 200, { services: noDelivery(s, s.services).map(x => ({ ...x, photo: x.photo ? "/media/" + x.photo : null })) });
 });
 // The videos page of one service (videos, Call, WhatsApp, TikTok). The super admin can edit any service;
 // a service admin only their own. Merchants and customers can't.

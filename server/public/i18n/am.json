@@ -1613,7 +1613,19 @@
     "The delivery man suggests a price, and you can agree or suggest another.": "አድራሹ ዋጋ ያቀርባል፣ እርስዎም መስማማት ወይም ሌላ ማቅረብ ይችላሉ።",
     "Enter the price you suggest.": "የሚያቀርቡትን ዋጋ ያስገቡ።",
     "Suggest a lower price, or pay the price the delivery man asked.": "ዝቅ ያለ ዋጋ ያቅርቡ፣ ወይም አድራሹ የጠየቀውን ዋጋ ይክፈሉ።",
-    "Customer's price": "የደንበኛው ዋጋ"
+    "Customer's price": "የደንበኛው ዋጋ",
+    "Motorbike": "ሞተር ሳይክል",
+    "Bajaj": "ባጃጅ",
+    "Car": "መኪና",
+    "Truck": "የጭነት መኪና",
+    "Bicycle": "ብስክሌት",
+    "On foot": "በእግር",
+    "Any": "ማንኛውም",
+    "Type of delivery": "የማድረሻ አይነት",
+    "Types of delivery you do": "የሚሰሩት የማድረሻ አይነቶች",
+    "Choose at least one type of delivery.": "ቢያንስ አንድ የማድረሻ አይነት ይምረጡ።",
+    "No delivery man of this type is available right now. Choose another type or try again later.": "የዚህ አይነት አድራሽ አሁን የለም። ሌላ አይነት ይምረጡ ወይም ቆይተው ይሞክሩ።",
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "ዕቃ ሲያልቅ ደንበኞች እንዳያዝዙት አልቋል ብለው ምልክት ያድርጉ። እንደገና ሲኖርዎት እንደገና አለ ይጫኑ።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

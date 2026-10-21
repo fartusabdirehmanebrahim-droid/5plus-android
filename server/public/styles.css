@@ -1315,3 +1315,8 @@ img, video, iframe{max-width:100%}
 .mk-steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:6px;color:var(--ink-2);line-height:1.45}
 .mk-kpis .kpi{padding:12px 10px;min-width:0}.mk-kpis .label{letter-spacing:.02em;font-size:10px;overflow-wrap:normal;word-break:normal;hyphens:none}
 .deliv-talk{margin-top:6px}.deliv-talk .note b{color:var(--ink)}.deliv-talk-row .suffix{min-width:100px}
+.veh-pick{display:flex;flex-wrap:wrap;gap:6px}
+.veh-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:7px 12px;font:600 13px/1.2 var(--body);cursor:pointer;min-height:36px}
+.veh-chip[aria-pressed="true"],.veh-chip[aria-checked="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.veh-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.veh{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--usd-soft);color:var(--ink-2)}
