@@ -736,7 +736,7 @@ const LESSON = [
   ["Add your products", "My shop → Products → + Add product. Add real photos, the price and an earning for people who share your product. The admin approves it, then customers see it.", "📸"],
   ["Orders and payments", "Customers pay with their wallet, with Safe payment (the money is held until they receive it) or straight to your merchant number. Deliver, the customer confirms, and the money is yours.", "💳"],
   ["Chat and calls", "Answer customers in Chats and call them free over the internet. Turn on Salah time or Sleep time in the menu to stop new orders for a while.", "💬"],
-  ["Out of stock and delivery", "Mark a product Out of stock when it runs out. For an order, press Get a delivery man: he sends his price and the customer pays it.", "🛵"],
+  ["Out of stock and delivery", "Mark a product Out of stock when it runs out. For an order, press Get a delivery man: he suggests a price, the customer agrees or suggests another, then pays it.", "🛵"],
   ["Earn and grow", "Share links to earn, choose a plan to post more products, and download your sales report as PDF or Word from Report.", "📈"],
 ];
 const MK_Q = [["clear", "Did the marketer explain the app clearly?", [["yes", "Yes"], ["partly", "Partly"], ["no", "No"]]],
@@ -806,7 +806,7 @@ function vDelivery(h) {
   if (S.couriers === undefined) { S.couriers = null; api("/api/delivery/couriers").then(r => { S.couriers = r.couriers; if (S.service === h.id) render(); }).catch(() => { S.couriers = []; }); }
   const list = S.couriers, DI = SUUQ.DELIV_IC;
   return `<div class="view ts"><div class="svc-bar"><button class="back" data-svcgo="hub" aria-label="Back to services">${ICON.back}</button><b>${esc(h.name)}</b></div>
-    <p class="note" style="margin:0">Ask a delivery man to pick something up and bring it to you. He sends his price; you pay it in My orders with Safe payment, your wallet or straight to him. If he can't take it, it goes to another delivery man.</p>
+    <p class="note" style="margin:0">Ask a delivery man to pick something up and bring it to you. He suggests a price; you agree or suggest another price, then pay it in My orders with Safe payment, your wallet or straight to him. If he can't take it, it goes to another delivery man.</p>
     <button class="btn btn-primary btn-block" data-delivreq="">${DI} Request a delivery</button>
     <h3 class="ts-h">Available now</h3>
     ${list == null ? `<div class="empty">Loading…</div>` : list.length ? `<div class="deliv-list">${list.map(c => `<div class="deliv-opt as-card"><span class="deliv-ic">${DI}</span><span class="t"><b data-no-i18n>${esc(c.name)}</b><small>${[c.area, c.city].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}</small></span><button class="btn btn-primary btn-sm" data-delivreq="${esc(c.product_id)}">Ask</button></div>`).join("")}</div>`

@@ -49,7 +49,3 @@ jobs:
           cp "$APK" 5PLUS.apk
           gh release view app >/dev/null 2>&1 || gh release create app --title "5PLUS app" --notes "Download 5PLUS.apk on your Android phone and open it to install. If asked, allow installing from this source." --latest
           gh release upload app 5PLUS.apk --clobber
-          printf '%s\n\n%s\n%s\n%s\n' "Download **5PLUS.apk** below on your Android phone and open it to install. If asked, allow installing from this source." \
-            "Direct link (always the newest): https://github.com/${{ github.repository }}/releases/download/app/5PLUS.apk" \
-            "Website: https://fiveplus.onrender.com" "Built from ${GITHUB_SHA::7} on $(date -u +%Y-%m-%d)." > notes.md
-          gh release edit app --notes-file notes.md

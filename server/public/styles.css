@@ -1314,3 +1314,4 @@ img, video, iframe{max-width:100%}
 .mk-code b{font-size:20px;letter-spacing:.06em;flex:1}
 .mk-steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:6px;color:var(--ink-2);line-height:1.45}
 .mk-kpis .kpi{padding:12px 10px;min-width:0}.mk-kpis .label{letter-spacing:.02em;font-size:10px;overflow-wrap:normal;word-break:normal;hyphens:none}
+.deliv-talk{margin-top:6px}.deliv-talk .note b{color:var(--ink)}.deliv-talk-row .suffix{min-width:100px}

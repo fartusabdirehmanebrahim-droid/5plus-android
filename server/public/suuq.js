@@ -48,9 +48,12 @@ const SUUQ = (() => {
   const shareLink = (pid, code) => `${location.origin}${location.pathname}?p=${encodeURIComponent(pid)}${code ? "&ref=" + encodeURIComponent(code) : ""}`;
   const statusLabel = { paid: "Paid · waiting for seller", delivered: "Delivered", completed: "Completed", cancelled: "Cancelled", cancelled_by_seller: "Cancelled by seller",
     requested: "Booking requested", accepted: "Booking accepted", declined: "Declined", quoted: "Price sent · waiting for payment",
-    awaiting_payment: "Waiting for payment confirmation", payment_rejected: "Payment not received" };
+    countered: "Price suggested · waiting for the delivery man", awaiting_payment: "Waiting for payment confirmation", payment_rejected: "Payment not received" };
   const PAY_NAME = { wallet: "Wallet", safe: "Safe payment", shop: "Pay to shop" };
-  const orderLabel = o => o.status === "declined" && o.forwarded ? "Declined · sent to another merchant"
+  const orderLabel = o => o.is_delivery && o.status === "declined" && o.forwarded ? "Sent to another delivery man"
+    : o.is_delivery && o.status === "quoted" ? (o.agreed ? "Price agreed" : "Price suggested")
+    : o.is_delivery && o.needs_price ? "Waiting for the delivery man's price"
+    : o.status === "declined" && o.forwarded ? "Declined · sent to another merchant"
     : o.kind === "buy" && o.status === "accepted" ? "Accepted · agree on the price in chat"
     : o.needs_price ? "Waiting for the seller's price" : statusLabel[o.status] || o.status;
   const statusTone = s => s === "completed" ? "sent" : ["cancelled", "cancelled_by_seller", "declined", "payment_rejected"].includes(s) ? "susp" : "waiting";
@@ -208,12 +211,12 @@ const SUUQ = (() => {
     return `<div class="courier-panel"><div class="courier-top">${DELIV_IC}<b>You're a delivery man</b></div>
       <label class="switch-row"><input type="checkbox" id="cr-on" ${c.available ? "checked" : ""}><span>${c.available ? "Available · customers and sellers can ask you" : "Not available · you get no new jobs"}</span></label>
       <div class="field"><label for="cr-area">Area you cover</label><div class="inline-form"><input class="input" id="cr-area" maxlength="200" value="${esc(c.area)}" placeholder="e.g. Hargeisa: Jigjiga Yar, 26 June, Airport"><button class="btn btn-ghost" id="cr-save">Save</button></div></div>
-      <small class="note">Jobs arrive in Orders. Accept, agree the price in chat, send the price; the customer pays (Safe payment, wallet or straight to you). If you reject, the job goes to another delivery man.</small>
+      <small class="note">Jobs arrive in Orders. Suggest your price; the customer agrees and pays (Safe payment, wallet or straight to you) or suggests another price, which you agree to or answer with a new price. If you reject, the job goes to another delivery man.</small>
       <span class="status-msg" id="st-cr"></span></div>`;
   }
   async function loadAff() { try { st.aff = await api("/api/affiliate"); } catch {} }
   const unreadChats = () => st.chats.reduce((a, c) => a + (c.unread || 0), 0);
-  const pendingSeller = () => st.sellerOrders.filter(o => ["paid", "requested", "quoted", "accepted", "delivered"].includes(o.status)).length;
+  const pendingSeller = () => st.sellerOrders.filter(o => ["paid", "requested", "quoted", "countered", "accepted", "delivered"].includes(o.status)).length;
 
   async function open(service, extra) {
     if (service === "wallet") await loadWallet();
@@ -1047,6 +1050,33 @@ const SUUQ = (() => {
         : `<div class="err" role="alert">${esc(os.err || "")}</div><button class="btn btn-primary btn-block" data-sq="book" data-needpin ${(os.pin || "").length === 4 ? "" : "disabled"}>Send booking request</button>`}
       <button class="btn btn-ghost btn-block" data-sq="closesheet">Cancel</button></div></div>`;
   }
+  // Delivery price talks. The delivery man suggests a price; the customer agrees (pays) or suggests another price;
+  // the delivery man agrees to it or suggests a new one. Either side can stop (Reject).
+  function priceBox(o, label, btn) {
+    return `<div class="quote-row deliv-talk-row"><div class="suffix"><span>${o.cur}</span><input id="qt-${o.id}" inputmode="decimal" aria-label="${esc(label)}" placeholder="0"></div>
+      <button class="btn btn-primary" data-${btn}="${o.id}">${btn === "counter" ? "Send" : "Send price"}</button></div>`;
+  }
+  function delivTalkBuyer(o) {
+    if (o.status === "quoted" && st.counterOpen === o.id && !o.agreed) return `<div class="deliv-talk"><b>Suggest another price</b>${priceBox(o, "Your price", "counter")}
+      <small class="note">The delivery man asked ${money(o.total, o.cur)}. He can agree to your price or suggest a new one.</small></div>`;
+    if (o.status === "quoted") return `<div class="deliv-talk"><small class="note">${o.agreed ? `<span>You and the delivery man agreed on</span> <b class="num">${money(o.total, o.cur)}</b>. <span>Pay it to confirm the delivery.</span>`
+      : `<span>The delivery man suggests</span> <b class="num">${money(o.total, o.cur)}</b>. <span>Pay it if you agree, or suggest another price.</span>`}</small></div>`;
+    if (o.status === "countered") return `<div class="deliv-talk"><small class="note"><span>You suggested</span> <b class="num">${money(o.counter, o.cur)}</b>. <span>Waiting for the delivery man to agree or suggest a new price.</span></small></div>`;
+    if (o.needs_price) return `<div class="deliv-talk"><small class="note">The delivery man will suggest a price. Then you agree or suggest another price.</small></div>`;
+    return "";
+  }
+  function delivTalkSeller(o) {
+    const reject = `<button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button>`, chat = `<button class="btn btn-ghost" data-chat-seller="${esc(o.product_id)}" data-buyer="${esc(o.buyer_name)}">Chat with customer</button>`;
+    if (o.status === "requested" || o.status === "accepted") return `<div class="offer-form deliv-talk"><b style="font-size:14px">Suggest your delivery price</b>${priceBox(o, "Your delivery price", "quote")}
+      <small class="note">The customer agrees and pays it, or suggests another price. If you reject, the job goes to another delivery man.</small><div class="req-actions">${chat}${reject}</div></div>`;
+    if (o.status === "countered") return `<div class="offer-form deliv-talk"><b style="font-size:14px"><span>The customer suggests</span> <span class="num">${money(o.counter, o.cur)}</span></b>
+      <small class="note"><span>You asked</span> <span class="num">${money(o.total, o.cur)}</span>.</small>
+      <div class="req-actions"><button class="btn btn-primary" data-oact="agree" data-oid="${o.id}">Agree ${money(o.counter, o.cur)}</button>${reject}</div>
+      <b style="font-size:13px">Or suggest a new price</b>${priceBox(o, "Your new price", "quote")}</div>`;
+    if (o.status === "quoted") return `<small class="note">${o.agreed ? `<span>Price agreed:</span> <b class="num">${money(o.total, o.cur)}</b>. <span>Waiting for the customer to pay.</span>`
+      : `<span>You suggested</span> <b class="num">${money(o.total, o.cur)}</b>. <span>Waiting for the customer to pay or suggest another price.</span>`}</small>`;
+    return "";
+  }
   function vOrders() {
     if (!st.orders.length) return `<div class="empty">You haven't ordered anything yet.</div>`;
     return `<div class="olist">${st.orders.map(o => `<div class="ocard">
@@ -1057,12 +1087,13 @@ const SUUQ = (() => {
         ${o.my_earn > 0 ? `<span class="earn">${o.status === "completed" ? `You earned ${esc(money(o.my_earn, o.cur))} · added to your earnings` : ["cancelled", "cancelled_by_seller", "declined", "payment_rejected"].includes(o.status) ? "" : `You earn ${esc(money(o.my_earn, o.cur))} when you confirm you received it`}</span>` : ""}
         ${o.kind === "buy" && o.pay_method !== "wallet" && o.pay_ussd ? `<small class="note">${esc(PAY_NAME[o.pay_method])} · <span class="num">${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))}</span>${o.pay_discount ? ` · your earnings ${esc(money(o.pay_discount, o.cur))} taken off` : ""}</small>` : ""}
         ${o.status === "awaiting_payment" ? `<small class="note">${o.pay_method === "safe" ? "Sarrif confirms the money arrived, then the seller delivers." : "The seller confirms the money arrived, then delivers."}</small>` : ""}
-        ${deliveryLine(o, false)}
+        ${deliveryLine(o, false)}${o.is_delivery ? delivTalkBuyer(o) : ""}
         ${o.status === "payment_rejected" ? `<small class="note" style="color:var(--danger)">${o.pay_method === "safe" ? "Sarrif didn't receive this payment. Contact support if you paid." : "The seller didn't receive this payment. Chat with them if you paid."}</small>` : ""}
         <div class="req-actions">
           ${o.status === "awaiting_payment" ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">Cancel</button>` : ""}
-          ${o.status === "quoted" ? `<button class="btn btn-primary" data-payorder="${o.id}">Pay ${money(o.total, o.cur)}</button>` : ""}
-          ${o.kind === "buy" && ["requested", "accepted", "quoted"].includes(o.status) ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">${o.status === "requested" ? "Cancel" : "Reject"}</button>` : ""}
+          ${o.status === "quoted" ? `<button class="btn btn-primary" data-payorder="${o.id}">${o.is_delivery && !o.agreed ? "Agree and pay" : "Pay"} ${money(o.total, o.cur)}</button>` : ""}
+          ${o.is_delivery && o.status === "quoted" && !o.agreed ? `<button class="btn btn-ghost" data-counteropen="${o.id}">Suggest another price</button>` : ""}
+          ${o.kind === "buy" && ["requested", "accepted", "quoted", "countered"].includes(o.status) ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">${o.status === "requested" ? "Cancel" : "Reject"}</button>` : ""}
           ${o.kind === "buy" && ["paid", "delivered"].includes(o.status) && o.pay_method === "safe" && o.buyer_ok ? `<small class="note">Thank you. Sarrif will check with you and release the payment to the seller.</small>`
             : o.kind === "buy" && ["paid", "delivered"].includes(o.status) ? `<button class="btn btn-primary" data-oact="received" data-oid="${o.id}">${String(o.service).startsWith("svc:") ? "Work finished · I received it" : "I received it"}</button>` : ""}
           ${(o.kind === "buy" && o.status === "paid") || (o.kind === "book" && ["requested", "accepted"].includes(o.status)) ? `<button class="btn btn-ghost" data-oact="cancel" data-oid="${o.id}">Cancel${o.kind === "buy" && o.pay_method !== "shop" ? " and refund" : ""}</button>` : ""}
@@ -1225,7 +1256,7 @@ const SUUQ = (() => {
     const close = () => { box.remove(); if (opts.onDone && d.done) opts.onDone(d.done); };
     const draw = () => {
       if (d.done) { box.innerHTML = `<div class="sheet-card deliv-card"><div class="receipt"><div class="tick">${ICON.tick}</div><h3 style="font-size:20px">Request sent</h3>
-        <p class="note" style="margin:0"><span>The delivery man will send the delivery price.</span> <span>${opts.order?.seller ? "The customer pays it in My orders." : "You pay it in My orders (Safe payment, wallet or straight to him)."}</span></p>
+        <p class="note" style="margin:0"><span>${opts.order?.seller ? "The delivery man suggests a price; the customer agrees or suggests another." : "The delivery man suggests a price, and you can agree or suggest another."}</span> <span>${opts.order?.seller ? "The customer pays it in My orders." : "You pay it in My orders (Safe payment, wallet or straight to him)."}</span></p>
         <p class="note" style="margin:0"><span data-no-i18n>${esc(d.done.courier || "")}</span></p></div>
         <button class="btn btn-primary btn-block" data-dv="close">OK</button></div>`; bind(); return; }
       const list = d.couriers;
@@ -1267,7 +1298,7 @@ const SUUQ = (() => {
   }
   const DELIV_IC = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="2.5"/><circle cx="18" cy="17" r="2.5"/><path d="M8.5 17h7M3.5 17V9h7l2 4h5.5l2.5 4"/><rect x="11" y="4" width="6" height="5" rx="1"/></svg>';
   // On an order: the delivery (status and price) or a button to get one.
-  const DELIV_ST = { requested: "Asked · waiting for the delivery man", accepted: "Accepted · the price comes next", quoted: "Price sent · waiting for payment", awaiting_payment: "Waiting for payment confirmation", paid: "Paid · on the way", delivered: "Delivered", completed: "Delivered", declined: "Declined", cancelled: "Cancelled", payment_rejected: "Payment not received" };
+  const DELIV_ST = { requested: "Asked · waiting for the delivery man", accepted: "Accepted · the price comes next", quoted: "Price suggested · waiting for payment", countered: "Customer suggested a price · waiting for the delivery man", awaiting_payment: "Waiting for payment confirmation", paid: "Paid · on the way", delivered: "Delivered", completed: "Delivered", declined: "Declined", cancelled: "Cancelled", payment_rejected: "Payment not received" };
   function deliveryLine(o, seller) {
     if (o.kind !== "buy" || !["paid", "delivered", "completed"].includes(o.status)) return "";
     const d = o.delivery;
@@ -1659,16 +1690,17 @@ const SUUQ = (() => {
       <button class="btn btn-ghost btn-block" data-sq="canceledit">Cancel</button></div>`;
   }
   function vSellerOrders() {
-    const pend = st.sellerOrders.filter(o => ["paid", "requested", "quoted", "accepted", "delivered", "awaiting_payment"].includes(o.status));
+    const pend = st.sellerOrders.filter(o => ["paid", "requested", "quoted", "countered", "accepted", "delivered", "awaiting_payment"].includes(o.status));
     const done = st.sellerOrders.filter(o => !pend.includes(o));
     const card = o => `<div class="ocard">
       ${o.image ? `<img src="${esc(o.image)}" alt="">` : `<span class="noimg">▶</span>`}
       <div class="t"><b>${esc(o.product_name)} × ${o.qty}</b><small>${esc(o.buyer_name)} · +252 ${esc(o.buyer_phone)} · ${new Date(o.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</small>
         ${o.book_at ? `<small class="onote book-at">📅 ${esc(o.book_at)}</small>` : ""}${o.note ? `<small class="onote">“${esc(o.note)}”</small>` : ""}
-        <div class="orow"><span class="pill ${statusTone(o.status)}">${esc(o.status === "accepted" ? (o.kind === "buy" ? "Accepted · send the agreed price" : "Booking accepted") : o.needs_price ? "Price requested" : o.status === "declined" && o.forwarded ? "Rejected · sent to another merchant" : statusLabel[o.status] || o.status)}</span><b class="num">${o.needs_price ? "—" : money(o.total, o.cur)}</b></div>
-        ${o.status === "requested" ? `<div class="req-actions"><button class="btn btn-primary" data-oact="accept" data-oid="${o.id}">Accept</button><button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button></div>
+        <div class="orow"><span class="pill ${statusTone(o.status)}">${esc(o.is_delivery && o.status === "countered" ? "Customer's price" : o.is_delivery && o.needs_price ? "New delivery job" : o.is_delivery && o.status === "declined" && o.forwarded ? "Rejected · sent to another delivery man" : o.status === "accepted" ? (o.kind === "buy" ? "Accepted · send the agreed price" : "Booking accepted") : o.needs_price ? "Price requested" : o.status === "declined" && o.forwarded ? "Rejected · sent to another merchant" : statusLabel[o.status] || o.status)}</span><b class="num">${o.needs_price ? "—" : money(o.total, o.cur)}</b></div>
+        ${o.is_delivery ? delivTalkSeller(o) : ""}
+        ${o.status === "requested" && !o.is_delivery ? `<div class="req-actions"><button class="btn btn-primary" data-oact="accept" data-oid="${o.id}">Accept</button><button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button></div>
           <small class="note">Accept, then agree the price with the buyer in chat. If you reject, the request goes to another merchant who sells the same thing.</small>` : ""}
-        ${o.status === "accepted" ? `<div class="offer-form">
+        ${o.status === "accepted" && !o.is_delivery ? `<div class="offer-form">
           <b style="font-size:14px">Send the agreed price</b>
           <div class="mini"><label for="qn-${o.id}">Item name</label><input class="input" id="qn-${o.id}" value="${esc(o.product_name)}"></div>
           <div class="mini"><label for="qd-${o.id}">Description</label><textarea class="input" id="qd-${o.id}" rows="2" placeholder="What is included, delivery, dates…"></textarea></div>
@@ -1676,8 +1708,8 @@ const SUUQ = (() => {
             <button class="btn btn-primary" data-quote="${o.id}">Send price</button></div>
           <small class="note">Total for ${o.qty}. The buyer then pays it${o.has_affiliate ? "; the affiliate earning comes out of it" : ""}.</small>
           <div class="req-actions"><button class="btn btn-ghost" data-chat-seller="${esc(o.product_id)}" data-buyer="${esc(o.buyer_name)}">Chat with buyer</button><button class="btn btn-danger" data-oact="decline" data-oid="${o.id}">Reject</button></div></div>` : ""}
-        ${o.status === "quoted" ? `<small class="note">Waiting for the buyer to pay. You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}.</small>` : ""}
-        ${o.kind === "buy" && !o.needs_price && o.status !== "quoted" ? `<small class="note">You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}${o.shop_charge ? ` · 5PLUS charge ${money(o.shop_charge, o.cur)} (from your wallet when finished)` : ""}</small>` : ""}
+        ${o.status === "quoted" && !o.is_delivery ? `<small class="note">Waiting for the buyer to pay. You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}.</small>` : ""}
+        ${o.kind === "buy" && !o.needs_price && o.status !== "quoted" && o.status !== "countered" ? `<small class="note">You get ${money(o.net, o.cur)}${o.commission ? ` · affiliate ${money(o.commission, o.cur)}` : ""}${o.shop_charge ? ` · 5PLUS charge ${money(o.shop_charge, o.cur)} (from your wallet when finished)` : ""}</small>` : ""}
         ${o.kind === "buy" && o.pay_method !== "wallet" ? `<small class="note">${esc(PAY_NAME[o.pay_method])}${o.pay_ussd ? ` · <span class="num">${esc(o.pay_ussd)}</span> (${esc(money(o.total - (o.pay_discount || 0) + o.pay_fee, o.cur))})` : ""}${o.pay_method === "shop" ? " · paid to you directly" : ""}</small>` : ""}
         ${o.status === "awaiting_payment" && o.pay_method === "safe" ? `<small class="note">Waiting for Sarrif to confirm the buyer's payment. Don't deliver yet.</small>` : ""}
         ${o.is_delivery ? "" : deliveryLine(o, true)}
@@ -1780,6 +1812,13 @@ const SUUQ = (() => {
     q("[data-payorder]").forEach(b => b.onclick = async () => { await loadWallet(); const o = st.orders.find(x => x.id === b.dataset.payorder); let pay_shop = null;
       try { pay_shop = (await api("/api/suuq/products/" + encodeURIComponent(o.product_id))).product.pay_shop; } catch {}
       st.paySheet = { id: b.dataset.payorder, pin: "", pay_shop }; render(); const i = document.getElementById("pay-pin"); if (i) i.focus(); });
+    q("[data-counteropen]").forEach(b => b.onclick = () => { st.counterOpen = b.dataset.counteropen; render(); setTimeout(() => document.getElementById("qt-" + st.counterOpen)?.focus(), 50); });
+    q("[data-counter]").forEach(b => b.onclick = async () => {
+      const inp = root.querySelector(`#qt-${b.dataset.counter}`), amount = Number(String(inp?.value || "").replace(/[^\d.]/g, ""));
+      b.disabled = true;
+      try { await api(`/api/suuq/orders/${b.dataset.counter}/action`, { body: { action: "counter", amount } }); } catch (e) { alertNote(b, e.message); return; }
+      st.counterOpen = null; await loadOrders(); render();
+    });
     q("[data-quote]").forEach(b => b.onclick = async () => {
       const inp = root.querySelector(`#qt-${b.dataset.quote}`), amount = Number(String(inp?.value || "").replace(/[^\d.]/g, ""));
       b.disabled = true;

@@ -869,6 +869,7 @@ module.exports = function market(ctx) {
     // A hidden-price request: the seller sends the price, then the buyer pays it from the wallet.
     if (o.kind === "buy" && (o.status === "requested" || o.status === "accepted")) r.needs_price = true;
     r.offer_desc = o.offer_desc || ""; r.forwarded = !!o.forwarded_to; r.from_order = !!o.from_order;
+    if (o.p_service === "delivery") { r.is_delivery = true; r.counter = o.counter || 0; r.agreed = !!o.agreed; }
     if (forSeller && r.needs_price) r.suggested = round(o.cur, o.p_price * o.qty);
     if (forSeller) Object.assign(r, { buyer_name: o.buyer_name, buyer_phone: o.buyer_phone, commission: o.commission, shop_charge: o.shop_charge || 0, net: round(o.cur, o.total - o.commission - (o.shop_charge || 0)), has_affiliate: !!o.affiliate_id });
     return r;
@@ -962,7 +963,8 @@ module.exports = function market(ctx) {
       else if (st === "paid") pushLater(staff, { kind: "paid", title: "Order paid", body: `${who} paid ${o.total} ${o.cur} · ${ref}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
       else if (st === "awaiting_payment" && o.pay_method === "shop") pushLater(staff, { kind: "info", title: "Check the money", body: `${who} says they paid ${o.total} ${o.cur} to your number · ${ref}`, goto: svc ? "desk" : "sellerorders", tag: o.id });
       else if (st === "accepted") pushLater([o.buyer_id], { kind: "info", title: "Request accepted", body: `${ref}: agree the price in chat.`, goto: "orders", tag: o.id });
-      else if (st === "quoted") pushLater([o.buyer_id], { kind: "info", title: "Price sent", body: `${ref}: ${o.total} ${o.cur}. Open 5PLUS to pay.`, goto: "orders", tag: o.id });
+      else if (st === "quoted") pushLater([o.buyer_id], { kind: "info", title: o.agreed ? "Price agreed" : o.p_service === "delivery" ? "Delivery price suggested" : "Price sent", body: `${ref}: ${o.total} ${o.cur}. ${o.p_service === "delivery" && !o.agreed ? "Pay it, or suggest another price." : "Open 5PLUS to pay."}`, goto: "orders", tag: o.id });
+      else if (st === "countered") pushLater(staff, { kind: "ring", title: "Customer suggests a price", body: `${who} suggests ${o.counter} ${o.cur} · ${ref}. Agree, or suggest another price.`, goto: "sellerorders", tag: o.id });
       else if (st === "delivered") pushLater([o.buyer_id], { kind: "info", title: "Delivered", body: `${ref}: confirm you received it.`, goto: "orders", tag: o.id });
     }
     if (String(o.p_service || "").startsWith("svc:")) {
@@ -1192,7 +1194,19 @@ module.exports = function market(ctx) {
         // Price requests (hidden price): requested → quoted (seller sends the price) → paid (buyer pays) → the normal buy steps.
         // The merchant accepts a request, agrees the price with the buyer (in chat), then sends the price with the item name and description.
         if (action === "accept" && seller && o.status === "requested") return await set("accepted");
-        if (action === "quote" && seller && (o.status === "requested" || o.status === "accepted")) {
+        // Delivery price talks: the delivery man suggests a price (quote); the customer pays it, or suggests another price
+        // (counter); the delivery man agrees to that price (agree) or suggests a new one (quote again).
+        const isDeliv = svcOf === "delivery";
+        if (action === "counter" && !seller && isDeliv && o.status === "quoted" && !o.agreed) {
+          const c = round(o.cur, Number(b.amount));
+          if (!(c > 0) || c > 1e10) fail("Enter the price you suggest.");
+          if (c >= o.total) fail("Suggest a lower price, or pay the price the delivery man asked.");
+          await db.run("UPDATE orders SET status = 'countered', counter = ?, agreed = 0, updated_at = ? WHERE id = ?", c, now(), o.id); return;
+        }
+        if (action === "agree" && seller && isDeliv && o.status === "countered") {
+          await db.run("UPDATE orders SET status = 'quoted', total = ?, unit_price = ?, commission = 0, agreed = 1, updated_at = ? WHERE id = ?", o.counter, round(o.cur, o.counter / o.qty), now(), o.id); return;
+        }
+        if (action === "quote" && seller && (o.status === "requested" || o.status === "accepted" || (isDeliv && o.status === "countered"))) {
           const total = round(o.cur, Number(b.amount));
           if (!(total > 0) || total > 1e10) fail("Enter the total price for this order.");
           const p = await db.get("SELECT * FROM products WHERE id = ?", o.product_id);
@@ -1202,7 +1216,7 @@ module.exports = function market(ctx) {
             if (commission >= total) fail(`The price must be more than the affiliate earning (${commission} ${o.cur}).`);
           }
           const name = String(b.name || "").trim().slice(0, 120) || o.product_name, desc = String(b.description || "").trim().slice(0, 600);
-          await db.run("UPDATE orders SET status = 'quoted', total = ?, unit_price = ?, commission = ?, product_name = ?, offer_desc = ?, updated_at = ? WHERE id = ?", total, round(o.cur, total / o.qty), commission, name, desc, now(), o.id);
+          await db.run("UPDATE orders SET status = 'quoted', total = ?, unit_price = ?, commission = ?, product_name = ?, offer_desc = ?, agreed = 0, updated_at = ? WHERE id = ?", total, round(o.cur, total / o.qty), commission, name, desc, now(), o.id);
           return;
         }
         if (action === "pay" && !seller && o.status === "quoted" && PAY_METHODS.includes(b.method) && b.method !== "wallet") {
@@ -1246,8 +1260,8 @@ module.exports = function market(ctx) {
           await ledger(u.id, o.cur, -o.total, "order_payment", o.ref, `${o.product_name} × ${o.qty}`);
           return await set("paid");
         }
-        if (action === "decline" && seller && ["requested", "accepted", "quoted"].includes(o.status)) { await set("declined"); fwd = await forward(o); return; }
-        if (action === "cancel" && !seller && ["requested", "accepted", "quoted"].includes(o.status)) return await set("cancelled");
+        if (action === "decline" && seller && ["requested", "accepted", "quoted", "countered"].includes(o.status)) { await set("declined"); fwd = await forward(o); return; }
+        if (action === "cancel" && !seller && ["requested", "accepted", "quoted", "countered"].includes(o.status)) return await set("cancelled");
         if (action === "deliver" && seller && o.status === "paid") return await set("delivered");
         // Safe payment: the money stays held until the admin releases it (after calling the customer).
         if (action === "received" && !seller && (o.status === "paid" || o.status === "delivered") && o.pay_method === "safe") {
@@ -2034,7 +2048,7 @@ module.exports = function market(ctx) {
   // The agency with the fewest open requests gets the next one (ties: a random one). Owners in skip are left out.
   async function pickAgency(skip) {
     const shops = (await travelShops()).filter(s => !skip.has(s.owner_id)); if (!shops.length) return null;
-    const busy = async s => (await db.get("SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND status IN ('requested', 'accepted', 'quoted')", s.id)).n;
+    const busy = async s => (await db.get("SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND status IN ('requested', 'accepted', 'quoted', 'countered')", s.id)).n;
     const scored = []; for (const s of shops) scored.push([Number(await busy(s)), Math.random(), s]);
     const s = scored.sort((a, b) => a[0] - b[0] || a[1] - b[1])[0][2], t = await ticketProduct(s);
     return { ...t, owner_id: s.owner_id, shop_name: s.name };
@@ -2076,7 +2090,7 @@ module.exports = function market(ctx) {
       const p = await courierProduct(s), row = await db.get(`${PROD_SELECT} WHERE p.id = ?`, p.id);
       if (!row || row.hidden || row.admin_hidden || PAUSES.includes(row.shop_pause)) continue;
       let pf = {}; try { pf = JSON.parse(s.profile || "{}"); } catch {}
-      const open = (await db.get("SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND status IN ('requested', 'accepted', 'quoted', 'paid')", s.id)).n;
+      const open = (await db.get("SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND status IN ('requested', 'accepted', 'quoted', 'countered', 'paid')", s.id)).n;
       out.push({ row, card: { product_id: p.id, name: s.name, shop_no: s.shop_no ?? null, area: row.description || "", city: pf.city || "", owner_id: s.owner_id, busy: Number(open) || 0 } });
     }
     return out;
@@ -2116,7 +2130,7 @@ module.exports = function market(ctx) {
       const o = await db.get(`${ORDER_SELECT} WHERE o.id = ?`, String(b.order_id));
       if (!o || (o.seller_id !== u.id && o.buyer_id !== u.id)) fail("Order not found.", 404);
       if (o.kind !== "buy" || !["paid", "delivered"].includes(o.status)) fail("Get a delivery man once the order is paid.");
-      if (await db.get("SELECT 1 AS x FROM orders WHERE for_order = ? AND status IN ('requested', 'accepted', 'quoted', 'awaiting_payment', 'paid', 'delivered', 'completed')", o.id)) fail("This order already has a delivery.");
+      if (await db.get("SELECT 1 AS x FROM orders WHERE for_order = ? AND status IN ('requested', 'accepted', 'quoted', 'countered', 'awaiting_payment', 'paid', 'delivered', 'completed')", o.id)) fail("This order already has a delivery.");
       buyerId = o.buyer_id; forOrder = o.id;
       let pf = {}; try { pf = JSON.parse(o.shop_profile || "{}"); } catch {}
       note = `Delivery for order ${o.ref}: ${o.product_name} × ${o.qty}. Pick up: ${from || [o.shop_name, pf.address, pf.city].filter(Boolean).join(", ")}. Deliver to: ${to || `${o.buyer_name} +252 ${o.buyer_phone}`}.`;

@@ -325,6 +325,9 @@ async function init() {
   await addColumn("orders", "pay_group", "TEXT NOT NULL DEFAULT ''");
   await addColumn("products", "out_of_stock", "INTEGER NOT NULL DEFAULT 0");
   await addColumn("orders", "for_order", "TEXT NOT NULL DEFAULT ''");
+  // Delivery price talks: the customer's suggested price, and whether the delivery man agreed to it.
+  await addColumn("orders", "counter", "REAL NOT NULL DEFAULT 0");
+  await addColumn("orders", "agreed", "INTEGER NOT NULL DEFAULT 0");
   await addColumn("users", "marketer_id", "INTEGER"); // the marketer who registered this merchant (marketing reward program)
   await addColumn("users", "lesson_done", "INTEGER NOT NULL DEFAULT 0"); // when the merchant finished the Learn 5PLUS lesson and the review // a delivery request: the order being delivered // the merchant marked it out of stock: shown, but can't be ordered // products bought together with one Safe payment
   await addColumn("orders", "safe_svc", "TEXT NOT NULL DEFAULT ''"); // Safe payment: the part whose admin received the money ('' = the main money processor) // Book: the date and time the customer chose ("2026-10-20 14:00")
