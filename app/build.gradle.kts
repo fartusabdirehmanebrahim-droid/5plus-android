@@ -26,14 +26,15 @@ plugins {
 
 android {
     namespace = "com.fiveplus.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.fiveplus.app"
         minSdk = 23
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // Google Play needs target SDK 35. Each GitHub build gets a higher version number (Play refuses the same one twice).
+        targetSdk = 35
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0) + 100
+        versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
 
         // Optional: put the address of your 5PLUS website here (the real app on your server) so the app always opens it.
         // Left as it is, the app asks on first launch: your website, or the demo built into the app.
@@ -46,11 +47,22 @@ android {
 
     buildFeatures { buildConfig = true }
 
+    // Google Play upload key. It comes from GitHub secrets (never from files in the repository):
+    // UPLOAD_KEYSTORE_B64 (the .jks file in base64), UPLOAD_KEYSTORE_PASSWORD, UPLOAD_KEY_ALIAS, UPLOAD_KEY_PASSWORD.
+    val ks = System.getenv("UPLOAD_KEYSTORE_FILE")
+    signingConfigs {
+        if (ks != null && file(ks).exists()) create("upload") {
+            storeFile = file(ks)
+            storePassword = System.getenv("UPLOAD_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("UPLOAD_KEY_ALIAS")
+            keyPassword = System.getenv("UPLOAD_KEY_PASSWORD")
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Uses the debug key so "Build APK" works straight away. Sign with your own key before publishing on Google Play.
-            signingConfig = signingConfigs.getByName("debug")
+            // With the upload key: ready for Google Play. Without it (local builds): the debug key, for testing only.
+            signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {

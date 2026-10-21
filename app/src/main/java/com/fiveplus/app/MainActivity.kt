@@ -248,7 +248,7 @@ class MainActivity : AppCompatActivity() {
             openWeb(demoUrl)
         })
         box.addView(text("To switch later: press and hold the 5PLUS icon → App info → Storage → Clear storage.", 13f, color = Color.parseColor("#7A8C87")))
-        setContentView(ScrollView(this).apply { addView(box) })
+        setContentView(ScrollView(this).apply { addView(box); fitsSystemWindows = true })
     }
 
     private fun button(label: String, onClick: () -> Unit) = Button(this).apply {
@@ -364,7 +364,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        setContentView(w)
+        // Android 15 draws apps edge to edge: keep the web app clear of the status bar, the navigation bar and the keyboard.
+        val frame = FrameLayout(this).apply { setBackgroundColor(Color.WHITE); addView(w, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) }
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(frame) { v, insets ->
+            val b = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.ime() or androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+            v.setPadding(b.left, b.top, b.right, b.bottom); androidx.core.view.WindowInsetsCompat.CONSUMED
+        }
+        setContentView(frame)
         w.loadUrl(url)
         checkDemoUpdate()
     }

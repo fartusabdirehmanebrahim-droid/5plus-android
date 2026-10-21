@@ -9,34 +9,36 @@ If they don't, the dialer opens with the code and they press call themselves.
 
 On a phone with two SIM cards, Android may ask which SIM to use unless a default SIM for calls is set in the phone's settings.
 
+## Links
+
+| What | Link |
+|---|---|
+| Download the Android app (always the newest) | https://github.com/fartusabdirehmanebrahim-droid/5plus-android/releases/download/app/5PLUS.apk |
+| Website | https://fiveplus.onrender.com |
+| Release page | https://github.com/fartusabdirehmanebrahim-droid/5plus-android/releases/tag/app |
+
+| Google Play file (AAB) | https://github.com/fartusabdirehmanebrahim-droid/5plus-android/releases/download/app/5PLUS.aab |
+
+Every change pushed to `main` builds a new APK and replaces `5PLUS.apk` on the release, so the download link above never changes.
+
+## Google Play
+
+`5PLUS.aab` is the file Google Play wants. It is signed with the 5PLUS **upload key**, stored here encrypted as
+`app/upload.jks.enc`. GitHub builds it only when the repository secret **PLAY_KEY_PASSWORD** is set
+(Settings → Secrets and variables → Actions → New repository secret). Keep the key file and its password safe:
+every update on Google Play must be signed with the same upload key. Each build has a higher version number automatically.
+
 ## What it opens
 
-On first launch the app asks:
+The app opens the 5PLUS website (`https://fiveplus.onrender.com`, set as `APP_URL` in `app/build.gradle.kts`).
+To use another address, change `APP_URL` there and push: GitHub builds the new APK.
 
-- **Open website**: type the address of your 5PLUS website (the real app on your server, with `https://`).
-- **Open the demo**: the whole app runs on the phone with sample accounts, like the demo page. Use this to test now.
+## How the APK is built
 
-To switch later: press and hold the 5PLUS icon → App info → Storage → Clear storage.
+GitHub builds it by itself: **Actions → Build APK** runs on every push to `main` (about 5 minutes),
+then publishes `5PLUS.apk` on the release **app** (link above). Each run also keeps the APK under **Artifacts** as `5PLUS-apk`.
 
-When your website is live, you can make the app always open it: in `app/build.gradle.kts` replace
-`https://your-5plus-website.com` with your address, then build again.
-
-## Get the APK (free, no programs to install): GitHub
-
-1. Make a free account on **github.com** and sign in.
-2. Press **+** (top right) → **New repository**. Name it `5plus-android`, choose **Private**, press **Create repository**.
-3. On the new page press **uploading an existing file**. Unzip `5PLUS-android.zip` on your computer, open the folder,
-   select **everything inside it** and drag it onto the page. Press **Commit changes**.
-4. The `.github` folder is hidden on some computers and may not upload. Check: open the **Actions** tab.
-   If it says "Get started with GitHub Actions", press **set up a workflow yourself**, name the file `build-apk.yml`,
-   paste the contents of `.github/workflows/build-apk.yml` from the zip, and press **Commit changes**.
-5. Open the **Actions** tab → **Build APK**. If a run fails, open it, press **build**, and read the last red lines.
-    After about 5 minutes the run turns green.
-   Open it, scroll to **Artifacts** and download **5PLUS-apk**. Inside the zip is `app-debug.apk`.
-6. Send `app-debug.apk` to your phone (WhatsApp to yourself, a cable, or Google Drive) and open it.
-   Android asks to allow installing from this source: allow it, then **Install**.
-
-Every time you upload changed files, GitHub builds a new APK.
+To install: open the download link on the Android phone, open the file, allow installing from this source if asked, then **Install**.
 
 ## Or build it on a computer: Android Studio
 

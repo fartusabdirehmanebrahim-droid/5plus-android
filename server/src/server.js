@@ -277,6 +277,27 @@ route("POST", "/api/auth/check-pin", async (req, res) => {
 });
 
 route("POST", "/api/auth/logout", async (req, res) => { endSession(res); send(res, 200, { ok: true }); });
+// A customer or merchant deletes their account (needed for Google Play). Money must be taken out first and no order may
+// be open. The person's details are removed; payment records stay (with the name removed) because the law needs them.
+route("POST", "/api/me/delete", async (req, res) => {
+  const u = await loadUser(req); if (!u) fail("Log in first.", 401);
+  if (u.role !== "customer") fail("Staff accounts are removed by the super admin.", 403);
+  const b = await readJson(req); await needPin(u, b.pin);
+  for (const cur of CURS) {
+    const w = Number((await db.get("SELECT COALESCE(SUM(amount),0) AS b FROM wallet_tx WHERE user_id = ? AND cur = ?", u.id, cur)).b) || 0;
+    const e = Number((await db.get("SELECT COALESCE(SUM(amount),0) AS b FROM earnings WHERE user_id = ? AND cur = ?", u.id, cur)).b) || 0;
+    if (w > 0.004) fail("Your wallet still has money. Send it out first, then delete your account.");
+    if (e > 0.004) fail("You still have earnings. Withdraw them first, then delete your account.");
+  }
+  const open = await db.get("SELECT COUNT(*) AS n FROM orders WHERE (buyer_id = ? OR seller_id = ?) AND status IN ('requested','accepted','quoted','countered','awaiting_payment','paid','delivered')", u.id, u.id);
+  if (Number(open.n) > 0) fail("You have orders that are not finished. Finish or cancel them first, then delete your account.");
+  if (u.face) { try { await db.files.del(u.face); } catch {} }
+  await db.run("UPDATE users SET name = 'Deleted account', phone = ?, pin_hash = '', wallets = '{}', face = '', suspended = 1, token_version = token_version + 1 WHERE id = ?", "deleted-" + u.id, u.id);
+  await db.run("DELETE FROM push_tokens WHERE user_id = ?", u.id);
+  const shop = await db.get("SELECT id FROM shops WHERE owner_id = ?", u.id);
+  if (shop) { await db.run("UPDATE shops SET suspended = 1, profile = '{}' WHERE id = ?", shop.id); await db.run("UPDATE products SET hidden = 1 WHERE shop_id = ?", shop.id); }
+  endSession(res); send(res, 200, { ok: true });
+});
 route("GET", "/api/me", async (req, res) => {
   const u = await loadUser(req);
   const staff = u && u.role !== "customer";

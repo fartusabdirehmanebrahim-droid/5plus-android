@@ -1624,7 +1624,16 @@
     "Types of delivery you do": "Noocyada gaarsiinta aad samayso",
     "Choose at least one type of delivery.": "Dooro ugu yaraan hal nooc oo gaarsiin ah.",
     "No delivery man of this type is available right now. Choose another type or try again later.": "Hadda nin gaarsiiya oo noocan ah ma jiro. Dooro nooc kale ama mar dambe isku day.",
-    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "Alaab marka ay dhammaato u calaamadee Wuu dhammaaday, si macaamiishu aysan u dalban. Riix Waa la helayaa mar kale marka aad haysato."
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "Alaab marka ay dhammaato u calaamadee Wuu dhammaaday, si macaamiishu aysan u dalban. Riix Waa la helayaa mar kale marka aad haysato.",
+    "Privacy policy": "Siyaasadda asturnaanta",
+    "Delete my account": "Tirtir akoonkayga",
+    "Delete your account?": "Ma tirtirtaa akoonkaaga?",
+    "Your name, phone number, wallet numbers and photo are removed and you can't log in again. This can't be undone.": "Magacaaga, lambarka taleefanka, lambarada jeebka iyo sawirka waa la tirtirayaa, mar dambena ma geli kartid. Dib looma celin karo.",
+    "Your account was deleted.": "Akoonkaaga waa la tirtiray.",
+    "Your wallet still has money. Send it out first, then delete your account.": "Jeebkaagu weli lacag ayuu leeyahay. Marka hore dir, kadib tirtir akoonkaaga.",
+    "You still have earnings. Withdraw them first, then delete your account.": "Weli dakhli ayaad leedahay. Marka hore la bax, kadib tirtir akoonkaaga.",
+    "You have orders that are not finished. Finish or cancel them first, then delete your account.": "Waxaad leedahay dalabyo aan dhammaan. Marka hore dhammee ama jooji, kadib tirtir akoonkaaga.",
+    "Staff accounts are removed by the super admin.": "Akoonnada shaqaalaha waxaa tirtira maamulaha sare."
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "Bandhig sawir wuxuu yeelan karaa ilaa {0} sawir.",

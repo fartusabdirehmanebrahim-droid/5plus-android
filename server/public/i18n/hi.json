@@ -1625,7 +1625,16 @@
     "Types of delivery you do": "आप किस तरह की डिलीवरी करते हैं",
     "Choose at least one type of delivery.": "कम से कम एक डिलीवरी प्रकार चुनें।",
     "No delivery man of this type is available right now. Choose another type or try again later.": "इस प्रकार का कोई डिलीवरी मैन अभी उपलब्ध नहीं है। दूसरा प्रकार चुनें या बाद में कोशिश करें।",
-    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "प्रोडक्ट ख़त्म होने पर उसे स्टॉक ख़त्म चिह्नित करें, ताकि ग्राहक उसे ऑर्डर न कर सकें। फिर से आने पर फिर से स्टॉक में दबाएँ।"
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "प्रोडक्ट ख़त्म होने पर उसे स्टॉक ख़त्म चिह्नित करें, ताकि ग्राहक उसे ऑर्डर न कर सकें। फिर से आने पर फिर से स्टॉक में दबाएँ।",
+    "Privacy policy": "गोपनीयता नीति",
+    "Delete my account": "मेरा खाता हटाएँ",
+    "Delete your account?": "अपना खाता हटाएँ?",
+    "Your name, phone number, wallet numbers and photo are removed and you can't log in again. This can't be undone.": "आपका नाम, फ़ोन नंबर, वॉलेट नंबर और फ़ोटो हटा दिए जाएँगे और आप फिर लॉग इन नहीं कर पाएँगे। इसे वापस नहीं किया जा सकता।",
+    "Your account was deleted.": "आपका खाता हटा दिया गया।",
+    "Your wallet still has money. Send it out first, then delete your account.": "आपके वॉलेट में अभी पैसे हैं। पहले उन्हें भेजें, फिर खाता हटाएँ।",
+    "You still have earnings. Withdraw them first, then delete your account.": "आपकी कमाई अभी बाकी है। पहले उसे निकालें, फिर खाता हटाएँ।",
+    "You have orders that are not finished. Finish or cancel them first, then delete your account.": "आपके कुछ ऑर्डर पूरे नहीं हुए हैं। पहले उन्हें पूरा या रद्द करें, फिर खाता हटाएँ।",
+    "Staff accounts are removed by the super admin.": "स्टाफ़ खाते सुपर एडमिन हटाते हैं।"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "एक गैलरी में {0} फ़ोटो तक हो सकती हैं।",

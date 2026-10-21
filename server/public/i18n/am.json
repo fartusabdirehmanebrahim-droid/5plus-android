@@ -1625,7 +1625,16 @@
     "Types of delivery you do": "የሚሰሩት የማድረሻ አይነቶች",
     "Choose at least one type of delivery.": "ቢያንስ አንድ የማድረሻ አይነት ይምረጡ።",
     "No delivery man of this type is available right now. Choose another type or try again later.": "የዚህ አይነት አድራሽ አሁን የለም። ሌላ አይነት ይምረጡ ወይም ቆይተው ይሞክሩ።",
-    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "ዕቃ ሲያልቅ ደንበኞች እንዳያዝዙት አልቋል ብለው ምልክት ያድርጉ። እንደገና ሲኖርዎት እንደገና አለ ይጫኑ።"
+    "Mark a product Out of stock when it runs out, so customers can't order it. Press Back in stock when you have it again.": "ዕቃ ሲያልቅ ደንበኞች እንዳያዝዙት አልቋል ብለው ምልክት ያድርጉ። እንደገና ሲኖርዎት እንደገና አለ ይጫኑ።",
+    "Privacy policy": "የግላዊነት መመሪያ",
+    "Delete my account": "መለያዬን ሰርዝ",
+    "Delete your account?": "መለያዎን ይሰርዙ?",
+    "Your name, phone number, wallet numbers and photo are removed and you can't log in again. This can't be undone.": "ስምዎ፣ ስልክ ቁጥርዎ፣ የዋሌት ቁጥሮችዎ እና ፎቶዎ ይሰረዛሉ፣ እንደገና መግባት አይችሉም። ይህ አይቀለበስም።",
+    "Your account was deleted.": "መለያዎ ተሰርዟል።",
+    "Your wallet still has money. Send it out first, then delete your account.": "ዋሌትዎ አሁንም ገንዘብ አለው። መጀመሪያ ይላኩት፣ ከዚያ መለያዎን ይሰርዙ።",
+    "You still have earnings. Withdraw them first, then delete your account.": "አሁንም ገቢ አለዎት። መጀመሪያ ያውጡት፣ ከዚያ መለያዎን ይሰርዙ።",
+    "You have orders that are not finished. Finish or cancel them first, then delete your account.": "ያልተጠናቀቁ ትዕዛዞች አሉዎት። መጀመሪያ ያጠናቅቁ ወይም ይሰርዙ፣ ከዚያ መለያዎን ይሰርዙ።",
+    "Staff accounts are removed by the super admin.": "የሰራተኛ መለያዎችን ዋና አስተዳዳሪው ያስወግዳል።"
   },
   "patterns": {
     "A gallery can have up to {0} photos.": "አንድ ጋለሪ እስከ {0} ፎቶዎች ሊኖሩት ይችላል።",

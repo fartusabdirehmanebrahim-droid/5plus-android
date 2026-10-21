@@ -1,16 +1,20 @@
-# Builds the 5PLUS APK on GitHub's computers every time you upload changes (or when you press "Run workflow").
-# Download it from the Actions tab → the latest run → Artifacts → 5PLUS-apk.
-# It finds the app folder by itself, so it works whether the files are at the top of the repository or inside a folder.
+# Builds 5PLUS on GitHub's computers every time you upload changes (or when you press "Run workflow"):
+# - 5PLUS.apk: install it straight on a phone (permanent link below).
+# - 5PLUS.aab: the Google Play format, signed with the 5PLUS upload key. Built only when the secret
+#   PLAY_KEY_PASSWORD is set (Settings → Secrets and variables → Actions). The key itself is app/upload.jks.enc,
+#   encrypted with that password, so it is useless without it.
 name: Build APK
 on:
   push:
   workflow_dispatch:
-# Needed to put the APK on the public download page (Releases).
+# Needed to put the files on the public download page (Releases).
 permissions:
   contents: write
 jobs:
   build:
     runs-on: ubuntu-24.04
+    env:
+      PLAY_KEY_PASSWORD: ${{ secrets.PLAY_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -20,32 +24,56 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Build
+      - name: Build APK
         run: |
           FOUND=$(find . -name settings.gradle.kts -not -path "./.git/*" | head -1)
           if [ -z "$FOUND" ]; then
             echo "::error::The app files are missing. Upload everything inside the android folder (app, gradle, settings.gradle.kts, build.gradle.kts, gradle.properties)."
-            find . -not -path "./.git/*" | head -60
             exit 1
           fi
           cd "$(dirname "$FOUND")"
-          echo "Building in $(pwd)"
-          ls -la
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           gradle --no-daemon --stacktrace assembleDebug
+      - name: Build Google Play bundle (AAB)
+        if: env.PLAY_KEY_PASSWORD != ''
+        run: |
+          cd "$(dirname "$(find . -name settings.gradle.kts -not -path "./.git/*" | head -1)")"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in app/upload.jks.enc -out "$RUNNER_TEMP/upload.jks" -pass env:PLAY_KEY_PASSWORD
+          export UPLOAD_KEYSTORE_FILE="$RUNNER_TEMP/upload.jks" UPLOAD_KEYSTORE_PASSWORD="$PLAY_KEY_PASSWORD" UPLOAD_KEY_ALIAS=upload UPLOAD_KEY_PASSWORD="$PLAY_KEY_PASSWORD"
+          gradle --no-daemon --stacktrace bundleRelease
+          rm -f "$RUNNER_TEMP/upload.jks"
       - uses: actions/upload-artifact@v4
         with:
           name: 5PLUS-apk
           path: "**/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
-      # A permanent public download link (no GitHub account needed), replaced by every new build of main:
-      # https://github.com/<owner>/<repo>/releases/download/app/5PLUS.apk
-      - name: Publish the download link
+      - uses: actions/upload-artifact@v4
+        if: env.PLAY_KEY_PASSWORD != ''
+        with:
+          name: 5PLUS-aab
+          path: "**/app/build/outputs/bundle/release/*.aab"
+          if-no-files-found: error
+      # Permanent public download links (no GitHub account needed), replaced by every new build of main:
+      # https://github.com/<owner>/<repo>/releases/download/app/5PLUS.apk  (and 5PLUS.aab for Google Play)
+      - name: Publish the download links
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           APK=$(find . -path "*/app/build/outputs/apk/debug/*.apk" | head -1)
           cp "$APK" 5PLUS.apk
-          gh release view app >/dev/null 2>&1 || gh release create app --title "5PLUS app" --notes "Download 5PLUS.apk on your Android phone and open it to install. If asked, allow installing from this source." --latest
+          gh release view app >/dev/null 2>&1 || gh release create app --title "5PLUS app" --notes "5PLUS app" --latest
           gh release upload app 5PLUS.apk --clobber
+          AAB=$(find . -path "*/app/build/outputs/bundle/release/*.aab" | head -1)
+          if [ -n "$AAB" ]; then cp "$AAB" 5PLUS.aab; gh release upload app 5PLUS.aab --clobber; fi
+          R="https://github.com/${{ github.repository }}/releases/download/app"
+          {
+            echo "Download **5PLUS.apk** below on your Android phone and open it to install. If asked, allow installing from this source."
+            echo
+            echo "- Phone install (APK, always the newest): $R/5PLUS.apk"
+            if [ -n "$AAB" ]; then echo "- Google Play upload (AAB, version $GITHUB_RUN_NUMBER + 100): $R/5PLUS.aab"; else echo "- Google Play file (AAB): add the secret PLAY_KEY_PASSWORD to build it."; fi
+            echo "- Website: https://fiveplus.onrender.com"
+            echo
+            echo "Built from ${GITHUB_SHA::7} on $(date -u +%Y-%m-%d)."
+          } > notes.md
+          gh release edit app --notes-file notes.md

@@ -1320,3 +1320,4 @@ img, video, iframe{max-width:100%}
 .veh-chip[aria-pressed="true"],.veh-chip[aria-checked="true"]{background:var(--green);border-color:var(--green);color:#fff}
 .veh-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .veh{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--usd-soft);color:var(--ink-2)}
+.del-acc{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 2px 12px;font-size:13px}.del-acc a{color:var(--ink-2)}.linkish{background:none;border:0;padding:6px 0;color:var(--danger);font:600 13px/1.2 var(--body);cursor:pointer;text-decoration:underline}
