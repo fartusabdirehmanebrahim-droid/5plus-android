@@ -1229,16 +1229,7 @@ function vMe() {
     ${S.user.account_type === "merchant" ? `<div class="leg"><div class="sum-row"><span>Account type</span><b>Merchant</b></div></div>` : `<div class="leg"><b style="font-family:var(--display)">Want to sell in Suuq?</b><p class="note" style="margin:0">Register as a merchant with your shop or company details.</p><button class="btn btn-merchant btn-block" id="become-merchant">${SUUQ_ICONS.shop}Become a merchant</button></div>`}
     ${tonePicker()}
     <button class="btn btn-ghost btn-block" id="logout">Log out</button>
-    ${S.user.role === "customer" ? `<div class="del-acc"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a><button class="linkish" id="del-acc">Delete my account</button></div>` : ""}`;
-}
-// Delete the account (Google Play asks for this). The server checks the PIN, that no money is left and no order is open.
-async function deleteAccount() {
-  const pin = await askPin("Delete your account?", "Your name, phone number, wallet numbers and photo are removed and you can't log in again. This can't be undone.");
-  if (!pin) return;
-  try { await api("/api/me/delete", { body: { pin } }); }
-  catch (e) { alert(SarrifI18n?.t ? SarrifI18n.t(e.message) : e.message); return; }
-  rememberMe(null); S.user = null; S.screen = "welcome"; S.sheet = null; if (es) { es.close(); es = null; } render();
-  alert(SarrifI18n?.t ? SarrifI18n.t("Your account was deleted.") : "Your account was deleted.");
+    <div class="del-acc"><a href="https://fiveplus.onrender.com/privacy.html" target="_blank" rel="noopener">Privacy policy</a></div>`;
 }
 // Alarm ringtone: 40 to choose from; ▶ plays it. Saved on this phone.
 function tonePicker() {
@@ -1379,7 +1370,6 @@ function bind() {
     catch (e) { document.getElementById("w-msg").textContent = e.message; }
   });
   click("logout", logout);
-  click("del-acc", deleteAccount);
 }
 async function doLogin() {
   S.busy = true; render();

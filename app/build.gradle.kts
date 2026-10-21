@@ -47,8 +47,7 @@ android {
 
     buildFeatures { buildConfig = true }
 
-    // Google Play upload key. It comes from GitHub secrets (never from files in the repository):
-    // UPLOAD_KEYSTORE_B64 (the .jks file in base64), UPLOAD_KEYSTORE_PASSWORD, UPLOAD_KEY_ALIAS, UPLOAD_KEY_PASSWORD.
+    // Release signing comes from the build environment.
     val ks = System.getenv("UPLOAD_KEYSTORE_FILE")
     signingConfigs {
         if (ks != null && file(ks).exists()) create("upload") {

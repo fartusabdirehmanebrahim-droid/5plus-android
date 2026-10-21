@@ -23,10 +23,7 @@ Every change pushed to `main` builds a new APK and replaces `5PLUS.apk` on the r
 
 ## Google Play
 
-`5PLUS.aab` is the file Google Play wants. It is signed with the 5PLUS **upload key**, stored here encrypted as
-`app/upload.jks.enc`. GitHub builds it only when the repository secret **PLAY_KEY_PASSWORD** is set
-(Settings → Secrets and variables → Actions → New repository secret). Keep the key file and its password safe:
-every update on Google Play must be signed with the same upload key. Each build has a higher version number automatically.
+`5PLUS.aab` is the file to upload to Google Play. Each build has a higher version number automatically.
 
 ## What it opens
 

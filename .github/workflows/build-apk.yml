@@ -1,8 +1,6 @@
 # Builds 5PLUS on GitHub's computers every time you upload changes (or when you press "Run workflow"):
 # - 5PLUS.apk: install it straight on a phone (permanent link below).
-# - 5PLUS.aab: the Google Play format, signed with the 5PLUS upload key. Built only when the secret
-#   PLAY_KEY_PASSWORD is set (Settings → Secrets and variables → Actions). The key itself is app/upload.jks.enc,
-#   encrypted with that password, so it is useless without it.
+# - 5PLUS.aab: the Google Play format (built when the repository is set up for it).
 name: Build APK
 on:
   push:
@@ -71,7 +69,7 @@ jobs:
             echo "Download **5PLUS.apk** below on your Android phone and open it to install. If asked, allow installing from this source."
             echo
             echo "- Phone install (APK, always the newest): $R/5PLUS.apk"
-            if [ -n "$AAB" ]; then echo "- Google Play upload (AAB, version $GITHUB_RUN_NUMBER + 100): $R/5PLUS.aab"; else echo "- Google Play file (AAB): add the secret PLAY_KEY_PASSWORD to build it."; fi
+            if [ -n "$AAB" ]; then echo "- Google Play upload (AAB): $R/5PLUS.aab"; fi
             echo "- Website: https://fiveplus.onrender.com"
             echo
             echo "Built from ${GITHUB_SHA::7} on $(date -u +%Y-%m-%d)."
